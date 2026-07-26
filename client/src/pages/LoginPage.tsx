@@ -41,58 +41,58 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-slate-950">
-      <div className="max-w-md w-full space-y-8 p-8 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-xl shadow-2xl">
+    <div className="min-h-[85vh] flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-slate-50">
+      <div className="max-w-md w-full space-y-8 p-8 rounded-2xl bg-white border border-slate-200 shadow-sm">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 mb-4">
             <Shield className="w-6 h-6" />
           </div>
-          <h2 className="text-3xl font-extrabold text-white">Welcome back</h2>
-          <p className="mt-2 text-sm text-slate-400">Sign in to your PatentHub AI account</p>
+          <h2 className="text-2xl font-bold text-slate-900">Welcome Back</h2>
+          <p className="mt-1.5 text-sm text-slate-500">Sign in to your PatentHub AI account</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Email or Username</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email or Username</label>
               <div className="relative">
-                <UserIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <UserIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   {...register('emailOrUsername')}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition-all text-sm font-medium"
                   placeholder="email@domain.com or username"
                 />
               </div>
-              {errors.emailOrUsername && <p className="mt-1 text-xs text-rose-400">{errors.emailOrUsername.message}</p>}
+              {errors.emailOrUsername && <p className="mt-1 text-xs text-rose-600">{errors.emailOrUsername.message}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Lock className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
                   {...register('password')}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition-all text-sm font-medium"
                   placeholder="••••••••"
                 />
               </div>
-              {errors.password && <p className="mt-1 text-xs text-rose-400">{errors.password.message}</p>}
+              {errors.password && <p className="mt-1 text-xs text-rose-600">{errors.password.message}</p>}
             </div>
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3 px-4 rounded-xl font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 px-4 rounded-xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'} <ArrowRight className="w-4 h-4" />
           </button>
 
-          <p className="text-center text-xs text-slate-400">
+          <p className="text-center text-xs text-slate-500">
             Don't have an account?{' '}
-            <Link to="/register" className="font-semibold text-indigo-400 hover:underline">
+            <Link to="/register" className="font-semibold text-blue-600 hover:underline">
               Create one now
             </Link>
           </p>

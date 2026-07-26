@@ -72,22 +72,24 @@ export const DashboardLayout: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex overflow-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex overflow-hidden">
       {/* Sidebar */}
       <aside
         className={`${
           collapsed ? 'w-20' : 'w-64'
-        } bg-slate-900 border-r border-slate-800 transition-all duration-300 flex flex-col fixed inset-y-0 left-0 z-40 md:relative`}
+        } bg-white border-r border-slate-200 transition-all duration-300 flex flex-col fixed inset-y-0 left-0 z-40 md:relative`}
       >
         {/* Sidebar Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
-          <Link to="/dashboard" className="flex items-center gap-2 font-bold text-indigo-400 overflow-hidden">
-            <Shield className="w-7 h-7 shrink-0 text-indigo-400" />
-            {!collapsed && <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent text-lg">PatentHub</span>}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200">
+          <Link to="/dashboard" className="flex items-center gap-2 font-bold text-slate-900 overflow-hidden">
+            <div className="p-1.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 shrink-0">
+              <Shield className="w-5 h-5" />
+            </div>
+            {!collapsed && <span className="text-lg">PatentHub <span className="text-blue-600">AI</span></span>}
           </Link>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+            className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
           >
             <ChevronLeft className={`w-5 h-5 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
           </button>
@@ -104,8 +106,8 @@ export const DashboardLayout: React.FC = () => {
                 to={item.path}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all ${
                   isActive
-                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-semibold'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200 font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <Icon className="w-5 h-5 shrink-0" />
@@ -116,17 +118,17 @@ export const DashboardLayout: React.FC = () => {
         </nav>
 
         {/* User Footer */}
-        <div className="p-3 border-t border-slate-800 flex items-center justify-between">
+        <div className="p-3 border-t border-slate-200 flex items-center justify-between">
           {!collapsed && user && (
             <div className="overflow-hidden pr-2">
-              <p className="text-sm font-semibold text-white truncate">{user.fullName}</p>
-              <p className="text-xs text-indigo-400 truncate font-medium">{user.role}</p>
+              <p className="text-sm font-bold text-slate-900 truncate">{user.fullName}</p>
+              <p className="text-xs text-blue-600 truncate font-semibold">{user.role}</p>
             </div>
           )}
           <button
             onClick={handleLogout}
             title="Log Out"
-            className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
           >
             <LogOut className="w-5 h-5" />
           </button>
@@ -136,15 +138,15 @@ export const DashboardLayout: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <header className="h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30">
+        <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30">
           <div className="flex items-center gap-4">
-            <h1 className="text-lg font-bold text-slate-200">
+            <h1 className="text-lg font-bold text-slate-900">
               {navItems.find((n) => n.path === location.pathname)?.label || 'Patent Workspace'}
             </h1>
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-xs px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-semibold">
+            <span className="text-xs px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-semibold">
               Role: {user?.role || 'User'}
             </span>
           </div>
