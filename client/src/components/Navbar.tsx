@@ -4,26 +4,34 @@ import { LogIn, FileText, Cpu, ArrowRight } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   return (
-    <nav className="border-b border-[#dadce0] bg-white sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 bg-white border-b border-[#dadce0]">
+      {/* Google 4-Color Top Stripe */}
+      <div className="h-1 w-full flex">
+        <div className="h-full w-1/4 bg-[#4285F4]"></div>
+        <div className="h-full w-1/4 bg-[#EA4335]"></div>
+        <div className="h-full w-1/4 bg-[#FBBC05]"></div>
+        <div className="h-full w-1/4 bg-[#34A853]"></div>
+      </div>
+
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2 text-xl font-bold tracking-tight text-[#202124]">
-            {/* Google 4-Color Dots Icon */}
+            {/* Google Logo Dot Icon */}
             <div className="flex items-center gap-1 p-1.5 rounded-lg bg-[#f8f9fa] border border-[#dadce0]">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#1a73e8]"></span>
-              <span className="w-2.5 h-2.5 rounded-full bg-[#ea4335]"></span>
-              <span className="w-2.5 h-2.5 rounded-full bg-[#fbbc04]"></span>
-              <span className="w-2.5 h-2.5 rounded-full bg-[#34a853]"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#4285F4]"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#EA4335]"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FBBC05]"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#34A853]"></span>
             </div>
-            <span className="font-semibold text-lg">
-              <span className="text-[#1a73e8]">P</span>
-              <span className="text-[#ea4335]">a</span>
-              <span className="text-[#fbbc04]">t</span>
-              <span className="text-[#34a853]">e</span>
-              <span className="text-[#1a73e8]">n</span>
-              <span className="text-[#ea4335]">t</span>
+            <span className="font-medium text-lg">
+              <span className="text-[#4285F4]">P</span>
+              <span className="text-[#EA4335]">a</span>
+              <span className="text-[#FBBC05]">t</span>
+              <span className="text-[#34A853]">e</span>
+              <span className="text-[#4285F4]">n</span>
+              <span className="text-[#EA4335]">t</span>
               <span className="text-[#202124] ml-1">Hub</span>
-              <span className="text-[#1a73e8] font-normal text-sm ml-1.5 px-2 py-0.5 rounded-full bg-[#e8f0fe] border border-[#c2e7ff]">AI</span>
+              <span className="text-[#1a73e8] font-normal text-xs ml-2 px-2.5 py-0.5 rounded-full bg-[#e8f0fe] border border-[#c2e7ff]">AI Workspace</span>
             </span>
           </Link>
 
@@ -35,7 +43,7 @@ export const Navbar: React.FC = () => {
             </Link>
             <Link to="/ai-assistant" className="flex items-center gap-1.5 hover:text-[#1a73e8] transition-colors">
               <Cpu className="w-4 h-4 text-[#1a73e8]" />
-              AI Workspace
+              AI Assistant
             </Link>
           </div>
 
@@ -55,7 +63,7 @@ export const Navbar: React.FC = () => {
             </Link>
           </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 };
