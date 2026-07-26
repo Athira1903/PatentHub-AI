@@ -8,18 +8,54 @@ import toast from 'react-hot-toast';
 import { Lock, Mail, User as UserIcon, Building, AtSign, ArrowRight } from 'lucide-react';
 import { api } from '../services/api';
 
-const registerSchema = z.object({
-  fullName: z.string().min(2, 'Full name must be at least 2 characters'),
-  username: z.string().min(3, 'Username must be at least 3 characters').regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'),
-  email: z.string().email('Please enter a valid email address'),
-  institution: z.string().optional(),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string().min(6, 'Please confirm your password'),
-  role: z.enum(['Inventor', 'Guide', 'CoInventor', 'PatentExpert', 'Admin']),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
+const RESERVED_USERNAMES = [
+  'admin',
+  'administrator',
+  'root',
+  'system',
+  'patenthub',
+  'guest',
+  'support',
+  'null',
+  'undefined',
+  'api',
+  'help',
+  'user',
+];
+
+const registerSchema = z
+  .object({
+    fullName: z
+      .string()
+      .trim()
+      .min(2, 'Full name must be at least 2 characters')
+      .max(100, 'Full name cannot exceed 100 characters')
+      .regex(/^[a-zA-Z\s'-]+$/, 'Full name can only contain letters, spaces, hyphens, and apostrophes'),
+    username: z
+      .string()
+      .trim()
+      .min(3, 'Username must be at least 3 characters')
+      .max(30, 'Username cannot exceed 30 characters')
+      .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores')
+      .refine((val) => !RESERVED_USERNAMES.includes(val.toLowerCase()), {
+        message: 'This username is reserved and cannot be used',
+      }),
+    email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
+    institution: z.string().optional(),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/[A-Z]/, 'Password must contain at least 1 uppercase letter')
+      .regex(/[a-z]/, 'Password must contain at least 1 lowercase letter')
+      .regex(/[0-9]/, 'Password must contain at least 1 number')
+      .regex(/[^a-zA-Z0-9]/, 'Password must contain at least 1 special character (!@#$%^&*)'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+    role: z.enum(['Inventor', 'Guide', 'CoInventor', 'PatentExpert', 'Admin']),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
@@ -142,6 +178,7 @@ export const RegisterPage: React.FC = () => {
                   placeholder="••••••••"
                 />
               </div>
+              <p className="text-[10px] text-slate-400 mt-1 font-medium">Min 8 chars: 1 upper, 1 lower, 1 number, 1 symbol</p>
               {errors.password && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.password.message}</p>}
             </div>
 
