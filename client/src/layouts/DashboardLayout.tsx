@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Shield,
   LayoutDashboard,
   FolderKanban,
   FileText,
@@ -72,32 +71,35 @@ export const DashboardLayout: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-[#202124] flex flex-col overflow-hidden">
-      {/* Sleek Blue Accent Border */}
-      <div className="h-1 w-full bg-gradient-to-r from-[#1a73e8] to-[#0b57d0] sticky top-0 z-50"></div>
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col overflow-hidden">
+      {/* Sleek Gradient Accent Border */}
+      <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-cyan-500 to-indigo-600 sticky top-0 z-50"></div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside
           className={`${
             collapsed ? 'w-20' : 'w-64'
-          } bg-white border-r border-[#dadce0] transition-all duration-300 flex flex-col fixed inset-y-0 left-0 z-40 md:relative`}
+          } bg-white border-r border-slate-200 transition-all duration-300 flex flex-col fixed inset-y-0 left-0 z-40 md:relative`}
         >
           {/* Sidebar Header */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-[#dadce0]">
-            <Link to="/dashboard" className="flex items-center gap-2 font-bold text-[#202124] overflow-hidden">
-              <div className="p-1.5 rounded-xl bg-[#e8f0fe] border border-[#c2e7ff] text-[#1a73e8] shrink-0">
-                <Shield className="w-5 h-5" />
+          <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200">
+            <Link to="/dashboard" className="flex items-center gap-2.5 font-bold text-slate-900 overflow-hidden">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 text-white shadow-md shadow-blue-500/20 shrink-0">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+                </svg>
               </div>
               {!collapsed && (
-                <span className="font-bold text-lg text-[#202124]">
-                  PatentHub <span className="text-[#1a73e8]">AI</span>
+                <span className="font-bold text-lg text-slate-900">
+                  PatentHub <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600">AI</span>
                 </span>
               )}
             </Link>
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="hidden md:flex p-1.5 rounded-full text-[#5f6368] hover:bg-[#f1f3f4] transition-colors"
+              className="hidden md:flex p-1.5 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
             >
               <ChevronLeft className={`w-5 h-5 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
             </button>
@@ -107,7 +109,7 @@ export const DashboardLayout: React.FC = () => {
           <div className="p-4">
             <Link
               to="/dashboard/create-project"
-              className={`flex items-center justify-center gap-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-xl shadow-sm transition-all font-semibold text-sm ${
+              className={`flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-md shadow-blue-500/20 transition-all font-bold text-sm ${
                 collapsed ? 'p-3' : 'px-4 py-3'
               }`}
             >
@@ -125,13 +127,13 @@ export const DashboardLayout: React.FC = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-r-full font-medium text-sm transition-all ${
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-r-xl font-medium text-sm transition-all ${
                     isActive
-                      ? 'bg-[#e8f0fe] text-[#1a73e8] font-semibold'
-                      : 'text-[#3c4043] hover:bg-[#f1f3f4]'
+                      ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-bold border-r-4 border-blue-600'
+                      : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-[#1a73e8]' : 'text-[#5f6368]'}`} />
+                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-500'}`} />
                   {!collapsed && <span>{item.label}</span>}
                 </Link>
               );
@@ -139,17 +141,17 @@ export const DashboardLayout: React.FC = () => {
           </nav>
 
           {/* User Footer */}
-          <div className="p-3 border-t border-[#dadce0] flex items-center justify-between">
+          <div className="p-3 border-t border-slate-200 flex items-center justify-between">
             {!collapsed && user && (
               <div className="overflow-hidden pr-2">
-                <p className="text-sm font-bold text-[#202124] truncate">{user.fullName}</p>
-                <p className="text-xs text-[#1a73e8] truncate font-semibold">{user.role}</p>
+                <p className="text-sm font-bold text-slate-900 truncate">{user.fullName}</p>
+                <p className="text-xs text-blue-600 truncate font-semibold">{user.role}</p>
               </div>
             )}
             <button
               onClick={handleLogout}
               title="Log Out"
-              className="p-2 rounded-full text-[#5f6368] hover:text-[#ea4335] hover:bg-[#fce8e6] transition-colors"
+              className="p-2 rounded-full text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -159,20 +161,20 @@ export const DashboardLayout: React.FC = () => {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Top Navbar */}
-          <header className="h-16 bg-white border-b border-[#dadce0] px-6 flex items-center justify-between sticky top-0 z-30">
+          <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30">
             <div className="flex items-center gap-4 flex-1 max-w-xl">
               <div className="relative w-full">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5f6368]" />
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search patent claims, projects, specifications..."
-                  className="w-full pl-10 pr-4 py-2 bg-[#f1f3f4] hover:bg-white border border-transparent hover:border-[#dadce0] focus:bg-white focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-full text-xs text-[#202124] transition-all font-medium"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-100 hover:bg-white border border-transparent hover:border-slate-300 focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-full text-xs text-slate-900 transition-all font-medium"
                 />
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              <span className="text-xs px-3 py-1 rounded-full bg-[#e8f0fe] border border-[#c2e7ff] text-[#0b57d0] font-semibold">
+              <span className="text-xs px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-semibold">
                 Role: {user?.role || 'User'}
               </span>
             </div>
