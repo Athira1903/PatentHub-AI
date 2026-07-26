@@ -17,7 +17,7 @@ import { ProfilePage } from './pages/ProfilePage';
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      <div className="min-h-screen bg-[#f8f9fa] text-[#202124] flex flex-col font-sans">
         <Routes>
           {/* Public Routes */}
           <Route
@@ -74,9 +74,10 @@ export const App: React.FC = () => {
           position="top-right"
           toastOptions={{
             style: {
-              background: '#0f172a',
-              color: '#f8fafc',
-              border: '1px solid #1e293b',
+              background: '#ffffff',
+              color: '#202124',
+              border: '1px solid #dadce0',
+              boxShadow: '0 2px 6px rgba(60,64,67,0.15)',
             },
           }}
         />
