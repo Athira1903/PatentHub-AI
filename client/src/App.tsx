@@ -8,6 +8,8 @@ import { RegisterPage } from './pages/RegisterPage';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProjectsPage } from './pages/ProjectsPage';
+import { CreateProject } from './pages/CreateProject';
+import { ProjectDetailsPage } from './pages/ProjectDetailsPage';
 import { TasksPage } from './pages/TasksPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -17,7 +19,7 @@ export const App: React.FC = () => {
     <BrowserRouter>
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
         <Routes>
-          {/* Public Routes with Main Navbar */}
+          {/* Public Routes */}
           <Route
             path="/"
             element={
@@ -50,9 +52,18 @@ export const App: React.FC = () => {
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="projects" element={<ProjectsPage />} />
+            <Route path="projects/:id" element={<ProjectDetailsPage />} />
+            <Route path="create-project" element={<CreateProject />} />
+            <Route path="documents" element={<ProjectsPage />} />
+            <Route path="prototype" element={<ProjectsPage />} />
+            <Route path="team" element={<ProjectsPage />} />
             <Route path="tasks" element={<TasksPage />} />
+            <Route path="patent-forms" element={<ProjectsPage />} />
+            <Route path="ai-workspace" element={<ProjectsPage />} />
+            <Route path="reports" element={<ProjectsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="settings" element={<ProfilePage />} />
           </Route>
 
           {/* Fallback */}

@@ -4,9 +4,17 @@ import {
   Shield,
   LayoutDashboard,
   FolderKanban,
+  PlusCircle,
+  FileText,
+  Cpu,
+  Users,
   CheckSquare,
+  FileCode,
+  Sparkles,
+  BarChart2,
   Bell,
   User,
+  Settings,
   LogOut,
   ChevronLeft,
 } from 'lucide-react';
@@ -49,10 +57,18 @@ export const DashboardLayout: React.FC = () => {
 
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Projects', path: '/dashboard/projects', icon: FolderKanban },
+    { label: 'My Projects', path: '/dashboard/projects', icon: FolderKanban },
+    { label: 'Create Project', path: '/dashboard/create-project', icon: PlusCircle },
+    { label: 'Documents', path: '/dashboard/documents', icon: FileText },
+    { label: 'Prototype', path: '/dashboard/prototype', icon: Cpu },
+    { label: 'Team', path: '/dashboard/team', icon: Users },
     { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+    { label: 'Patent Forms', path: '/dashboard/patent-forms', icon: FileCode },
+    { label: 'AI Workspace', path: '/dashboard/ai-workspace', icon: Sparkles },
+    { label: 'Reports', path: '/dashboard/reports', icon: BarChart2 },
     { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
     { label: 'Profile', path: '/dashboard/profile', icon: User },
+    { label: 'Settings', path: '/dashboard/settings', icon: Settings },
   ];
 
   return (
@@ -88,7 +104,7 @@ export const DashboardLayout: React.FC = () => {
                 to={item.path}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all ${
                   isActive
-                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
+                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-semibold'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
@@ -123,12 +139,12 @@ export const DashboardLayout: React.FC = () => {
         <header className="h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30">
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-bold text-slate-200">
-              {navItems.find((n) => n.path === location.pathname)?.label || 'Workspace'}
+              {navItems.find((n) => n.path === location.pathname)?.label || 'Patent Workspace'}
             </h1>
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-semibold">
+            <span className="text-xs px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-semibold">
               Role: {user?.role || 'User'}
             </span>
           </div>

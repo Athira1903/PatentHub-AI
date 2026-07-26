@@ -13,6 +13,22 @@ model Role {
   users User[]
 }
 
+enum ProjectStage {
+  IDEA
+  PATENT_SEARCH
+  PROTOTYPE_PLANNING
+  PROTOTYPE_DEVELOPMENT
+  DOCUMENTATION
+  GUIDE_REVIEW
+  PATENT_FORMS
+  READY_FOR_FILING
+}
+
+enum MemberRole {
+  CO_INVENTOR
+  GUIDE
+}
+
 model User {
   id          String   @id @default(uuid())
   fullName    String
@@ -25,7 +41,62 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  patents Patent[]
+  ownedProjects  PatentProject[] @relation("ProjectOwner")
+  memberProjects PatentMember[]  @relation("MemberUser")
+  legacyPatents  Patent[]
+}
+
+model PatentProject {
+  id               String       @id @default(uuid())
+  title            String
+  innovationIdea   String       @db.Text
+  problemStatement String       @db.Text
+  proposedSolution String       @db.Text
+  technicalDomain  String
+  category         String
+  stage            ProjectStage @default(IDEA)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  ownerId String
+  owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  members   PatentMember[]
+  documents Document[]
+  tasks     Task[]
+}
+
+model PatentMember {
+  id        String        @id @default(uuid())
+  projectId String
+  project   PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation("MemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  role      MemberRole    @default(CO_INVENTOR)
+  createdAt DateTime      @default(now())
+
+  @@unique([projectId, userId])
+}
+
+model Document {
+  id        String        @id @default(uuid())
+  name      String
+  fileUrl   String
+  fileType  String?
+  projectId String
+  project   PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+}
+
+model Task {
+  id          String        @id @default(uuid())
+  title       String
+  description String?       @db.Text
+  status      String        @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  projectId   String
+  project     PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 model Patent {
@@ -34,7 +105,7 @@ model Patent {
   abstract    String?  @db.Text
   description String?  @db.Text
   claims      String?  @db.Text
-  status      String   @default("DRAFT") // DRAFT, FILED, GRANTED, REJECTED
+  status      String   @default("DRAFT")
   fileUrl     String?
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
