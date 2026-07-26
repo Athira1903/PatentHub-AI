@@ -73,13 +73,8 @@ export const DashboardLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-[#202124] flex flex-col overflow-hidden">
-      {/* Google 4-Color Accent Line */}
-      <div className="h-1 w-full flex sticky top-0 z-50">
-        <div className="h-full w-1/4 bg-[#1a73e8]"></div>
-        <div className="h-full w-1/4 bg-[#ea4335]"></div>
-        <div className="h-full w-1/4 bg-[#fbbc04]"></div>
-        <div className="h-full w-1/4 bg-[#34a853]"></div>
-      </div>
+      {/* Sleek Blue Accent Border */}
+      <div className="h-1 w-full bg-gradient-to-r from-[#1a73e8] to-[#0b57d0] sticky top-0 z-50"></div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
@@ -112,7 +107,7 @@ export const DashboardLayout: React.FC = () => {
           <div className="p-4">
             <Link
               to="/dashboard/create-project"
-              className={`flex items-center justify-center gap-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-xl shadow-sm transition-all font-medium text-sm ${
+              className={`flex items-center justify-center gap-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-xl shadow-sm transition-all font-semibold text-sm ${
                 collapsed ? 'p-3' : 'px-4 py-3'
               }`}
             >
@@ -121,7 +116,7 @@ export const DashboardLayout: React.FC = () => {
             </Link>
           </div>
 
-          {/* Sidebar Links (Google Workspace Pill Style) */}
+          {/* Sidebar Links */}
           <nav className="flex-1 py-1 pr-3 space-y-0.5 overflow-y-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
