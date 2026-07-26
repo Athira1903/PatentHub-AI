@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Shield,
   LayoutDashboard,
   FolderKanban,
   PlusCircle,
@@ -17,6 +16,7 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
+  Search,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -72,31 +72,44 @@ export const DashboardLayout: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex overflow-hidden">
+    <div className="min-h-screen bg-[#f8f9fa] text-[#202124] flex overflow-hidden">
       {/* Sidebar */}
       <aside
         className={`${
           collapsed ? 'w-20' : 'w-64'
-        } bg-white border-r border-slate-200 transition-all duration-300 flex flex-col fixed inset-y-0 left-0 z-40 md:relative`}
+        } bg-white border-r border-[#dadce0] transition-all duration-300 flex flex-col fixed inset-y-0 left-0 z-40 md:relative`}
       >
         {/* Sidebar Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200">
-          <Link to="/dashboard" className="flex items-center gap-2 font-bold text-slate-900 overflow-hidden">
-            <div className="p-1.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 shrink-0">
-              <Shield className="w-5 h-5" />
+        <div className="h-16 flex items-center justify-between px-4 border-b border-[#dadce0]">
+          <Link to="/dashboard" className="flex items-center gap-2 font-bold text-[#202124] overflow-hidden">
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-[#f8f9fa] border border-[#dadce0] shrink-0">
+              <span className="w-2 h-2 rounded-full bg-[#1a73e8]"></span>
+              <span className="w-2 h-2 rounded-full bg-[#ea4335]"></span>
+              <span className="w-2 h-2 rounded-full bg-[#fbbc04]"></span>
+              <span className="w-2 h-2 rounded-full bg-[#34a853]"></span>
             </div>
-            {!collapsed && <span className="text-lg">PatentHub <span className="text-blue-600">AI</span></span>}
+            {!collapsed && (
+              <span className="font-semibold text-base">
+                <span className="text-[#1a73e8]">P</span>
+                <span className="text-[#ea4335]">a</span>
+                <span className="text-[#fbbc04]">t</span>
+                <span className="text-[#34a853]">e</span>
+                <span className="text-[#1a73e8]">n</span>
+                <span className="text-[#ea4335]">t</span>
+                <span className="text-[#202124] ml-1">Hub</span>
+              </span>
+            )}
           </Link>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            className="hidden md:flex p-1.5 rounded-full text-[#5f6368] hover:bg-[#f1f3f4] transition-colors"
           >
             <ChevronLeft className={`w-5 h-5 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
           </button>
         </div>
 
-        {/* Sidebar Links */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        {/* Sidebar Links (Google Workspace Pill Style) */}
+        <nav className="flex-1 py-3 pr-3 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -104,13 +117,13 @@ export const DashboardLayout: React.FC = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-r-full font-medium text-sm transition-all ${
                   isActive
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200 font-semibold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    ? 'bg-[#e8f0fe] text-[#1a73e8] font-medium'
+                    : 'text-[#3c4043] hover:bg-[#f1f3f4]'
                 }`}
               >
-                <Icon className="w-5 h-5 shrink-0" />
+                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-[#1a73e8]' : 'text-[#5f6368]'}`} />
                 {!collapsed && <span>{item.label}</span>}
               </Link>
             );
@@ -118,17 +131,17 @@ export const DashboardLayout: React.FC = () => {
         </nav>
 
         {/* User Footer */}
-        <div className="p-3 border-t border-slate-200 flex items-center justify-between">
+        <div className="p-3 border-t border-[#dadce0] flex items-center justify-between">
           {!collapsed && user && (
             <div className="overflow-hidden pr-2">
-              <p className="text-sm font-bold text-slate-900 truncate">{user.fullName}</p>
-              <p className="text-xs text-blue-600 truncate font-semibold">{user.role}</p>
+              <p className="text-sm font-medium text-[#202124] truncate">{user.fullName}</p>
+              <p className="text-xs text-[#1a73e8] truncate font-normal">{user.role}</p>
             </div>
           )}
           <button
             onClick={handleLogout}
             title="Log Out"
-            className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+            className="p-2 rounded-full text-[#5f6368] hover:text-[#d93025] hover:bg-[#fce8e6] transition-colors"
           >
             <LogOut className="w-5 h-5" />
           </button>
@@ -138,15 +151,20 @@ export const DashboardLayout: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-bold text-slate-900">
-              {navItems.find((n) => n.path === location.pathname)?.label || 'Patent Workspace'}
-            </h1>
+        <header className="h-16 bg-white border-b border-[#dadce0] px-6 flex items-center justify-between sticky top-0 z-30">
+          <div className="flex items-center gap-4 flex-1 max-w-xl">
+            <div className="relative w-full">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5f6368]" />
+              <input
+                type="text"
+                placeholder="Search patent claims, projects, documents..."
+                className="w-full pl-10 pr-4 py-2 bg-[#f1f3f4] hover:bg-white border border-transparent hover:border-[#dadce0] focus:bg-white focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-full text-xs text-[#202124] transition-all"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-xs px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-semibold">
+            <span className="text-xs px-3 py-1 rounded-full bg-[#e8f0fe] border border-[#c2e7ff] text-[#0b57d0] font-medium">
               Role: {user?.role || 'User'}
             </span>
           </div>

@@ -111,11 +111,11 @@ export const ProjectDetailsPage: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="p-12 text-center text-slate-500">Loading workspace...</div>;
+    return <div className="p-12 text-center text-[#5f6368]">Loading workspace...</div>;
   }
 
   if (!project) {
-    return <div className="p-12 text-center text-rose-600 font-semibold">Project not found or access denied.</div>;
+    return <div className="p-12 text-center text-[#d93025] font-medium">Project not found or access denied.</div>;
   }
 
   const currentStageIndex = STAGES.findIndex((s) => s.key === project.stage);
@@ -138,29 +138,29 @@ export const ProjectDetailsPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <Link
             to="/dashboard/projects"
-            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shadow-sm"
+            className="p-2 rounded-full bg-white border border-[#dadce0] text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] transition-colors shadow-sm"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700">
+              <span className="text-xs font-medium px-3 py-0.5 rounded-full bg-[#e8f0fe] border border-[#c2e7ff] text-[#0b57d0]">
                 {project.category}
               </span>
-              <span className="text-xs text-slate-500">• {project.technicalDomain}</span>
+              <span className="text-xs text-[#5f6368]">• {project.technicalDomain}</span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mt-1">{project.title}</h2>
+            <h2 className="text-2xl font-medium text-[#202124] mt-1">{project.title}</h2>
           </div>
         </div>
       </div>
 
-      {/* Workflow Progress Bar */}
-      <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+      {/* Workflow Progress Bar (Google Material 3 Stepper) */}
+      <div className="p-6 rounded-2xl bg-white border border-[#dadce0] shadow-sm space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-blue-600" /> Patent Workflow Pipeline
+          <h3 className="text-xs font-bold text-[#5f6368] uppercase tracking-wider flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-[#1a73e8]" /> Patent Workflow Pipeline
           </h3>
-          <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+          <span className="text-xs text-[#0b57d0] font-medium bg-[#e8f0fe] px-3 py-1 rounded-full border border-[#c2e7ff]">
             Current Stage: {project.stage.replace(/_/g, ' ')}
           </span>
         </div>
@@ -175,17 +175,17 @@ export const ProjectDetailsPage: React.FC = () => {
                 key={s.key}
                 disabled={!project.isOwner}
                 onClick={() => handleStageChange(s.key)}
-                className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
                   isCurrent
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm font-semibold'
+                    ? 'bg-[#1a73e8] border-[#1a73e8] text-white shadow-sm font-medium'
                     : isCompleted
-                    ? 'bg-blue-50 border-blue-200 text-blue-900 hover:border-blue-300 font-medium'
-                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300 font-medium'
+                    ? 'bg-[#e8f0fe] border-[#c2e7ff] text-[#0b57d0] hover:border-[#1a73e8] font-medium'
+                    : 'bg-[#f8f9fa] border-[#dadce0] text-[#5f6368] hover:border-[#bdc1c6] font-normal'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-[10px] font-bold ${isCurrent ? 'text-blue-100' : 'text-slate-400'}`}>0{idx + 1}</span>
-                  {isCompleted && <CheckCircle2 className={`w-3.5 h-3.5 ${isCurrent ? 'text-white' : 'text-blue-600'}`} />}
+                  <span className={`text-[10px] font-bold ${isCurrent ? 'text-white' : 'text-[#5f6368]'}`}>0{idx + 1}</span>
+                  {isCompleted && <CheckCircle2 className={`w-3.5 h-3.5 ${isCurrent ? 'text-white' : 'text-[#1a73e8]'}`} />}
                 </div>
                 <span className="text-xs leading-tight line-clamp-2">{s.label}</span>
               </button>
@@ -194,8 +194,8 @@ export const ProjectDetailsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-1">
+      {/* Tabs Navigation (Google Material 3 Pill Tabs) */}
+      <div className="flex items-center gap-2 border-b border-[#dadce0] overflow-x-auto pb-1">
         {tabs.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.name;
@@ -203,10 +203,10 @@ export const ProjectDetailsPage: React.FC = () => {
             <button
               key={t.name}
               onClick={() => setActiveTab(t.name)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium text-sm transition-all whitespace-nowrap ${
                 isActive
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                  ? 'bg-[#e8f0fe] text-[#1a73e8] font-medium'
+                  : 'text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4]'
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -217,26 +217,26 @@ export const ProjectDetailsPage: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+      <div className="p-6 rounded-2xl bg-white border border-[#dadce0] shadow-sm">
         {activeTab === 'Overview' && (
           <div className="space-y-6">
             <div>
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Innovation Idea</h4>
-              <p className="text-slate-800 text-sm leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200 font-medium">
+              <h4 className="text-xs font-bold text-[#5f6368] uppercase tracking-wider mb-2">Innovation Idea</h4>
+              <p className="text-[#202124] text-sm leading-relaxed bg-[#f8f9fa] p-4 rounded-xl border border-[#dadce0]">
                 {project.innovationIdea}
               </p>
             </div>
 
             <div>
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Problem Statement</h4>
-              <p className="text-slate-800 text-sm leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200 font-medium">
+              <h4 className="text-xs font-bold text-[#5f6368] uppercase tracking-wider mb-2">Problem Statement</h4>
+              <p className="text-[#202124] text-sm leading-relaxed bg-[#f8f9fa] p-4 rounded-xl border border-[#dadce0]">
                 {project.problemStatement}
               </p>
             </div>
 
             <div>
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Proposed Technical Solution</h4>
-              <p className="text-slate-800 text-sm leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200 font-medium">
+              <h4 className="text-xs font-bold text-[#5f6368] uppercase tracking-wider mb-2">Proposed Technical Solution</h4>
+              <p className="text-[#202124] text-sm leading-relaxed bg-[#f8f9fa] p-4 rounded-xl border border-[#dadce0]">
                 {project.proposedSolution}
               </p>
             </div>
@@ -246,7 +246,7 @@ export const ProjectDetailsPage: React.FC = () => {
         {activeTab === 'Members' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h4 className="text-lg font-bold text-slate-900">Project Inventors & Team</h4>
+              <h4 className="text-lg font-medium text-[#202124]">Project Inventors & Team</h4>
               {project.isOwner && (
                 <form onSubmit={handleInviteMember} className="flex items-center gap-2">
                   <input
@@ -254,12 +254,12 @@ export const ProjectDetailsPage: React.FC = () => {
                     value={inviteUsername}
                     onChange={(e) => setInviteUsername(e.target.value)}
                     placeholder="Enter co-inventor username"
-                    className="px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    className="px-4 py-2 bg-white border border-[#dadce0] rounded-full text-xs text-[#202124] placeholder-[#5f6368] focus:outline-none focus:border-[#1a73e8]"
                   />
                   <select
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as any)}
-                    className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-medium"
+                    className="px-3 py-2 bg-white border border-[#dadce0] rounded-full text-xs text-[#202124]"
                   >
                     <option value="CO_INVENTOR">Co-Inventor</option>
                     <option value="GUIDE">Guide / Advisor</option>
@@ -267,7 +267,7 @@ export const ProjectDetailsPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={inviting}
-                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition-colors shadow-sm"
+                    className="px-4 py-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-full text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
                   >
                     <UserPlus className="w-3.5 h-3.5" /> Invite
                   </button>
@@ -277,24 +277,24 @@ export const ProjectDetailsPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Owner */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <div className="p-4 rounded-xl bg-[#f8f9fa] border border-[#dadce0] flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-bold text-slate-900">{project.owner.fullName}</p>
-                  <p className="text-xs text-slate-500">@{project.owner.username}</p>
+                  <p className="text-sm font-medium text-[#202124]">{project.owner.fullName}</p>
+                  <p className="text-xs text-[#5f6368]">@{project.owner.username}</p>
                 </div>
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 border border-purple-200 text-purple-700">
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-[#fce8e6] text-[#c5221f] border border-[#fad2cf]">
                   Lead Inventor (Owner)
                 </span>
               </div>
 
               {/* Members */}
               {project.members.map((m) => (
-                <div key={m.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                <div key={m.id} className="p-4 rounded-xl bg-[#f8f9fa] border border-[#dadce0] flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-bold text-slate-900">{m.user.fullName}</p>
-                    <p className="text-xs text-slate-500">@{m.user.username}</p>
+                    <p className="text-sm font-medium text-[#202124]">{m.user.fullName}</p>
+                    <p className="text-xs text-[#5f6368]">@{m.user.username}</p>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 border border-blue-200 text-blue-700">
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-[#e8f0fe] text-[#0b57d0] border border-[#c2e7ff]">
                     {m.role.replace(/_/g, ' ')}
                   </span>
                 </div>
@@ -305,10 +305,10 @@ export const ProjectDetailsPage: React.FC = () => {
 
         {activeTab === 'Documents' && (
           <div className="p-8 text-center">
-            <FileText className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-            <h4 className="text-base font-semibold text-slate-800">Project Specifications & Documents</h4>
-            <p className="text-xs text-slate-500 mt-1 mb-4">Upload PDF specifications and diagram attachments.</p>
-            <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm">
+            <FileText className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
+            <h4 className="text-base font-medium text-[#202124]">Project Specifications & Documents</h4>
+            <p className="text-xs text-[#5f6368] mt-1 mb-4">Upload PDF specifications and diagram attachments.</p>
+            <button className="px-5 py-2.5 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-full text-xs font-medium shadow-sm">
               Upload Specification Document
             </button>
           </div>
@@ -316,41 +316,41 @@ export const ProjectDetailsPage: React.FC = () => {
 
         {activeTab === 'Prototype' && (
           <div className="p-8 text-center">
-            <Cpu className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-            <h4 className="text-base font-semibold text-slate-800">Prototype Planning & Schematics</h4>
-            <p className="text-xs text-slate-500 mt-1">CAD drawings, circuit diagrams, and technical proof-of-concepts.</p>
+            <Cpu className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
+            <h4 className="text-base font-medium text-[#202124]">Prototype Planning & Schematics</h4>
+            <p className="text-xs text-[#5f6368] mt-1">CAD drawings, circuit diagrams, and technical proof-of-concepts.</p>
           </div>
         )}
 
         {activeTab === 'Tasks' && (
           <div className="p-8 text-center">
-            <CheckSquare className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-            <h4 className="text-base font-semibold text-slate-800">Task Management</h4>
-            <p className="text-xs text-slate-500 mt-1">Assign patent drafting tasks to co-inventors and guides.</p>
+            <CheckSquare className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
+            <h4 className="text-base font-medium text-[#202124]">Task Management</h4>
+            <p className="text-xs text-[#5f6368] mt-1">Assign patent drafting tasks to co-inventors and guides.</p>
           </div>
         )}
 
         {activeTab === 'Patent Forms' && (
           <div className="p-8 text-center">
-            <FileCode className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-            <h4 className="text-base font-semibold text-slate-800">Official Patent Office Forms</h4>
-            <p className="text-xs text-slate-500 mt-1">Form 1 (Application), Form 2 (Specification), and Form 3.</p>
+            <FileCode className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
+            <h4 className="text-base font-medium text-[#202124]">Official Patent Office Forms</h4>
+            <p className="text-xs text-[#5f6368] mt-1">Form 1 (Application), Form 2 (Specification), and Form 3.</p>
           </div>
         )}
 
         {activeTab === 'Reports' && (
           <div className="p-8 text-center">
-            <BarChart2 className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-            <h4 className="text-base font-semibold text-slate-800">Patent Readiness Report</h4>
-            <p className="text-xs text-slate-500 mt-1">Automated claim novelty and filing readiness breakdown.</p>
+            <BarChart2 className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
+            <h4 className="text-base font-medium text-[#202124]">Patent Readiness Report</h4>
+            <p className="text-xs text-[#5f6368] mt-1">Automated claim novelty and filing readiness breakdown.</p>
           </div>
         )}
 
         {activeTab === 'Settings' && (
           <div className="p-8 text-center">
-            <SettingsIcon className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-            <h4 className="text-base font-semibold text-slate-800">Project Settings</h4>
-            <p className="text-xs text-slate-500 mt-1">Manage permissions, category labels, and project visibility.</p>
+            <SettingsIcon className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
+            <h4 className="text-base font-medium text-[#202124]">Project Settings</h4>
+            <p className="text-xs text-[#5f6368] mt-1">Manage permissions, category labels, and project visibility.</p>
           </div>
         )}
       </div>
