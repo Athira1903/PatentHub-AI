@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Cpu, Search, ArrowRight, Database, Sparkles, CheckCircle2, FileCode, Layers, Radar } from 'lucide-react';
+import { Search, ArrowRight, Database, CheckCircle2, FileCode, Layers, Radar, FileCheck, ShieldCheck } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
   return (
@@ -17,7 +17,7 @@ export const HomePage: React.FC = () => {
           transition={{ duration: 0.5 }}
         >
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-600/10 via-cyan-500/10 to-indigo-600/10 border border-blue-500/20 text-blue-700 mb-6 shadow-xs">
-            <Sparkles className="w-4 h-4 text-cyan-600" /> Next-Gen AI Patent Preparation & Workflow Engine
+            <ShieldCheck className="w-4 h-4 text-blue-600" /> Next-Gen Patent Preparation & Workflow Engine
           </span>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900 max-w-4xl mx-auto leading-[1.15]">
@@ -44,7 +44,7 @@ export const HomePage: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Unique Bento Grid Feature Interactive Showcase */}
+        {/* Bento Grid Feature Interactive Showcase */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
@@ -56,11 +56,11 @@ export const HomePage: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-200">
-                  <Cpu className="w-5 h-5" />
+                  <FileCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-lg">AI Claim Novelty & Boundary Evaluator</h3>
-                  <p className="text-xs text-slate-500 font-medium">Gemini 2.0 Flash Claim Decomposition</p>
+                  <h3 className="font-bold text-slate-900 text-lg">Claim Novelty & Boundary Evaluator</h3>
+                  <p className="text-xs text-slate-500 font-medium">Automatic Specification Claim Decomposition</p>
                 </div>
               </div>
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -196,7 +196,7 @@ export const HomePage: React.FC = () => {
             className="p-8 rounded-3xl bg-white border border-slate-200 shadow-md hover:shadow-xl transition-all"
           >
             <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-6">
-              <Cpu className="w-6 h-6" />
+              <FileCheck className="w-6 h-6" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Claim Analysis & Novelty</h3>
             <p className="text-slate-600 leading-relaxed text-sm">
@@ -212,7 +212,7 @@ export const HomePage: React.FC = () => {
               <Search className="w-6 h-6" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Prior Art & Vector Search</h3>
-            <p className="text-slate-600 leading-relaxed text-sm">
+            <p className="text-[#5f6368] leading-relaxed text-sm">
               Discover relevant technical publications and existing patents through semantic similarity search engines.
             </p>
           </motion.div>
@@ -225,7 +225,7 @@ export const HomePage: React.FC = () => {
               <Database className="w-6 h-6" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Team & Guide Collaboration</h3>
-            <p className="text-slate-600 leading-relaxed text-sm">
+            <p className="text-[#5f6368] leading-relaxed text-sm">
               Invite co-inventors, assign advisors, manage specification documents, and track official patent forms seamlessly.
             </p>
           </motion.div>

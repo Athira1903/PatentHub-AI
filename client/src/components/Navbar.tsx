@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { LogIn, FileText, Cpu, ArrowRight } from 'lucide-react';
+import { LogIn, FileText, ArrowRight } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   return (
@@ -29,8 +29,7 @@ export const Navbar: React.FC = () => {
               <FileText className="w-4 h-4 text-slate-500" />
               Patents
             </Link>
-            <Link to="/ai-assistant" className="flex items-center gap-1.5 hover:text-blue-600 transition-colors">
-              <Cpu className="w-4 h-4 text-cyan-600" />
+            <Link to="/ai-assistant" className="hover:text-blue-600 transition-colors">
               AI Assistant
             </Link>
           </div>
