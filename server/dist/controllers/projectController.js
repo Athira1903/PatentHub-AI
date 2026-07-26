@@ -4,20 +4,20 @@ exports.inviteMember = exports.deleteProject = exports.updateProject = exports.g
 const zod_1 = require("zod");
 const projectService_1 = require("../services/projectService");
 const createProjectSchema = zod_1.z.object({
-    title: zod_1.z.string().min(3, 'Title must be at least 3 characters'),
-    innovationIdea: zod_1.z.string().min(10, 'Innovation idea must be at least 10 characters'),
-    problemStatement: zod_1.z.string().min(10, 'Problem statement must be at least 10 characters'),
-    proposedSolution: zod_1.z.string().min(10, 'Proposed solution must be at least 10 characters'),
-    technicalDomain: zod_1.z.string().min(2, 'Technical domain is required'),
-    category: zod_1.z.string().min(2, 'Category is required'),
+    title: zod_1.z.string().trim().min(3, 'Title must be at least 3 characters'),
+    innovationIdea: zod_1.z.string().trim().min(10, 'Innovation idea must be at least 10 characters'),
+    problemStatement: zod_1.z.string().trim().min(10, 'Problem statement must be at least 10 characters'),
+    proposedSolution: zod_1.z.string().trim().min(10, 'Proposed solution must be at least 10 characters'),
+    technicalDomain: zod_1.z.string().trim().min(2, 'Technical domain is required'),
+    category: zod_1.z.string().trim().min(2, 'Category is required'),
 });
 const updateProjectSchema = zod_1.z.object({
-    title: zod_1.z.string().min(3).optional(),
-    innovationIdea: zod_1.z.string().min(10).optional(),
-    problemStatement: zod_1.z.string().min(10).optional(),
-    proposedSolution: zod_1.z.string().min(10).optional(),
-    technicalDomain: zod_1.z.string().min(2).optional(),
-    category: zod_1.z.string().min(2).optional(),
+    title: zod_1.z.string().trim().min(3).optional(),
+    innovationIdea: zod_1.z.string().trim().min(10).optional(),
+    problemStatement: zod_1.z.string().trim().min(10).optional(),
+    proposedSolution: zod_1.z.string().trim().min(10).optional(),
+    technicalDomain: zod_1.z.string().trim().min(2).optional(),
+    category: zod_1.z.string().trim().min(2).optional(),
     stage: zod_1.z.enum([
         'IDEA',
         'PATENT_SEARCH',
@@ -30,7 +30,7 @@ const updateProjectSchema = zod_1.z.object({
     ]).optional(),
 });
 const inviteMemberSchema = zod_1.z.object({
-    username: zod_1.z.string().min(1, 'Username is required'),
+    username: zod_1.z.string().trim().min(1, 'Username is required'),
     role: zod_1.z.enum(['CO_INVENTOR', 'GUIDE']).optional().default('CO_INVENTOR'),
 });
 const createProject = async (req, res) => {
@@ -47,6 +47,10 @@ const createProject = async (req, res) => {
         res.status(201).json({ message: 'Project created successfully', project });
     }
     catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
+            return;
+        }
         res.status(400).json({ message: error.message || 'Failed to create project' });
     }
 };
@@ -92,6 +96,10 @@ const updateProject = async (req, res) => {
         res.status(200).json({ message: 'Project updated successfully', project });
     }
     catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
+            return;
+        }
         res.status(400).json({ message: error.message || 'Failed to update project' });
     }
 };
@@ -123,6 +131,10 @@ const inviteMember = async (req, res) => {
         res.status(201).json({ message: 'Team member added successfully', member });
     }
     catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
+            return;
+        }
         res.status(400).json({ message: error.message || 'Failed to add team member' });
     }
 };

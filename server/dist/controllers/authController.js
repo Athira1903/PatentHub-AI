@@ -4,10 +4,14 @@ exports.getProfile = exports.login = exports.register = void 0;
 const zod_1 = require("zod");
 const authService_1 = require("../services/authService");
 const registerSchema = zod_1.z.object({
-    fullName: zod_1.z.string().min(2, 'Full name must be at least 2 characters'),
-    username: zod_1.z.string().min(3, 'Username must be at least 3 characters'),
-    email: zod_1.z.string().email('Valid email address required'),
-    institution: zod_1.z.string().optional(),
+    fullName: zod_1.z.string().trim().min(2, 'Full name must be at least 2 characters'),
+    username: zod_1.z
+        .string()
+        .trim()
+        .min(3, 'Username must be at least 3 characters')
+        .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'),
+    email: zod_1.z.string().trim().toLowerCase().email('Valid email address required'),
+    institution: zod_1.z.string().trim().optional(),
     password: zod_1.z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: zod_1.z.string().min(6),
     role: zod_1.z.enum(['Inventor', 'Guide', 'CoInventor', 'PatentExpert', 'Admin']),
@@ -16,7 +20,7 @@ const registerSchema = zod_1.z.object({
     path: ['confirmPassword'],
 });
 const loginSchema = zod_1.z.object({
-    emailOrUsername: zod_1.z.string().min(1, 'Email or username is required'),
+    emailOrUsername: zod_1.z.string().trim().min(1, 'Email or username is required'),
     password: zod_1.z.string().min(1, 'Password is required'),
 });
 const register = async (req, res) => {
@@ -36,9 +40,15 @@ const register = async (req, res) => {
         });
     }
     catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({
+                message: error.errors[0]?.message || 'Validation failed',
+                errors: error.errors,
+            });
+            return;
+        }
         res.status(400).json({
             message: error.message || 'Registration failed',
-            errors: error.errors || null,
         });
     }
 };
@@ -53,9 +63,15 @@ const login = async (req, res) => {
         });
     }
     catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({
+                message: error.errors[0]?.message || 'Validation failed',
+                errors: error.errors,
+            });
+            return;
+        }
         res.status(401).json({
             message: error.message || 'Login failed',
-            errors: error.errors || null,
         });
     }
 };

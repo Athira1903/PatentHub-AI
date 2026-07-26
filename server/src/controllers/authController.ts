@@ -4,10 +4,14 @@ import { AuthService } from '../services/authService';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
 const registerSchema = z.object({
-  fullName: z.string().min(2, 'Full name must be at least 2 characters'),
-  username: z.string().min(3, 'Username must be at least 3 characters'),
-  email: z.string().email('Valid email address required'),
-  institution: z.string().optional(),
+  fullName: z.string().trim().min(2, 'Full name must be at least 2 characters'),
+  username: z
+    .string()
+    .trim()
+    .min(3, 'Username must be at least 3 characters')
+    .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'),
+  email: z.string().trim().toLowerCase().email('Valid email address required'),
+  institution: z.string().trim().optional(),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string().min(6),
   role: z.enum(['Inventor', 'Guide', 'CoInventor', 'PatentExpert', 'Admin']),
@@ -17,7 +21,7 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  emailOrUsername: z.string().min(1, 'Email or username is required'),
+  emailOrUsername: z.string().trim().min(1, 'Email or username is required'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -39,9 +43,15 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       ...result,
     });
   } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        message: error.errors[0]?.message || 'Validation failed',
+        errors: error.errors,
+      });
+      return;
+    }
     res.status(400).json({
       message: error.message || 'Registration failed',
-      errors: error.errors || null,
     });
   }
 };
@@ -57,9 +67,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       ...result,
     });
   } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        message: error.errors[0]?.message || 'Validation failed',
+        errors: error.errors,
+      });
+      return;
+    }
     res.status(401).json({
       message: error.message || 'Login failed',
-      errors: error.errors || null,
     });
   }
 };
