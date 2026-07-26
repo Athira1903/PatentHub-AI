@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
+  Shield,
   LayoutDashboard,
   FolderKanban,
   FileText,
@@ -72,12 +73,12 @@ export const DashboardLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-[#202124] flex flex-col overflow-hidden">
-      {/* Google 4-Color Top Stripe */}
+      {/* Google 4-Color Accent Line */}
       <div className="h-1 w-full flex sticky top-0 z-50">
-        <div className="h-full w-1/4 bg-[#4285F4]"></div>
-        <div className="h-full w-1/4 bg-[#EA4335]"></div>
-        <div className="h-full w-1/4 bg-[#FBBC05]"></div>
-        <div className="h-full w-1/4 bg-[#34A853]"></div>
+        <div className="h-full w-1/4 bg-[#1a73e8]"></div>
+        <div className="h-full w-1/4 bg-[#ea4335]"></div>
+        <div className="h-full w-1/4 bg-[#fbbc04]"></div>
+        <div className="h-full w-1/4 bg-[#34a853]"></div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
@@ -90,21 +91,12 @@ export const DashboardLayout: React.FC = () => {
           {/* Sidebar Header */}
           <div className="h-16 flex items-center justify-between px-4 border-b border-[#dadce0]">
             <Link to="/dashboard" className="flex items-center gap-2 font-bold text-[#202124] overflow-hidden">
-              <div className="flex items-center gap-1 p-1 rounded-lg bg-[#f8f9fa] border border-[#dadce0] shrink-0">
-                <span className="w-2 h-2 rounded-full bg-[#4285F4]"></span>
-                <span className="w-2 h-2 rounded-full bg-[#EA4335]"></span>
-                <span className="w-2 h-2 rounded-full bg-[#FBBC05]"></span>
-                <span className="w-2 h-2 rounded-full bg-[#34A853]"></span>
+              <div className="p-1.5 rounded-xl bg-[#e8f0fe] border border-[#c2e7ff] text-[#1a73e8] shrink-0">
+                <Shield className="w-5 h-5" />
               </div>
               {!collapsed && (
-                <span className="font-medium text-base">
-                  <span className="text-[#4285F4]">P</span>
-                  <span className="text-[#EA4335]">a</span>
-                  <span className="text-[#FBBC05]">t</span>
-                  <span className="text-[#34A853]">e</span>
-                  <span className="text-[#4285F4]">n</span>
-                  <span className="text-[#EA4335]">t</span>
-                  <span className="text-[#202124] ml-1">Hub</span>
+                <span className="font-bold text-lg text-[#202124]">
+                  PatentHub <span className="text-[#1a73e8]">AI</span>
                 </span>
               )}
             </Link>
@@ -116,23 +108,20 @@ export const DashboardLayout: React.FC = () => {
             </button>
           </div>
 
-          {/* Google Drive "+ New" FAB Button */}
+          {/* New Project Action Button */}
           <div className="p-4">
             <Link
               to="/dashboard/create-project"
-              className={`flex items-center justify-center gap-3 bg-white hover:bg-[#f8f9fa] border border-[#dadce0] text-[#3c4043] hover:text-[#1a73e8] rounded-2xl shadow-md hover:shadow-lg transition-all ${
-                collapsed ? 'p-3' : 'px-5 py-3.5'
+              className={`flex items-center justify-center gap-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-xl shadow-sm transition-all font-medium text-sm ${
+                collapsed ? 'p-3' : 'px-4 py-3'
               }`}
             >
-              {/* Google 4-Color Plus Icon */}
-              <div className="flex items-center justify-center w-6 h-6">
-                <Plus className="w-6 h-6 text-[#1a73e8]" />
-              </div>
-              {!collapsed && <span className="font-medium text-sm text-[#3c4043]">New Project</span>}
+              <Plus className="w-5 h-5 shrink-0" />
+              {!collapsed && <span>New Project</span>}
             </Link>
           </div>
 
-          {/* Sidebar Links (Google Workspace Active Pill Style) */}
+          {/* Sidebar Links (Google Workspace Pill Style) */}
           <nav className="flex-1 py-1 pr-3 space-y-0.5 overflow-y-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -143,7 +132,7 @@ export const DashboardLayout: React.FC = () => {
                   to={item.path}
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-r-full font-medium text-sm transition-all ${
                     isActive
-                      ? 'bg-[#e8f0fe] text-[#1a73e8] font-medium'
+                      ? 'bg-[#e8f0fe] text-[#1a73e8] font-semibold'
                       : 'text-[#3c4043] hover:bg-[#f1f3f4]'
                   }`}
                 >
@@ -158,14 +147,14 @@ export const DashboardLayout: React.FC = () => {
           <div className="p-3 border-t border-[#dadce0] flex items-center justify-between">
             {!collapsed && user && (
               <div className="overflow-hidden pr-2">
-                <p className="text-sm font-medium text-[#202124] truncate">{user.fullName}</p>
-                <p className="text-xs text-[#1a73e8] truncate font-normal">{user.role}</p>
+                <p className="text-sm font-bold text-[#202124] truncate">{user.fullName}</p>
+                <p className="text-xs text-[#1a73e8] truncate font-semibold">{user.role}</p>
               </div>
             )}
             <button
               onClick={handleLogout}
               title="Log Out"
-              className="p-2 rounded-full text-[#5f6368] hover:text-[#d93025] hover:bg-[#fce8e6] transition-colors"
+              className="p-2 rounded-full text-[#5f6368] hover:text-[#ea4335] hover:bg-[#fce8e6] transition-colors"
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -182,13 +171,13 @@ export const DashboardLayout: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search patent claims, projects, specifications..."
-                  className="w-full pl-10 pr-4 py-2 bg-[#f1f3f4] hover:bg-white border border-transparent hover:border-[#dadce0] focus:bg-white focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-full text-xs text-[#202124] transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-[#f1f3f4] hover:bg-white border border-transparent hover:border-[#dadce0] focus:bg-white focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-full text-xs text-[#202124] transition-all font-medium"
                 />
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              <span className="text-xs px-3 py-1 rounded-full bg-[#e8f0fe] border border-[#c2e7ff] text-[#0b57d0] font-medium">
+              <span className="text-xs px-3 py-1 rounded-full bg-[#e8f0fe] border border-[#c2e7ff] text-[#0b57d0] font-semibold">
                 Role: {user?.role || 'User'}
               </span>
             </div>
