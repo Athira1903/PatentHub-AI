@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id    String @id @default(uuid())
+  name  String @unique // Inventor, Guide, CoInventor, PatentExpert, Admin
+  users User[]
+}
+
+model User {
+  id          String   @id @default(uuid())
+  fullName    String
+  username    String   @unique
+  email       String   @unique
+  password    String
+  institution String?
+  roleId      String
+  role        Role     @relation(fields: [roleId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  patents Patent[]
+}
+
+model Patent {
+  id          String   @id @default(uuid())
+  title       String
+  abstract    String?  @db.Text
+  description String?  @db.Text
+  claims      String?  @db.Text
+  status      String   @default("DRAFT") // DRAFT, FILED, GRANTED, REJECTED
+  fileUrl     String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
