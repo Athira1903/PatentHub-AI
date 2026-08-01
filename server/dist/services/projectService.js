@@ -10,10 +10,16 @@ class ProjectService {
                 innovationIdea: input.innovationIdea,
                 problemStatement: input.problemStatement,
                 proposedSolution: input.proposedSolution,
+                objectives: input.objectives || null,
                 technicalDomain: input.technicalDomain,
+                keywords: input.keywords || null,
                 category: input.category,
+                expectedFilingDate: input.expectedFilingDate || null,
+                patentType: input.patentType || null,
+                visibility: input.visibility || 'PRIVATE',
                 ownerId: input.ownerId,
                 stage: 'IDEA',
+                isArchived: false,
             },
             include: {
                 owner: {
@@ -27,14 +33,19 @@ class ProjectService {
             },
         });
     }
-    static async getUserProjects(userId) {
-        return db_1.prisma.patentProject.findMany({
-            where: {
+    static async getUserProjects(userId, userRole, includeArchived = false) {
+        const baseWhere = includeArchived ? {} : { isArchived: false };
+        const whereClause = userRole === 'Admin'
+            ? baseWhere
+            : {
+                ...baseWhere,
                 OR: [
                     { ownerId: userId },
                     { members: { some: { userId } } },
                 ],
-            },
+            };
+        return db_1.prisma.patentProject.findMany({
+            where: whereClause,
             include: {
                 owner: {
                     select: { id: true, fullName: true, username: true },
@@ -51,7 +62,7 @@ class ProjectService {
             orderBy: { updatedAt: 'desc' },
         });
     }
-    static async getProjectById(projectId, userId) {
+    static async getProjectById(projectId, userId, userRole) {
         const project = await db_1.prisma.patentProject.findUnique({
             where: { id: projectId },
             include: {
@@ -70,13 +81,14 @@ class ProjectService {
         if (!project) {
             throw new Error('Patent project not found');
         }
-        // Check if user is owner or member
+        // Check if user is owner or member, or is an Administrator
         const isOwner = project.ownerId === userId;
         const isMember = project.members.some((m) => m.userId === userId);
-        if (!isOwner && !isMember) {
+        const isAdmin = userRole === 'Admin';
+        if (!isOwner && !isMember && !isAdmin) {
             throw new Error('Access denied. You are not a member of this project.');
         }
-        return { ...project, isOwner };
+        return { ...project, isOwner: isOwner || isAdmin };
     }
     static async updateProject(projectId, userId, input) {
         const project = await db_1.prisma.patentProject.findUnique({ where: { id: projectId } });
@@ -97,6 +109,19 @@ class ProjectService {
                     },
                 },
             },
+        });
+    }
+    static async archiveProject(projectId, userId, isArchived = true) {
+        const project = await db_1.prisma.patentProject.findUnique({ where: { id: projectId } });
+        if (!project) {
+            throw new Error('Patent project not found');
+        }
+        if (project.ownerId !== userId) {
+            throw new Error('Only the project owner can archive this project');
+        }
+        return db_1.prisma.patentProject.update({
+            where: { id: projectId },
+            data: { isArchived },
         });
     }
     static async deleteProject(projectId, userId) {
@@ -124,7 +149,7 @@ class ProjectService {
         if (targetUser.id === ownerId) {
             throw new Error('You are already the owner of this project');
         }
-        const existingMember = await db_1.prisma.patentMember.findUnique({
+        const existingMember = await db_1.prisma.projectMember.findUnique({
             where: {
                 projectId_userId: { projectId, userId: targetUser.id },
             },
@@ -132,7 +157,7 @@ class ProjectService {
         if (existingMember) {
             throw new Error(`User '${username}' is already a member of this project`);
         }
-        return db_1.prisma.patentMember.create({
+        return db_1.prisma.projectMember.create({
             data: {
                 projectId,
                 userId: targetUser.id,

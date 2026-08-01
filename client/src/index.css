@@ -1,14 +1,140 @@
 @import "tailwindcss";
 
+@theme {
+  --color-slate-50: #f7faf9;       /* soft sage-tinted gray background */
+  --color-slate-100: #eef3f2;      /* slightly darker for elements/pills */
+  --color-slate-200: #dce4e2;      /* soft light border */
+  --color-slate-300: #c5d4d2;      /* medium-light border */
+  --color-slate-400: #93aba7;      /* placeholder/icon color */
+  --color-slate-500: #698581;      /* secondary text label color */
+  --color-slate-600: #476865;      /* secondary text content color */
+  --color-slate-700: #334f4c;      /* dark muted text */
+  --color-slate-800: #1f3735;      /* very dark slate green */
+  --color-slate-900: #0a2a28;      /* primary text / dark headings */
+  --color-slate-950: #002422;      /* main hero titles / logos */
+
+  --color-blue-50: #f0f7f6;
+  --color-blue-100: #dbece8;
+  --color-blue-200: #bce2dc;
+  --color-blue-300: #90cdcd;
+  --color-blue-400: #5da49b;
+  --color-blue-500: #007d88;
+  --color-blue-600: #006670;        /* core brand deep teal */
+  --color-blue-700: #004d55;        /* brand hover */
+  --color-blue-800: #00373c;
+  --color-blue-900: #002125;
+
+  --color-indigo-50: #f0f7f6;
+  --color-indigo-100: #dbece8;
+  --color-indigo-200: #bce2dc;
+  --color-indigo-300: #90cdcd;
+  --color-indigo-400: #5da49b;
+  --color-indigo-500: #007d88;
+  --color-indigo-600: #006670;      /* core brand deep teal */
+  --color-indigo-700: #004d55;      /* brand hover */
+  --color-indigo-800: #00373c;
+  --color-indigo-900: #002125;
+
+  --color-cyan-50: #eefdfa;
+  --color-cyan-100: #ccfbf1;
+  --color-cyan-200: #99f6e4;
+  --color-cyan-300: #5eead4;
+  --color-cyan-400: #2dd4bf;
+  --color-cyan-500: #14b8a6;        /* bright teal accent */
+  --color-cyan-600: #0d9488;
+  --color-cyan-700: #0f766e;
+}
+
 @layer base {
   :root {
-    --font-sans: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-heading: 'Plus Jakarta Sans', 'Inter', sans-serif;
   }
-  
+
   body {
     font-family: var(--font-sans);
-    background-color: #f8f9fa;
-    color: #202124;
+    background-color: var(--color-slate-50);
+    color: var(--color-slate-900);
     min-height: 100vh;
+    overflow-x: hidden;
   }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.025em;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-slate-100);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-slate-300);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-400);
+}
+
+/* Glassmorphism & Utility FX */
+.glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(220, 228, 226, 0.8);
+}
+
+.glass-nav {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(220, 228, 226, 0.7);
+}
+
+.gradient-border-top {
+  position: relative;
+}
+.gradient-border-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-blue-600), var(--color-cyan-500), var(--color-indigo-700));
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+
+/* Custom Keyframe Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 6s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.35s ease-out forwards;
 }

@@ -13,6 +13,10 @@ import {
   FileCode,
   BarChart2,
   Sparkles,
+  Key,
+  Eye,
+  Calendar,
+  Layers,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -23,10 +27,16 @@ export interface ProjectDetail {
   innovationIdea: string;
   problemStatement: string;
   proposedSolution: string;
+  objectives?: string;
   technicalDomain: string;
+  keywords?: string;
   category: string;
   stage: string;
+  expectedFilingDate?: string;
+  patentType?: string;
+  visibility?: string;
   isOwner: boolean;
+  isArchived: boolean;
   createdAt: string;
   owner: { id: string; fullName: string; username: string; email: string };
   members: Array<{ id: string; role: string; user: { id: string; fullName: string; username: string; email: string } }>;
@@ -36,13 +46,13 @@ export interface ProjectDetail {
 
 const STAGES = [
   { key: 'IDEA', label: 'Idea' },
-  { key: 'PATENT_SEARCH', label: 'Patent Search' },
-  { key: 'PROTOTYPE_PLANNING', label: 'Prototype Planning' },
-  { key: 'PROTOTYPE_DEVELOPMENT', label: 'Prototype Development' },
+  { key: 'LITERATURE_REVIEW', label: 'Literature Review' },
+  { key: 'PROTOTYPE', label: 'Prototype' },
   { key: 'DOCUMENTATION', label: 'Documentation' },
+  { key: 'FORMS_PREPARATION', label: 'Forms Preparation' },
   { key: 'GUIDE_REVIEW', label: 'Guide Review' },
-  { key: 'PATENT_FORMS', label: 'Patent Forms' },
-  { key: 'READY_FOR_FILING', label: 'Ready for Filing' },
+  { key: 'PATENT_EXPERT_REVIEW', label: 'Patent Expert Review' },
+  { key: 'FILING_READY', label: 'Filing Ready' },
 ];
 
 export const ProjectDetailsPage: React.FC = () => {
@@ -50,11 +60,12 @@ export const ProjectDetailsPage: React.FC = () => {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    'Overview' | 'Members' | 'Documents' | 'Prototype' | 'Tasks' | 'Patent Forms' | 'Reports' | 'Settings'
+    'Overview' | 'Members' | 'Documents' | 'Prototype' | 'Tasks' | 'Patent Forms' | 'AI Intelligence' | 'Reports' | 'Settings'
   >('Overview');
   const [inviteUsername, setInviteUsername] = useState('');
-  const [inviteRole, setInviteRole] = useState<'CO_INVENTOR' | 'GUIDE'>('CO_INVENTOR');
+  const [inviteRole, setInviteRole] = useState<'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'>('CO_INVENTOR');
   const [inviting, setInviting] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -69,6 +80,23 @@ export const ProjectDetailsPage: React.FC = () => {
     };
     if (id) fetchProject();
   }, [id]);
+
+  useEffect(() => {
+    const search = async () => {
+      if (!inviteUsername.trim() || inviteUsername.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+      try {
+        const res = await api.get(`/users/search?q=${inviteUsername}`);
+        setSearchResults(res.data || []);
+      } catch (e) {
+        setSearchResults([]);
+      }
+    };
+    const debounce = setTimeout(search, 300);
+    return () => clearTimeout(debounce);
+  }, [inviteUsername]);
 
   const handleStageChange = async (newStage: string) => {
     if (!project?.isOwner) {
@@ -89,33 +117,27 @@ export const ProjectDetailsPage: React.FC = () => {
     if (!inviteUsername.trim()) return;
     setInviting(true);
     try {
-      const response = await api.post(`/projects/${id}/members`, {
-        username: inviteUsername,
+      await api.post('/collaboration/invite', {
+        projectId: id,
+        username: inviteUsername.trim(),
         role: inviteRole,
       });
-      toast.success(`Invited ${response.data.member.user.fullName}!`);
-      setProject((prev) =>
-        prev
-          ? {
-              ...prev,
-              members: [...prev.members, response.data.member],
-            }
-          : null
-      );
+      toast.success(`Invitation sent successfully to @${inviteUsername}!`);
       setInviteUsername('');
+      setSearchResults([]);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to invite team member');
+      toast.error(error.response?.data?.message || 'Failed to send invitation.');
     } finally {
       setInviting(false);
     }
   };
 
   if (loading) {
-    return <div className="p-12 text-center text-[#5f6368]">Loading workspace...</div>;
+    return <div className="p-12 text-center text-slate-500 font-medium">Loading workspace...</div>;
   }
 
   if (!project) {
-    return <div className="p-12 text-center text-[#d93025] font-medium">Project not found or access denied.</div>;
+    return <div className="p-12 text-center text-rose-600 font-medium">Project not found or access denied.</div>;
   }
 
   const currentStageIndex = STAGES.findIndex((s) => s.key === project.stage);
@@ -127,40 +149,41 @@ export const ProjectDetailsPage: React.FC = () => {
     { name: 'Prototype', icon: Cpu },
     { name: 'Tasks', icon: CheckSquare },
     { name: 'Patent Forms', icon: FileCode },
+    { name: 'AI Intelligence', icon: Sparkles },
     { name: 'Reports', icon: BarChart2 },
     { name: 'Settings', icon: SettingsIcon },
   ] as const;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
             to="/dashboard/projects"
-            className="p-2 rounded-full bg-white border border-[#dadce0] text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] transition-colors shadow-sm"
+            className="p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors shadow-2xs"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium px-3 py-0.5 rounded-full bg-[#e8f0fe] border border-[#c2e7ff] text-[#0b57d0]">
+              <span className="text-xs font-bold px-3 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700">
                 {project.category}
               </span>
-              <span className="text-xs text-[#5f6368]">• {project.technicalDomain}</span>
+              <span className="text-xs text-slate-400 font-semibold">• {project.technicalDomain}</span>
             </div>
-            <h2 className="text-2xl font-medium text-[#202124] mt-1">{project.title}</h2>
+            <h2 className="text-2xl font-extrabold text-slate-900 mt-1 tracking-tight">{project.title}</h2>
           </div>
         </div>
       </div>
 
-      {/* Workflow Progress Bar (Google Material 3 Stepper) */}
-      <div className="p-6 rounded-2xl bg-white border border-[#dadce0] shadow-sm space-y-4">
+      {/* Workflow Progress Bar Stepper */}
+      <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-md space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-[#5f6368] uppercase tracking-wider flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[#1a73e8]" /> Patent Workflow Pipeline
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-blue-600" /> Patent Workflow Pipeline
           </h3>
-          <span className="text-xs text-[#0b57d0] font-medium bg-[#e8f0fe] px-3 py-1 rounded-full border border-[#c2e7ff]">
+          <span className="text-xs text-blue-700 font-extrabold bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
             Current Stage: {project.stage.replace(/_/g, ' ')}
           </span>
         </div>
@@ -175,17 +198,17 @@ export const ProjectDetailsPage: React.FC = () => {
                 key={s.key}
                 disabled={!project.isOwner}
                 onClick={() => handleStageChange(s.key)}
-                className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
+                className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                   isCurrent
-                    ? 'bg-[#1a73e8] border-[#1a73e8] text-white shadow-sm font-medium'
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-md font-bold'
                     : isCompleted
-                    ? 'bg-[#e8f0fe] border-[#c2e7ff] text-[#0b57d0] hover:border-[#1a73e8] font-medium'
-                    : 'bg-[#f8f9fa] border-[#dadce0] text-[#5f6368] hover:border-[#bdc1c6] font-normal'
+                    ? 'bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-500 font-bold'
+                    : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300 font-medium'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-[10px] font-bold ${isCurrent ? 'text-white' : 'text-[#5f6368]'}`}>0{idx + 1}</span>
-                  {isCompleted && <CheckCircle2 className={`w-3.5 h-3.5 ${isCurrent ? 'text-white' : 'text-[#1a73e8]'}`} />}
+                  <span className={`text-[10px] font-bold ${isCurrent ? 'text-white' : 'text-slate-400'}`}>0{idx + 1}</span>
+                  {isCompleted && <CheckCircle2 className={`w-3.5 h-3.5 ${isCurrent ? 'text-white' : 'text-blue-600'}`} />}
                 </div>
                 <span className="text-xs leading-tight line-clamp-2">{s.label}</span>
               </button>
@@ -194,8 +217,8 @@ export const ProjectDetailsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs Navigation (Google Material 3 Pill Tabs) */}
-      <div className="flex items-center gap-2 border-b border-[#dadce0] overflow-x-auto pb-1">
+      {/* Tabs Navigation (Pill Tabs) */}
+      <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-1">
         {tabs.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.name;
@@ -203,10 +226,10 @@ export const ProjectDetailsPage: React.FC = () => {
             <button
               key={t.name}
               onClick={() => setActiveTab(t.name)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium text-sm transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
                 isActive
-                  ? 'bg-[#e8f0fe] text-[#1a73e8] font-medium'
-                  : 'text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4]'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -217,57 +240,135 @@ export const ProjectDetailsPage: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div className="p-6 rounded-2xl bg-white border border-[#dadce0] shadow-sm">
+      <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-md">
         {activeTab === 'Overview' && (
           <div className="space-y-6">
+            {/* Meta details dashboard */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Patent Type</p>
+                  <p className="text-xs font-bold text-slate-800">{project.patentType || 'Utility'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Visibility</p>
+                  <p className="text-xs font-bold text-slate-800">{project.visibility || 'PRIVATE'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Expected Filing Date</p>
+                  <p className="text-xs font-bold text-slate-800">
+                    {project.expectedFilingDate ? new Date(project.expectedFilingDate).toLocaleDateString() : 'Not Set'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {project.keywords && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
+                <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
+                  <Key className="w-3.5 h-3.5" /> Keywords:
+                </span>
+                {project.keywords.split(',').map((kw, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">
+                    {kw.trim()}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div>
-              <h4 className="text-xs font-bold text-[#5f6368] uppercase tracking-wider mb-2">Innovation Idea</h4>
-              <p className="text-[#202124] text-sm leading-relaxed bg-[#f8f9fa] p-4 rounded-xl border border-[#dadce0]">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Innovation Abstract</h4>
+              <p className="text-slate-800 text-xs sm:text-sm leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-200/60 font-semibold shadow-2xs">
                 {project.innovationIdea}
               </p>
             </div>
 
             <div>
-              <h4 className="text-xs font-bold text-[#5f6368] uppercase tracking-wider mb-2">Problem Statement</h4>
-              <p className="text-[#202124] text-sm leading-relaxed bg-[#f8f9fa] p-4 rounded-xl border border-[#dadce0]">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Problem Statement</h4>
+              <p className="text-slate-800 text-xs sm:text-sm leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-200/60 font-semibold shadow-2xs">
                 {project.problemStatement}
               </p>
             </div>
 
             <div>
-              <h4 className="text-xs font-bold text-[#5f6368] uppercase tracking-wider mb-2">Proposed Technical Solution</h4>
-              <p className="text-[#202124] text-sm leading-relaxed bg-[#f8f9fa] p-4 rounded-xl border border-[#dadce0]">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Proposed Technical Solution</h4>
+              <p className="text-slate-800 text-xs sm:text-sm leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-200/60 font-semibold shadow-2xs">
                 {project.proposedSolution}
               </p>
             </div>
+
+            {project.objectives && (
+              <div>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Objectives</h4>
+                <p className="text-slate-800 text-xs sm:text-sm leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-200/60 font-semibold shadow-2xs">
+                  {project.objectives}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'Members' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h4 className="text-lg font-medium text-[#202124]">Project Inventors & Team</h4>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <h4 className="text-base font-extrabold text-slate-900 tracking-tight">Project Inventors & Team</h4>
               {project.isOwner && (
-                <form onSubmit={handleInviteMember} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={inviteUsername}
-                    onChange={(e) => setInviteUsername(e.target.value)}
-                    placeholder="Enter co-inventor username"
-                    className="px-4 py-2 bg-white border border-[#dadce0] rounded-full text-xs text-[#202124] placeholder-[#5f6368] focus:outline-none focus:border-[#1a73e8]"
-                  />
+                <form onSubmit={handleInviteMember} className="flex flex-wrap items-center gap-2 relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={inviteUsername}
+                      onChange={(e) => setInviteUsername(e.target.value)}
+                      placeholder="Search username..."
+                      className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 font-semibold min-w-[180px]"
+                    />
+                    {searchResults.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100 min-w-[200px]">
+                        {searchResults.map((u) => (
+                          <button
+                            type="button"
+                            key={u.id}
+                            onClick={() => {
+                              setInviteUsername(u.username);
+                              setSearchResults([]);
+                            }}
+                            className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors text-xs flex flex-col cursor-pointer"
+                          >
+                            <span className="font-bold text-slate-800">{u.fullName}</span>
+                            <span className="text-[10px] text-slate-500">@{u.username} • {u.role}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <select
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as any)}
-                    className="px-3 py-2 bg-white border border-[#dadce0] rounded-full text-xs text-[#202124]"
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 cursor-pointer font-bold"
                   >
                     <option value="CO_INVENTOR">Co-Inventor</option>
-                    <option value="GUIDE">Guide / Advisor</option>
+                    <option value="GUIDE">Faculty Guide</option>
+                    <option value="PATENT_EXPERT">Patent Expert</option>
                   </select>
                   <button
                     type="submit"
                     disabled={inviting}
-                    className="px-4 py-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-full text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-colors shadow-md cursor-pointer"
                   >
                     <UserPlus className="w-3.5 h-3.5" /> Invite
                   </button>
@@ -277,24 +378,24 @@ export const ProjectDetailsPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Owner */}
-              <div className="p-4 rounded-xl bg-[#f8f9fa] border border-[#dadce0] flex items-center justify-between">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between shadow-2xs">
                 <div>
-                  <p className="text-sm font-medium text-[#202124]">{project.owner.fullName}</p>
-                  <p className="text-xs text-[#5f6368]">@{project.owner.username}</p>
+                  <p className="text-sm font-extrabold text-slate-800">{project.owner.fullName}</p>
+                  <p className="text-xs text-slate-400 font-bold">@{project.owner.username}</p>
                 </div>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-[#fce8e6] text-[#c5221f] border border-[#fad2cf]">
+                <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                   Lead Inventor (Owner)
                 </span>
               </div>
 
               {/* Members */}
-              {project.members.map((m) => (
-                <div key={m.id} className="p-4 rounded-xl bg-[#f8f9fa] border border-[#dadce0] flex items-center justify-between">
+              {project.members && project.members.map((m) => (
+                <div key={m.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between shadow-2xs">
                   <div>
-                    <p className="text-sm font-medium text-[#202124]">{m.user.fullName}</p>
-                    <p className="text-xs text-[#5f6368]">@{m.user.username}</p>
+                    <p className="text-sm font-extrabold text-slate-800">{m.user.fullName}</p>
+                    <p className="text-xs text-slate-400 font-bold">@{m.user.username}</p>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-[#e8f0fe] text-[#0b57d0] border border-[#c2e7ff]">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                     {m.role.replace(/_/g, ' ')}
                   </span>
                 </div>
@@ -305,10 +406,10 @@ export const ProjectDetailsPage: React.FC = () => {
 
         {activeTab === 'Documents' && (
           <div className="p-8 text-center">
-            <FileText className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
-            <h4 className="text-base font-medium text-[#202124]">Project Specifications & Documents</h4>
-            <p className="text-xs text-[#5f6368] mt-1 mb-4">Upload PDF specifications and diagram attachments.</p>
-            <button className="px-5 py-2.5 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-full text-xs font-medium shadow-sm">
+            <FileText className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+            <h4 className="text-base font-extrabold text-slate-900">Project Specifications & Documents</h4>
+            <p className="text-xs text-slate-400 mt-1 mb-4 font-semibold">Upload PDF specifications and diagram attachments.</p>
+            <button className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-transform hover:-translate-y-0.5">
               Upload Specification Document
             </button>
           </div>
@@ -316,41 +417,56 @@ export const ProjectDetailsPage: React.FC = () => {
 
         {activeTab === 'Prototype' && (
           <div className="p-8 text-center">
-            <Cpu className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
-            <h4 className="text-base font-medium text-[#202124]">Prototype Planning & Schematics</h4>
-            <p className="text-xs text-[#5f6368] mt-1">CAD drawings, circuit diagrams, and technical proof-of-concepts.</p>
+            <Cpu className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+            <h4 className="text-base font-extrabold text-slate-900">Prototype Planning & Schematics</h4>
+            <p className="text-xs text-slate-400 mt-1 font-semibold">CAD drawings, circuit diagrams, and version controls (V1, V2, V3).</p>
           </div>
         )}
 
         {activeTab === 'Tasks' && (
           <div className="p-8 text-center">
-            <CheckSquare className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
-            <h4 className="text-base font-medium text-[#202124]">Task Management</h4>
-            <p className="text-xs text-[#5f6368] mt-1">Assign patent drafting tasks to co-inventors and guides.</p>
+            <CheckSquare className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+            <h4 className="text-base font-extrabold text-slate-900">Task Management</h4>
+            <p className="text-xs text-slate-400 mt-1 font-semibold">Assign patent drafting tasks to co-inventors, and allow guides to verify.</p>
           </div>
         )}
 
         {activeTab === 'Patent Forms' && (
           <div className="p-8 text-center">
-            <FileCode className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
-            <h4 className="text-base font-medium text-[#202124]">Official Patent Office Forms</h4>
-            <p className="text-xs text-[#5f6368] mt-1">Form 1 (Application), Form 2 (Specification), and Form 3.</p>
+            <FileCode className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+            <h4 className="text-base font-extrabold text-slate-900">Official Patent Office Forms</h4>
+            <p className="text-xs text-slate-400 mt-1 font-semibold">Form 1 (Application), Form 2 (Specification), Form 3, and Form 5 drafts.</p>
+          </div>
+        )}
+
+        {activeTab === 'AI Intelligence' && (
+          <div className="p-8 text-center space-y-4">
+            <Sparkles className="w-12 h-12 mx-auto text-indigo-500 animate-pulse-slow" />
+            <div>
+              <h4 className="text-base font-extrabold text-slate-900">AI Document Intelligence & Prior Art Search</h4>
+              <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto font-semibold">
+                Use Gemini to extract key parameters, similarity scores, risk evaluations, and generate AI prior art analysis summaries.
+              </p>
+            </div>
+            <button className="px-5 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 text-white rounded-xl text-xs font-extrabold shadow-md cursor-pointer transition-transform hover:-translate-y-0.5">
+              Launch Gemini AI Review
+            </button>
           </div>
         )}
 
         {activeTab === 'Reports' && (
           <div className="p-8 text-center">
-            <BarChart2 className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
-            <h4 className="text-base font-medium text-[#202124]">Patent Readiness Report</h4>
-            <p className="text-xs text-[#5f6368] mt-1">Automated claim novelty and filing readiness breakdown.</p>
+            <BarChart2 className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+            <h4 className="text-base font-extrabold text-slate-900">Patent Readiness Report</h4>
+            <p className="text-xs text-slate-400 mt-1 font-semibold">Automated claims novelty assessment, team activity reports, and PDF downloads.</p>
           </div>
         )}
 
         {activeTab === 'Settings' && (
           <div className="p-8 text-center">
-            <SettingsIcon className="w-10 h-10 mx-auto text-[#5f6368] mb-2" />
-            <h4 className="text-base font-medium text-[#202124]">Project Settings</h4>
-            <p className="text-xs text-[#5f6368] mt-1">Manage permissions, category labels, and project visibility.</p>
+            <SettingsIcon className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+            <h4 className="text-base font-extrabold text-slate-900">Project Settings</h4>
+            <p className="text-xs text-slate-400 mt-1 font-semibold">Manage permissions, visibility settings, and delete or archive project archives.</p>
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getProfile = exports.login = exports.register = void 0;
+exports.googleLogin = exports.verifyOtpReset = exports.sendOtp = exports.getProfile = exports.login = exports.activate = exports.register = void 0;
 const zod_1 = require("zod");
 const authService_1 = require("../services/authService");
 const RESERVED_USERNAMES = [
@@ -17,30 +17,32 @@ const RESERVED_USERNAMES = [
     'help',
     'user',
 ];
-const registerSchema = zod_1.z
-    .object({
+const registerSchema = zod_1.z.object({
     fullName: zod_1.z
         .string()
         .trim()
         .min(2, 'Full name must be at least 2 characters')
         .max(100, 'Full name cannot exceed 100 characters')
         .regex(/^[a-zA-Z\s'-]+$/, 'Full name can only contain letters, spaces, hyphens, and apostrophes'),
-    username: zod_1.z
-        .string()
-        .trim()
-        .min(3, 'Username must be at least 3 characters')
-        .max(30, 'Username cannot exceed 30 characters')
-        .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores')
-        .refine((val) => !RESERVED_USERNAMES.includes(val.toLowerCase()), {
-        message: 'This username is reserved and cannot be used',
-    }),
     email: zod_1.z
         .string()
         .trim()
         .toLowerCase()
         .email('Please enter a valid email address')
         .max(150, 'Email address is too long'),
+    phone: zod_1.z
+        .string()
+        .trim()
+        .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number'),
     institution: zod_1.z.string().trim().max(150, 'Institution name cannot exceed 150 characters').optional(),
+    department: zod_1.z.string().trim().min(1, 'Department is required').max(100, 'Department cannot exceed 100 characters'),
+    designation: zod_1.z.string().trim().min(1, 'Designation is required').max(100, 'Designation cannot exceed 100 characters'),
+    userType: zod_1.z.enum(['Student', 'Guide', 'PatentExpert', 'Admin']),
+    employeeOrStudentId: zod_1.z.string().trim().max(50).optional(),
+});
+const activateSchema = zod_1.z.object({
+    username: zod_1.z.string().trim().min(1, 'Username is required'),
+    otp: zod_1.z.string().trim().length(6, 'OTP must be exactly 6 digits'),
     password: zod_1.z
         .string()
         .min(8, 'Password must be at least 8 characters')
@@ -48,16 +50,10 @@ const registerSchema = zod_1.z
         .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
         .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
         .regex(/[0-9]/, 'Password must contain at least one number')
-        .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character (!@#$%^&*)'),
-    confirmPassword: zod_1.z.string().min(1, 'Please confirm your password'),
-    role: zod_1.z.enum(['Inventor', 'Guide', 'CoInventor', 'PatentExpert', 'Admin']),
-})
-    .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ['confirmPassword'],
+        .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character'),
 });
 const loginSchema = zod_1.z.object({
-    emailOrUsername: zod_1.z.string().trim().min(1, 'Email or username is required'),
+    emailOrUsername: zod_1.z.string().trim().min(1, 'Username is required'),
     password: zod_1.z.string().min(1, 'Password is required'),
 });
 const register = async (req, res) => {
@@ -65,14 +61,16 @@ const register = async (req, res) => {
         const validatedData = registerSchema.parse(req.body);
         const result = await authService_1.AuthService.register({
             fullName: validatedData.fullName,
-            username: validatedData.username,
             email: validatedData.email,
+            phone: validatedData.phone,
             institution: validatedData.institution,
-            password: validatedData.password,
-            roleName: validatedData.role,
+            department: validatedData.department,
+            designation: validatedData.designation,
+            userType: validatedData.userType,
+            employeeOrStudentId: validatedData.employeeOrStudentId,
         });
         res.status(201).json({
-            message: 'Registration successful',
+            message: 'Registration successful. Please check your email for activation credentials.',
             ...result,
         });
     }
@@ -90,6 +88,33 @@ const register = async (req, res) => {
     }
 };
 exports.register = register;
+const activate = async (req, res) => {
+    try {
+        const validatedData = activateSchema.parse(req.body);
+        const result = await authService_1.AuthService.activateAccount({
+            username: validatedData.username,
+            otp: validatedData.otp,
+            newPassword: validatedData.password,
+        });
+        res.status(200).json({
+            message: 'Account activated successfully',
+            ...result,
+        });
+    }
+    catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({
+                message: error.errors[0]?.message || 'Validation failed',
+                errors: error.errors,
+            });
+            return;
+        }
+        res.status(400).json({
+            message: error.message || 'Activation failed',
+        });
+    }
+};
+exports.activate = activate;
 const login = async (req, res) => {
     try {
         const validatedData = loginSchema.parse(req.body);
@@ -130,3 +155,57 @@ const getProfile = async (req, res) => {
     }
 };
 exports.getProfile = getProfile;
+const sendOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email || !email.includes('@')) {
+            res.status(400).json({ message: 'Please provide a valid email address' });
+            return;
+        }
+        const result = await authService_1.AuthService.requestOtp(email);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message || 'Failed to send OTP' });
+    }
+};
+exports.sendOtp = sendOtp;
+const verifyOtpReset = async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+        if (!email || !otp || !newPassword) {
+            res.status(400).json({ message: 'Email, OTP, and new password are required' });
+            return;
+        }
+        const result = await authService_1.AuthService.verifyOtpAndResetPassword(email, otp, newPassword);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message || 'Failed to verify OTP' });
+    }
+};
+exports.verifyOtpReset = verifyOtpReset;
+const googleLogin = async (req, res) => {
+    try {
+        const { email, fullName, googleId } = req.body;
+        if (!email || !email.includes('@')) {
+            res.status(400).json({ message: 'Valid Google account email is required' });
+            return;
+        }
+        const result = await authService_1.AuthService.googleLogin({
+            email,
+            fullName: fullName || email.split('@')[0],
+            googleId,
+        });
+        res.status(200).json({
+            message: 'Google sign in successful',
+            ...result,
+        });
+    }
+    catch (error) {
+        res.status(400).json({
+            message: error.message || 'Google Sign-In failed',
+        });
+    }
+};
+exports.googleLogin = googleLogin;

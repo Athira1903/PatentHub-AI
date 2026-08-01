@@ -15,18 +15,20 @@ model Role {
 
 enum ProjectStage {
   IDEA
-  PATENT_SEARCH
-  PROTOTYPE_PLANNING
-  PROTOTYPE_DEVELOPMENT
+  LITERATURE_REVIEW
+  PROTOTYPE
   DOCUMENTATION
+  FORMS_PREPARATION
   GUIDE_REVIEW
-  PATENT_FORMS
-  READY_FOR_FILING
+  PATENT_EXPERT_REVIEW
+  FILING_READY
 }
 
-enum MemberRole {
+enum ProjectRole {
+  INVENTOR
   CO_INVENTOR
   GUIDE
+  PATENT_EXPERT
 }
 
 model User {
@@ -38,44 +40,112 @@ model User {
   institution String?
   roleId      String
   role        Role     @relation(fields: [roleId], references: [id])
+  isActive    Boolean  @default(true)
+  employeeOrStudentId  String?
+  activationOtp        String?
+  activationOtpExpires DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  ownedProjects  PatentProject[] @relation("ProjectOwner")
-  memberProjects PatentMember[]  @relation("MemberUser")
-  legacyPatents  Patent[]
+  profile             Profile?
+  projectMembers      ProjectMember[]
+  sentInvitations     Invitation[]     @relation("InvitationSender")
+  receivedInvitations Invitation[]     @relation("InvitationReceiver")
+  notifications       Notification[]
+  activityLogs        ActivityLog[]
+  assignedTasks       Task[]           @relation("TaskAssignee")
+  comments            Comment[]
+  legacyPatents       Patent[]
+  ownedProjects       PatentProject[]  @relation("ProjectOwner")
 }
 
 model PatentProject {
-  id               String       @id @default(uuid())
-  title            String
-  innovationIdea   String       @db.Text
-  problemStatement String       @db.Text
-  proposedSolution String       @db.Text
-  technicalDomain  String
-  category         String
-  stage            ProjectStage @default(IDEA)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id                 String       @id @default(uuid())
+  title              String
+  innovationIdea     String       @db.Text
+  problemStatement   String       @db.Text
+  proposedSolution   String       @db.Text
+  objectives         String?      @db.Text
+  technicalDomain    String
+  keywords           String?      @db.Text
+  category           String
+  stage              ProjectStage @default(IDEA)
+  expectedFilingDate DateTime?
+  patentType         String?
+  visibility         String       @default("PRIVATE")
+  isArchived         Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   ownerId String
   owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
-  members   PatentMember[]
-  documents Document[]
-  tasks     Task[]
+  members      ProjectMember[]
+  documents    Document[]
+  tasks        Task[]
+  comments     Comment[]
+  activityLogs ActivityLog[]
+  invitations  Invitation[]
 }
 
-model PatentMember {
+model ProjectMember {
   id        String        @id @default(uuid())
   projectId String
   project   PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   userId    String
-  user      User          @relation("MemberUser", fields: [userId], references: [id], onDelete: Cascade)
-  role      MemberRole    @default(CO_INVENTOR)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      ProjectRole   @default(INVENTOR)
   createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   @@unique([projectId, userId])
+}
+
+model Invitation {
+  id          String        @id @default(uuid())
+  projectId   String
+  project     PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User          @relation("InvitationSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId  String
+  receiver    User          @relation("InvitationReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  role        ProjectRole
+  status      String        @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  message     String   @db.Text
+  type        String   @default("GENERAL") // INVITATION, TASK, COMMENT, STATUS_CHANGE, GENERAL
+  referenceId String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Comment {
+  id        String        @id @default(uuid())
+  content   String        @db.Text
+  projectId String
+  project   PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ActivityLog {
+  id        String         @id @default(uuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   PatentProject? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  action    String
+  createdAt DateTime       @default(now())
 }
 
 model Document {
@@ -97,6 +167,9 @@ model Task {
   project     PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  assignedToId String?
+  assignedTo   User?        @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 }
 
 model Patent {
@@ -111,4 +184,23 @@ model Patent {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Profile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone            String
+  dob              DateTime
+  gender           String
+  institution      String
+  department       String
+  designation      String
+  organization     String?
+  researchDomain   String
+  bio              String?  @db.Text
+  profileImage     String?
+  profileCompleted Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

@@ -9,6 +9,7 @@ router.post('/', projectController_1.createProject);
 router.get('/', projectController_1.getProjects);
 router.get('/:id', projectController_1.getProjectById);
 router.put('/:id', projectController_1.updateProject);
+router.put('/:id/archive', projectController_1.archiveProject);
 router.delete('/:id', projectController_1.deleteProject);
 router.post('/:id/members', projectController_1.inviteMember);
 exports.default = router;

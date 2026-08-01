@@ -13,11 +13,13 @@ import { ProjectDetailsPage } from './pages/ProjectDetailsPage';
 import { TasksPage } from './pages/TasksPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { CompleteProfilePage } from './pages/CompleteProfilePage';
+import { ActivatePage } from './pages/ActivatePage';
 
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-[#f8f9fa] text-[#202124] flex flex-col font-sans">
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
         <Routes>
           {/* Public Routes */}
           <Route
@@ -47,6 +49,18 @@ export const App: React.FC = () => {
               </>
             }
           />
+          <Route
+            path="/activate"
+            element={
+              <>
+                <Navbar />
+                <ActivatePage />
+              </>
+            }
+          />
+
+          {/* Onboarding Profile Route */}
+          <Route path="/complete-profile" element={<CompleteProfilePage />} />
 
           {/* Protected Dashboard Routes */}
           <Route path="/dashboard" element={<DashboardLayout />}>
@@ -54,16 +68,9 @@ export const App: React.FC = () => {
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="projects/:id" element={<ProjectDetailsPage />} />
             <Route path="create-project" element={<CreateProject />} />
-            <Route path="documents" element={<ProjectsPage />} />
-            <Route path="prototype" element={<ProjectsPage />} />
-            <Route path="team" element={<ProjectsPage />} />
             <Route path="tasks" element={<TasksPage />} />
-            <Route path="patent-forms" element={<ProjectsPage />} />
-            <Route path="ai-workspace" element={<ProjectsPage />} />
-            <Route path="reports" element={<ProjectsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile" element={<ProfilePage />} />
-            <Route path="settings" element={<ProfilePage />} />
           </Route>
 
           {/* Fallback */}
@@ -75,9 +82,9 @@ export const App: React.FC = () => {
           toastOptions={{
             style: {
               background: '#ffffff',
-              color: '#202124',
-              border: '1px solid #dadce0',
-              boxShadow: '0 2px 6px rgba(60,64,67,0.15)',
+              color: '#0a2a28',
+              border: '1px solid #dce4e2',
+              boxShadow: '0 2px 6px rgba(10,42,40,0.08)',
             },
           }}
         />

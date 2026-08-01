@@ -1,37 +1,48 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.inviteMember = exports.deleteProject = exports.updateProject = exports.getProjectById = exports.getProjects = exports.createProject = void 0;
+exports.archiveProject = exports.inviteMember = exports.deleteProject = exports.updateProject = exports.getProjectById = exports.getProjects = exports.createProject = void 0;
 const zod_1 = require("zod");
 const projectService_1 = require("../services/projectService");
 const createProjectSchema = zod_1.z.object({
     title: zod_1.z.string().trim().min(3, 'Title must be at least 3 characters'),
-    innovationIdea: zod_1.z.string().trim().min(10, 'Innovation idea must be at least 10 characters'),
+    innovationIdea: zod_1.z.string().trim().min(10, 'Innovation abstract must be at least 10 characters'),
     problemStatement: zod_1.z.string().trim().min(10, 'Problem statement must be at least 10 characters'),
     proposedSolution: zod_1.z.string().trim().min(10, 'Proposed solution must be at least 10 characters'),
+    objectives: zod_1.z.string().trim().optional(),
     technicalDomain: zod_1.z.string().trim().min(2, 'Technical domain is required'),
+    keywords: zod_1.z.string().trim().optional(),
     category: zod_1.z.string().trim().min(2, 'Category is required'),
+    expectedFilingDate: zod_1.z.string().optional().transform((val) => val ? new Date(val) : undefined),
+    patentType: zod_1.z.string().trim().optional(),
+    visibility: zod_1.z.string().trim().optional(),
 });
 const updateProjectSchema = zod_1.z.object({
     title: zod_1.z.string().trim().min(3).optional(),
     innovationIdea: zod_1.z.string().trim().min(10).optional(),
     problemStatement: zod_1.z.string().trim().min(10).optional(),
     proposedSolution: zod_1.z.string().trim().min(10).optional(),
+    objectives: zod_1.z.string().trim().optional(),
     technicalDomain: zod_1.z.string().trim().min(2).optional(),
+    keywords: zod_1.z.string().trim().optional(),
     category: zod_1.z.string().trim().min(2).optional(),
     stage: zod_1.z.enum([
         'IDEA',
-        'PATENT_SEARCH',
-        'PROTOTYPE_PLANNING',
-        'PROTOTYPE_DEVELOPMENT',
+        'LITERATURE_REVIEW',
+        'PROTOTYPE',
         'DOCUMENTATION',
+        'FORMS_PREPARATION',
         'GUIDE_REVIEW',
-        'PATENT_FORMS',
-        'READY_FOR_FILING',
+        'PATENT_EXPERT_REVIEW',
+        'FILING_READY',
     ]).optional(),
+    expectedFilingDate: zod_1.z.string().optional().transform((val) => val ? new Date(val) : undefined),
+    patentType: zod_1.z.string().trim().optional(),
+    visibility: zod_1.z.string().trim().optional(),
+    isArchived: zod_1.z.boolean().optional(),
 });
 const inviteMemberSchema = zod_1.z.object({
     username: zod_1.z.string().trim().min(1, 'Username is required'),
-    role: zod_1.z.enum(['CO_INVENTOR', 'GUIDE']).optional().default('CO_INVENTOR'),
+    role: zod_1.z.enum(['CO_INVENTOR', 'GUIDE', 'PATENT_EXPERT']).optional().default('CO_INVENTOR'),
 });
 const createProject = async (req, res) => {
     try {
@@ -61,7 +72,8 @@ const getProjects = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const projects = await projectService_1.ProjectService.getUserProjects(req.user.userId);
+        const includeArchived = req.query.archived === 'true';
+        const projects = await projectService_1.ProjectService.getUserProjects(req.user.userId, req.user.role, includeArchived);
         res.status(200).json({ projects });
     }
     catch (error) {
@@ -76,7 +88,7 @@ const getProjectById = async (req, res) => {
             return;
         }
         const projectId = req.params.id;
-        const project = await projectService_1.ProjectService.getProjectById(projectId, req.user.userId);
+        const project = await projectService_1.ProjectService.getProjectById(projectId, req.user.userId, req.user.role);
         res.status(200).json({ project });
     }
     catch (error) {
@@ -139,3 +151,19 @@ const inviteMember = async (req, res) => {
     }
 };
 exports.inviteMember = inviteMember;
+const archiveProject = async (req, res) => {
+    try {
+        if (!req.user?.userId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const projectId = req.params.id;
+        const isArchived = req.body.isArchived !== false; // defaults to true
+        await projectService_1.ProjectService.archiveProject(projectId, req.user.userId, isArchived);
+        res.status(200).json({ message: `Project ${isArchived ? 'archived' : 'unarchived'} successfully` });
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message || 'Failed to update archive status' });
+    }
+};
+exports.archiveProject = archiveProject;

@@ -16,6 +16,7 @@
     "axios": "^1.18.1",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.21",
+    "firebase": "^11.10.0",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.27.0",
     "react": "^19.2.7",

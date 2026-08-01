@@ -5,11 +5,16 @@ import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
 const createProjectSchema = z.object({
   title: z.string().trim().min(3, 'Title must be at least 3 characters'),
-  innovationIdea: z.string().trim().min(10, 'Innovation idea must be at least 10 characters'),
+  innovationIdea: z.string().trim().min(10, 'Innovation abstract must be at least 10 characters'),
   problemStatement: z.string().trim().min(10, 'Problem statement must be at least 10 characters'),
   proposedSolution: z.string().trim().min(10, 'Proposed solution must be at least 10 characters'),
+  objectives: z.string().trim().optional(),
   technicalDomain: z.string().trim().min(2, 'Technical domain is required'),
+  keywords: z.string().trim().optional(),
   category: z.string().trim().min(2, 'Category is required'),
+  expectedFilingDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
+  patentType: z.string().trim().optional(),
+  visibility: z.string().trim().optional(),
 });
 
 const updateProjectSchema = z.object({
@@ -17,23 +22,29 @@ const updateProjectSchema = z.object({
   innovationIdea: z.string().trim().min(10).optional(),
   problemStatement: z.string().trim().min(10).optional(),
   proposedSolution: z.string().trim().min(10).optional(),
+  objectives: z.string().trim().optional(),
   technicalDomain: z.string().trim().min(2).optional(),
+  keywords: z.string().trim().optional(),
   category: z.string().trim().min(2).optional(),
   stage: z.enum([
     'IDEA',
-    'PATENT_SEARCH',
-    'PROTOTYPE_PLANNING',
-    'PROTOTYPE_DEVELOPMENT',
+    'LITERATURE_REVIEW',
+    'PROTOTYPE',
     'DOCUMENTATION',
+    'FORMS_PREPARATION',
     'GUIDE_REVIEW',
-    'PATENT_FORMS',
-    'READY_FOR_FILING',
+    'PATENT_EXPERT_REVIEW',
+    'FILING_READY',
   ]).optional(),
+  expectedFilingDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
+  patentType: z.string().trim().optional(),
+  visibility: z.string().trim().optional(),
+  isArchived: z.boolean().optional(),
 });
 
 const inviteMemberSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
-  role: z.enum(['CO_INVENTOR', 'GUIDE']).optional().default('CO_INVENTOR'),
+  role: z.enum(['CO_INVENTOR', 'GUIDE', 'PATENT_EXPERT']).optional().default('CO_INVENTOR'),
 });
 
 export const createProject = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -67,7 +78,8 @@ export const getProjects = async (req: AuthenticatedRequest, res: Response): Pro
       return;
     }
 
-    const projects = await ProjectService.getUserProjects(req.user.userId);
+    const includeArchived = req.query.archived === 'true';
+    const projects = await ProjectService.getUserProjects(req.user.userId, req.user.role, includeArchived);
     res.status(200).json({ projects });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to fetch projects' });
@@ -82,7 +94,7 @@ export const getProjectById = async (req: AuthenticatedRequest, res: Response): 
     }
 
     const projectId = req.params.id as string;
-    const project = await ProjectService.getProjectById(projectId, req.user.userId);
+    const project = await ProjectService.getProjectById(projectId, req.user.userId, req.user.role);
     res.status(200).json({ project });
   } catch (error: any) {
     res.status(404).json({ message: error.message || 'Project not found' });
@@ -144,7 +156,7 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       projectId,
       req.user.userId,
       validatedData.username,
-      validatedData.role
+      validatedData.role as any
     );
 
     res.status(201).json({ message: 'Team member added successfully', member });
@@ -154,5 +166,22 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
     res.status(400).json({ message: error.message || 'Failed to add team member' });
+  }
+};
+
+export const archiveProject = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const projectId = req.params.id as string;
+    const isArchived = req.body.isArchived !== false; // defaults to true
+
+    await ProjectService.archiveProject(projectId, req.user.userId, isArchived);
+    res.status(200).json({ message: `Project ${isArchived ? 'archived' : 'unarchived'} successfully` });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message || 'Failed to update archive status' });
   }
 };
