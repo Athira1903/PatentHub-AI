@@ -18,6 +18,7 @@
     "dayjs": "^1.11.21",
     "firebase": "^11.10.0",
     "framer-motion": "^12.42.2",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.27.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

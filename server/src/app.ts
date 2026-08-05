@@ -6,13 +6,14 @@ import projectRoutes from './routes/projectRoutes';
 import profileRoutes from './routes/profileRoutes';
 import userRoutes from './routes/userRoutes';
 import collaborationRoutes from './routes/collaborationRoutes';
+import documentRoutes from './routes/documentRoutes';
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Serve local static uploaded profile pictures
+// Serve local static uploaded profile pictures and documents
 app.use('/uploads', express.static(path.join(__dirname, '../../public/uploads')));
 
 // Routes
@@ -21,6 +22,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/collaboration', collaborationRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Health check endpoint
 app.get('/api/health', (_req: Request, res: Response) => {

@@ -11,10 +11,11 @@ const projectRoutes_1 = __importDefault(require("./routes/projectRoutes"));
 const profileRoutes_1 = __importDefault(require("./routes/profileRoutes"));
 const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const collaborationRoutes_1 = __importDefault(require("./routes/collaborationRoutes"));
+const documentRoutes_1 = __importDefault(require("./routes/documentRoutes"));
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
-// Serve local static uploaded profile pictures
+// Serve local static uploaded profile pictures and documents
 app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../../public/uploads')));
 // Routes
 app.use('/api/auth', authRoutes_1.default);
@@ -22,6 +23,7 @@ app.use('/api/projects', projectRoutes_1.default);
 app.use('/api/profile', profileRoutes_1.default);
 app.use('/api/users', userRoutes_1.default);
 app.use('/api/collaboration', collaborationRoutes_1.default);
+app.use('/api/documents', documentRoutes_1.default);
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
     res.status(200).json({

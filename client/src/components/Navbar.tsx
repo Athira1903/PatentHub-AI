@@ -28,6 +28,16 @@ export const Navbar: React.FC = () => {
             Home
           </Link>
           <Link
+            to="/about"
+            className={`transition-colors ${
+              location.pathname === '/about'
+                ? 'text-slate-950 font-extrabold'
+                : 'text-slate-600 hover:text-slate-950'
+            }`}
+          >
+            About
+          </Link>
+          <Link
             to="/patents"
             className={`flex items-center gap-1.5 transition-colors ${
               location.pathname.startsWith('/patents')

@@ -5,7 +5,7 @@ import { prisma } from '../config/db';
 export const generateInnovationAi = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { action } = req.body;
-    const projectId = req.params.id;
+    const projectId = req.params.id as string;
 
     const project = await prisma.patentProject.findUnique({
       where: { id: projectId }
@@ -41,7 +41,7 @@ export const generateInnovationAi = async (req: AuthenticatedRequest, res: Respo
 
 export const getSimilarityAnalysis = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const projectId = req.params.id;
+    const projectId = req.params.id as string;
     const project = await prisma.patentProject.findUnique({
       where: { id: projectId }
     });
@@ -87,7 +87,7 @@ export const getSimilarityAnalysis = async (req: AuthenticatedRequest, res: Resp
 
 export const getNoveltyAssessment = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const projectId = req.params.id;
+    const projectId = req.params.id as string;
     const project = await prisma.patentProject.findUnique({
       where: { id: projectId }
     });

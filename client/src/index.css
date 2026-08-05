@@ -1,48 +1,48 @@
 @import "tailwindcss";
 
 @theme {
-  --color-slate-50: #f7faf9;       /* soft sage-tinted gray background */
-  --color-slate-100: #eef3f2;      /* slightly darker for elements/pills */
-  --color-slate-200: #dce4e2;      /* soft light border */
-  --color-slate-300: #c5d4d2;      /* medium-light border */
-  --color-slate-400: #93aba7;      /* placeholder/icon color */
-  --color-slate-500: #698581;      /* secondary text label color */
-  --color-slate-600: #476865;      /* secondary text content color */
-  --color-slate-700: #334f4c;      /* dark muted text */
-  --color-slate-800: #1f3735;      /* very dark slate green */
-  --color-slate-900: #0a2a28;      /* primary text / dark headings */
-  --color-slate-950: #002422;      /* main hero titles / logos */
+  --color-slate-50: #f8fafb;       /* soft tinted white background */
+  --color-slate-100: #f1f5f9;      /* cool gray-blue for pills */
+  --color-slate-200: #e2e8f0;      /* soft light border */
+  --color-slate-300: #cbd5e1;      /* medium-light border */
+  --color-slate-400: #94a3b8;      /* placeholder/icon color */
+  --color-slate-500: #64748b;      /* secondary text label color */
+  --color-slate-600: #475569;      /* secondary text content color */
+  --color-slate-700: #334155;      /* dark muted text */
+  --color-slate-800: #1e293b;      /* very dark slate */
+  --color-slate-900: #0f172a;      /* primary text / dark headings */
+  --color-slate-950: #020617;      /* main titles / logos */
 
-  --color-blue-50: #f0f7f6;
-  --color-blue-100: #dbece8;
-  --color-blue-200: #bce2dc;
-  --color-blue-300: #90cdcd;
-  --color-blue-400: #5da49b;
-  --color-blue-500: #007d88;
-  --color-blue-600: #006670;        /* core brand deep teal */
-  --color-blue-700: #004d55;        /* brand hover */
-  --color-blue-800: #00373c;
-  --color-blue-900: #002125;
+  --color-blue-50: #f0fdfa;
+  --color-blue-100: #ccfbf1;
+  --color-blue-200: #99f6e4;
+  --color-blue-300: #5eead4;
+  --color-blue-400: #2dd4bf;
+  --color-blue-500: #14b8a6;
+  --color-blue-600: #0d9488;        /* core brand teal */
+  --color-blue-700: #0f766e;        /* teal hover */
+  --color-blue-800: #115e59;
+  --color-blue-900: #134e4a;
 
-  --color-indigo-50: #f0f7f6;
-  --color-indigo-100: #dbece8;
-  --color-indigo-200: #bce2dc;
-  --color-indigo-300: #90cdcd;
-  --color-indigo-400: #5da49b;
-  --color-indigo-500: #007d88;
-  --color-indigo-600: #006670;      /* core brand deep teal */
-  --color-indigo-700: #004d55;      /* brand hover */
-  --color-indigo-800: #00373c;
-  --color-indigo-900: #002125;
+  --color-indigo-50: #ecfdf5;
+  --color-indigo-100: #d1fae5;
+  --color-indigo-200: #a7f3d0;
+  --color-indigo-300: #6ee7b7;
+  --color-indigo-400: #34d399;
+  --color-indigo-500: #10b981;
+  --color-indigo-600: #059669;      /* premium emerald accent */
+  --color-indigo-700: #047857;      /* emerald hover */
+  --color-indigo-800: #065f46;
+  --color-indigo-900: #064e3b;
 
-  --color-cyan-50: #eefdfa;
-  --color-cyan-100: #ccfbf1;
-  --color-cyan-200: #99f6e4;
-  --color-cyan-300: #5eead4;
-  --color-cyan-400: #2dd4bf;
-  --color-cyan-500: #14b8a6;        /* bright teal accent */
-  --color-cyan-600: #0d9488;
-  --color-cyan-700: #0f766e;
+  --color-cyan-50: #ecfeff;
+  --color-cyan-100: #cffafe;
+  --color-cyan-200: #a5f3fc;
+  --color-cyan-300: #67e8f9;
+  --color-cyan-400: #22d3ee;
+  --color-cyan-500: #06b6d4;        /* cyan accent */
+  --color-cyan-600: #0891b2;
+  --color-cyan-700: #0e7490;
 }
 
 @layer base {
@@ -137,4 +137,18 @@
 
 .animate-fade-in {
   animation: fadeIn 0.35s ease-out forwards;
+}
+
+@keyframes shine {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@keyframes border-beam {
+  0% { offset-distance: 0%; }
+  100% { offset-distance: 100%; }
+}
+
+.animate-shine {
+  animation: shine 5s linear infinite;
 }

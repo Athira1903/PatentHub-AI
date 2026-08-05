@@ -5,6 +5,7 @@ import { Navbar } from './components/Navbar';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { AboutPage } from './pages/AboutPage';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProjectsPage } from './pages/ProjectsPage';
@@ -22,12 +23,13 @@ export const App: React.FC = () => {
       <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
         <Routes>
           {/* Public Routes */}
+          <Route path="/" element={<HomePage />} />
           <Route
-            path="/"
+            path="/about"
             element={
               <>
                 <Navbar />
-                <HomePage />
+                <AboutPage />
               </>
             }
           />

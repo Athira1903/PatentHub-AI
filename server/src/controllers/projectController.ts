@@ -7,8 +7,11 @@ const createProjectSchema = z.object({
   title: z.string().trim().min(3, 'Title must be at least 3 characters'),
   innovationIdea: z.string().trim().min(10, 'Innovation abstract must be at least 10 characters'),
   problemStatement: z.string().trim().min(10, 'Problem statement must be at least 10 characters'),
+  existingSolutions: z.string().trim().optional(),
+  drawbacks: z.string().trim().optional(),
   proposedSolution: z.string().trim().min(10, 'Proposed solution must be at least 10 characters'),
   objectives: z.string().trim().optional(),
+  novelFeatures: z.string().trim().optional(),
   technicalDomain: z.string().trim().min(2, 'Technical domain is required'),
   keywords: z.string().trim().optional(),
   category: z.string().trim().min(2, 'Category is required'),
@@ -21,8 +24,11 @@ const updateProjectSchema = z.object({
   title: z.string().trim().min(3).optional(),
   innovationIdea: z.string().trim().min(10).optional(),
   problemStatement: z.string().trim().min(10).optional(),
+  existingSolutions: z.string().trim().optional(),
+  drawbacks: z.string().trim().optional(),
   proposedSolution: z.string().trim().min(10).optional(),
   objectives: z.string().trim().optional(),
+  novelFeatures: z.string().trim().optional(),
   technicalDomain: z.string().trim().min(2).optional(),
   keywords: z.string().trim().optional(),
   category: z.string().trim().min(2).optional(),
@@ -35,6 +41,7 @@ const updateProjectSchema = z.object({
     'GUIDE_REVIEW',
     'PATENT_EXPERT_REVIEW',
     'FILING_READY',
+    'FILED',
   ]).optional(),
   expectedFilingDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
   patentType: z.string().trim().optional(),
@@ -183,5 +190,91 @@ export const archiveProject = async (req: AuthenticatedRequest, res: Response): 
     res.status(200).json({ message: `Project ${isArchived ? 'archived' : 'unarchived'} successfully` });
   } catch (error: any) {
     res.status(400).json({ message: error.message || 'Failed to update archive status' });
+  }
+};
+
+const createTaskSchema = z.object({
+  title: z.string().trim().min(3, 'Title must be at least 3 characters'),
+  description: z.string().trim().optional(),
+  assignedToUsername: z.string().trim().optional(),
+});
+
+const updateTaskSchema = z.object({
+  title: z.string().trim().optional(),
+  description: z.string().trim().optional(),
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']).optional(),
+  assignedToId: z.string().trim().optional().nullable(),
+});
+
+export const createTask = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const projectId = req.params.id as string;
+    const validatedData = createTaskSchema.parse(req.body);
+
+    const task = await ProjectService.createTask(
+      projectId,
+      req.user.userId,
+      validatedData.title,
+      validatedData.description,
+      validatedData.assignedToUsername
+    );
+
+    res.status(201).json({ message: 'Task created successfully', task });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
+      return;
+    }
+    res.status(400).json({ message: error.message || 'Failed to create task' });
+  }
+};
+
+export const updateTask = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const projectId = req.params.id as string;
+    const taskId = req.params.taskId as string;
+    const validatedData = updateTaskSchema.parse(req.body);
+
+    const task = await ProjectService.updateTask(
+      projectId,
+      taskId,
+      req.user.userId,
+      validatedData as any
+    );
+
+    res.status(200).json({ message: 'Task updated successfully', task });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
+      return;
+    }
+    res.status(400).json({ message: error.message || 'Failed to update task' });
+  }
+};
+
+export const deleteTask = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const projectId = req.params.id as string;
+    const taskId = req.params.taskId as string;
+
+    await ProjectService.deleteTask(projectId, taskId, req.user.userId);
+    res.status(200).json({ message: 'Task deleted successfully' });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message || 'Failed to delete task' });
   }
 };

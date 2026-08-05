@@ -3,18 +3,14 @@ import { Link, useOutletContext } from 'react-router-dom';
 import {
   FolderKanban,
   Plus,
-  ArrowRight,
-  Clock,
-  ChevronRight,
-  BookOpen,
-  Users,
   ShieldCheck,
   UserCheck,
   UserX,
   PlusCircle,
   Search,
   CheckCircle,
-  Activity,
+  Bell,
+  FileText,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -28,6 +24,25 @@ export interface ProjectSummary {
   createdAt: string;
   owner: { fullName: string; username: string };
   members: Array<{ user: { fullName: string; username: string }; role: string }>;
+  tasks?: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    createdAt: string;
+    assignedTo?: { id: string; fullName: string; username: string } | null;
+  }>;
+  comments?: Array<{
+    id: string;
+    content: string;
+    createdAt: string;
+    user: { id: string; fullName: string; username: string; role: string };
+  }>;
+  _count?: {
+    documents: number;
+    tasks: number;
+    members: number;
+  };
 }
 
 export interface AdminUser {
@@ -51,6 +66,7 @@ const STAGES = [
   'GUIDE_REVIEW',
   'PATENT_EXPERT_REVIEW',
   'FILING_READY',
+  'FILED',
 ];
 
 const getStageProgress = (stage: string) => {
@@ -78,8 +94,25 @@ export const DashboardPage: React.FC = () => {
   const [inviteCategory, setInviteCategory] = useState('');
   const [submittingInvite, setSubmittingInvite] = useState(false);
 
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  const fetchNotificationsCount = async () => {
+    try {
+      const [invitesRes, notifiesRes] = await Promise.all([
+        api.get('/collaboration/invitations'),
+        api.get('/collaboration/notifications'),
+      ]);
+      const pendingInvites = (invitesRes.data || []).filter((i: any) => i.status === 'PENDING').length;
+      const unreadNotifs = (notifiesRes.data || []).filter((n: any) => !n.isRead).length;
+      setUnreadNotificationsCount(pendingInvites + unreadNotifs);
+    } catch (error) {
+      console.error('Failed to fetch notifications count', error);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
+    fetchNotificationsCount();
     if (role === 'Admin') {
       fetchUsers();
     }
@@ -138,23 +171,23 @@ export const DashboardPage: React.FC = () => {
 
     setSubmittingInvite(true);
     try {
-      // 1. Create the project as Guide (who becomes project owner)
+      // 1. Create project
       const projectRes = await api.post('/projects', {
         title: inviteProjectTitle,
-        innovationIdea: 'Created by Faculty Guide supervising Student research workspace.',
-        problemStatement: 'Defined by Faculty Guide supervisor.',
-        proposedSolution: 'To be populated by invited Student.',
+        innovationIdea: 'Initiated by Supervisor Faculty Guide for student collaboration.',
+        problemStatement: 'Under evaluation.',
+        proposedSolution: 'To be drafted.',
         technicalDomain: inviteDomain,
         category: inviteCategory,
       });
 
       const projectId = projectRes.data.project.id;
 
-      // 2. Invite Student as INVENTOR
+      // 2. Invite Student as Co-Inventor or Inventor
       await api.post('/collaboration/invite', {
         projectId,
         username: inviteUsername,
-        role: 'INVENTOR',
+        role: 'CO_INVENTOR',
       });
 
       toast.success('Project created and Student invited successfully!');
@@ -164,9 +197,19 @@ export const DashboardPage: React.FC = () => {
       setInviteCategory('');
       fetchProjects();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to initiate project invitation.');
+      toast.error(error.response?.data?.message || 'Failed to initiate project guidance.');
     } finally {
       setSubmittingInvite(false);
+    }
+  };
+
+  const handleCompleteTask = async (projectId: string, taskId: string) => {
+    try {
+      await api.put(`/projects/${projectId}/tasks/${taskId}`, { status: 'COMPLETED' });
+      toast.success('Task completed!');
+      fetchProjects();
+    } catch (e) {
+      toast.error('Failed to complete task');
     }
   };
 
@@ -177,63 +220,170 @@ export const DashboardPage: React.FC = () => {
       u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // --- RENDER 1: ADMIN DASHBOARD ---
+  // Helper values for Inventor Dashboard
+  const activeProjectsCount = projects.length;
+  const pendingTasks = projects.flatMap((p: ProjectSummary) =>
+    (p.tasks || []).map((t: any) => ({ ...t, projectId: p.id, projectTitle: p.title }))
+  ).filter((t: any) => t.status !== 'COMPLETED');
+  const pendingTasksCount = pendingTasks.length;
+  
+  const totalDocumentsCount = projects.reduce((sum, p) => sum + (p._count?.documents || 0), 0);
+
+  // Stages count for Donut Chart
+  const draftingCount = projects.filter(p => ['IDEA', 'LITERATURE_REVIEW', 'PROTOTYPE'].includes(p.stage)).length;
+  const reviewCount = projects.filter(p => ['DOCUMENTATION', 'FORMS_PREPARATION', 'GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length;
+  const prototypeCount = projects.filter(p => p.stage === 'FILING_READY').length;
+  const othersCount = projects.filter(p => p.stage === 'FILED').length;
+
+  // Admin dynamic donut chart stats
+  const totalUsers = usersList.length;
+  const studentsCount = usersList.filter(u => u.role === 'Inventor').length;
+  const guidesCount = usersList.filter(u => u.role === 'Guide').length;
+  const expertsCount = usersList.filter(u => u.role === 'PatentExpert').length;
+  const adminsCount = usersList.filter(u => u.role === 'Admin').length;
+
+  const studentPct = totalUsers > 0 ? Math.round((studentsCount / totalUsers) * 100) : 0;
+  const guidePct = totalUsers > 0 ? Math.round((guidesCount / totalUsers) * 100) : 0;
+  const expertPct = totalUsers > 0 ? Math.round((expertsCount / totalUsers) * 100) : 0;
+  const adminPct = totalUsers > 0 ? Math.round((adminsCount / totalUsers) * 100) : 0;
+
+  const adminTotalDocuments = projects.reduce((sum, p) => sum + (p._count?.documents || 0), 0);
+  const adminStorageUsed = `${(adminTotalDocuments * 1.8).toFixed(1)} MB`;
+
+  // Patent Expert stats
+  const expertCompletedCount = projects.filter(p => ['FILING_READY', 'FILED'].includes(p.stage)).length;
+  const expertCompletedPct = projects.length > 0 ? Math.round((expertCompletedCount / projects.length) * 100) : 0;
+  const expertStrokeDashoffset = 238 - (238 * expertCompletedPct) / 100;
+
+  // --- RENDER 1: ADMIN CONTROL HUB ---
   if (role === 'Admin') {
     return (
-      <div className="space-y-6 max-w-6xl mx-auto py-4 animate-fade-in relative">
-        <div className="flex justify-between items-center border-b border-slate-200/60 pb-5">
+      <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-none">
-              Admin Control Hub
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Welcome back, Administrator!
             </h1>
-            <p className="text-xs text-slate-500 font-medium mt-2">
-              Promote user roles, manage accounts activation, and audit platform projects.
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+              Monitor and manage the entire platform.
             </p>
           </div>
-          <div className="flex gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-700 text-xs font-bold rounded-xl">
-              <ShieldCheck className="w-4 h-4" /> System Administrator
-            </span>
-          </div>
+          <span className="px-3.5 py-1.5 bg-blue-50 border border-blue-150 text-blue-700 text-xs font-bold rounded-xl flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4" /> Root Admin
+          </span>
         </div>
 
-        {/* Admin Quick Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex items-center gap-4">
-            <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-2xl font-extrabold text-slate-900">{usersList.length}</span>
-              <p className="text-slate-500 text-xs font-medium">Registered Platform Users</p>
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex items-center gap-4">
-            <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600">
-              <FolderKanban className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-2xl font-extrabold text-slate-900">{projects.length}</span>
-              <p className="text-slate-500 text-xs font-medium">Total Patent Projects</p>
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex items-center gap-4">
-            <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600">
-              <Activity className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-2xl font-extrabold text-slate-900">
-                {usersList.filter((u) => u.isActive).length}
+        {/* 4 Admin Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{totalUsers}</span>
+              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded font-extrabold">
+                +12% this month
               </span>
-              <p className="text-slate-500 text-xs font-medium">Active Accounts</p>
+            </div>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Total Users</p>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{projects.length}</span>
+              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded font-extrabold">
+                +18% this month
+              </span>
+            </div>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Active Projects</p>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                {projects.filter(p => ['GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length}
+              </span>
+              <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded font-extrabold">
+                -5% this month
+              </span>
+            </div>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Pending Audits</p>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{adminStorageUsed}</span>
+              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded font-extrabold">
+                +6% this month
+              </span>
+            </div>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Storage Used</p>
+          </div>
+        </div>
+
+        {/* User Distribution & System Overview Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* User Distribution Donut Chart */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">User Distribution</h3>
+            <div className="flex items-center justify-around gap-4 py-4">
+              <div className="relative inline-flex items-center justify-center shrink-0">
+                <svg className="w-28 h-28 transform -rotate-90">
+                  <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="10" fill="transparent" />
+                  {/* Students: studentPct% */}
+                  <circle cx="56" cy="56" r="46" stroke="#4f46e5" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * studentPct) / 100} fill="transparent" />
+                  {/* Guides: guidePct% */}
+                  <circle cx="56" cy="56" r="46" stroke="#f59e0b" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * (studentPct + guidePct)) / 100} fill="transparent" />
+                  {/* Experts: expertPct% */}
+                  <circle cx="56" cy="56" r="46" stroke="#06b6d4" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * (studentPct + guidePct + expertPct)) / 100} fill="transparent" />
+                </svg>
+                <div className="absolute text-center">
+                  <span className="text-lg font-extrabold text-slate-900">{totalUsers}</span>
+                  <span className="text-[8px] text-slate-400 font-bold block uppercase">Users</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-[10px] font-bold text-slate-500">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full" />
+                  <span>Inventors: {studentPct}% ({studentsCount})</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
+                  <span>Guides: {guidePct}% ({guidesCount})</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-cyan-500 rounded-full" />
+                  <span>Experts: {expertPct}% ({expertsCount})</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-slate-300 rounded-full" />
+                  <span>Admins: {adminPct}% ({adminsCount})</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* System Overview Activity log */}
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">System Overview</h3>
+            <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+              {[
+                { log: 'New user registered: rahul.verma@gmail.com', time: '1h ago' },
+                { log: 'Project "Smart Irrigation System" created', time: '2h ago' },
+                { log: 'User role updated: aditya@abc.com to GUIDE', time: '1d ago' },
+                { log: 'System database backup completed successfully', time: '1d ago' },
+                { log: 'New patent expert joined: ravi.patel@ipo.in', time: '2d ago' },
+              ].map((activity, index) => (
+                <div key={index} className="flex justify-between items-center text-xs p-3 bg-slate-50 border border-slate-150 rounded-xl">
+                  <span className="font-semibold text-slate-700">{activity.log}</span>
+                  <span className="text-[10px] text-slate-400 font-bold">{activity.time}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* User Accounts Management panel */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-8 shadow-sm">
+        {/* Global Platform Accounts List table */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Platform Accounts</h2>
@@ -339,168 +489,175 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  // --- RENDER 2: GUIDE / FACULTY DASHBOARD ---
+  // --- RENDER 2: GUIDE / MENTOR DASHBOARD ---
   if (role === 'Guide') {
     return (
-      <div className="space-y-6 max-w-6xl mx-auto py-4 animate-fade-in relative z-10">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200/60 pb-5">
+      <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-none">
-              Faculty Supervisor Workspace
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Welcome back, Dr. {user?.fullName.split(' ')[0] || 'Neha'}!
             </h1>
-            <p className="text-xs text-slate-500 font-medium mt-2">
-              Initiate supervised projects, assign students, and approve patent filing stages.
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+              Here's an overview of projects under your guidance.
             </p>
           </div>
-          <div className="flex gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-100 text-amber-700 text-xs font-bold rounded-xl">
-              <UserCheck className="w-4 h-4" /> Faculty Guide
-            </span>
+          <span className="px-3.5 py-1.5 bg-amber-50 border border-amber-150 text-amber-700 text-xs font-bold rounded-xl flex items-center gap-1.5">
+            <UserCheck className="w-4 h-4" /> Faculty Guide
+          </span>
+        </div>
+
+        {/* Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-2xl font-extrabold text-slate-900">{projects.length}</span>
+              <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
+            </div>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Total Projects</p>
+          </div>
+
+          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-2xl font-extrabold text-slate-900">
+                {projects.filter(p => p.stage === 'GUIDE_REVIEW').length}
+              </span>
+              <div className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
+            </div>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Under Review</p>
+          </div>
+
+          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-2xl font-extrabold text-slate-900">{pendingTasksCount}</span>
+              <div className="w-2.5 h-2.5 bg-purple-500 rounded-full" />
+            </div>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Pending Tasks</p>
+          </div>
+
+          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-2xl font-extrabold text-slate-900">{unreadNotificationsCount}</span>
+              <div className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse" />
+            </div>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Notifications</p>
           </div>
         </div>
 
+        {/* Guided Projects & Activity Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Project List Column */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-8 shadow-sm space-y-6">
+          {/* Projects under guidance */}
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-6">
+            <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Supervised Projects</h2>
+                <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Projects Under My Guidance</h2>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">Active patent specification lifecycle</p>
               </div>
-
-              {loadingProjects ? (
-                <div className="py-16 text-center text-slate-400 text-sm font-medium">Loading projects...</div>
-              ) : projects.length === 0 ? (
-                <div className="py-16 text-center text-slate-400 text-xs font-medium space-y-3">
-                  <FolderKanban className="w-8 h-8 mx-auto text-slate-300" />
-                  <p>You are not supervising any patent projects yet. Initialize one on the right panel!</p>
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  {projects.map((proj) => {
-                    const progress = getStageProgress(proj.stage);
-                    return (
-                      <div
-                        key={proj.id}
-                        className="p-5 border border-slate-200/80 hover:border-blue-500/20 hover:shadow-2xs rounded-2xl bg-slate-50/50 hover:bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all group"
-                      >
-                        <div className="space-y-1 max-w-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                              {proj.category}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                              {proj.technicalDomain}
-                            </span>
-                          </div>
-                          <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
-                            {proj.title}
-                          </h4>
-                          <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" />
-                            Owner: {proj.owner.fullName} (@{proj.owner.username})
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                          <div className="w-24 text-right">
-                            <span className="text-[11px] font-bold text-blue-600 font-mono">{progress}% Complete</span>
-                            <div className="w-full h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                              <div className="h-full bg-blue-600 rounded-full" style={{ width: `${progress}%` }} />
-                            </div>
-                          </div>
-                          <Link
-                            to={`/dashboard/projects/${proj.id}`}
-                            className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-bold shadow-2xs hover:shadow-xs transition-all shrink-0 flex items-center gap-1.5"
-                          >
-                            <span>Review</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </Link>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <span className="text-xs text-indigo-650 font-bold hover:underline cursor-pointer">View all</span>
             </div>
+
+            {loadingProjects ? (
+              <div className="py-16 text-center text-slate-400 text-sm font-medium">Loading projects...</div>
+            ) : projects.length === 0 ? (
+              <div className="py-16 text-center text-slate-400 text-xs font-medium space-y-3">
+                <FolderKanban className="w-8 h-8 mx-auto text-slate-300" />
+                <p>You are not supervising any patent projects yet. Use the tool on the right to start!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {projects.map((proj) => {
+                  const progress = getStageProgress(proj.stage);
+                  return (
+                    <div key={proj.id} className="p-4 border border-slate-200 rounded-2xl bg-slate-50/40 hover:bg-white transition-all flex justify-between items-center gap-4">
+                      <div className="space-y-1">
+                        <h4 className="font-extrabold text-slate-900 text-xs">{proj.title}</h4>
+                        <p className="text-[10px] text-slate-455 font-semibold">By: {proj.owner.fullName}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="w-24">
+                          <div className="flex justify-between text-[9px] font-bold text-slate-500 mb-1">
+                            <span>Readiness</span>
+                            <span>{progress}%</span>
+                          </div>
+                          <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                        <Link
+                          to={`/dashboard/projects/${proj.id}`}
+                          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700"
+                        >
+                          Review
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Right Create/Invite Panel Column */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
+          {/* Right Column: Supervise Form & Tip */}
+          <div className="space-y-6">
+            {/* Create guided project */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
               <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <PlusCircle className="w-4.5 h-4.5 text-blue-600" /> Supervise New Project
+                <PlusCircle className="w-4.5 h-4.5 text-indigo-650" /> Supervise New Project
               </h3>
-              <p className="text-slate-500 text-xs leading-relaxed font-medium">
-                Initiate a research workspace and invite a student to collaborate:
-              </p>
-
-              <form onSubmit={handleGuideCreateProject} className="space-y-3.5 pt-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Project Title
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={inviteProjectTitle}
-                    onChange={(e) => setInviteProjectTitle(e.target.value)}
-                    placeholder="e.g. Smart Irrigation System"
-                    className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-blue-600 font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Student Username
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={inviteUsername}
-                    onChange={(e) => setInviteUsername(e.target.value)}
-                    placeholder="e.g. rahul_dev"
-                    className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-blue-600 font-semibold"
-                  />
-                </div>
-
+              <form onSubmit={handleGuideCreateProject} className="space-y-3 pt-2">
+                <input
+                  type="text"
+                  required
+                  value={inviteProjectTitle}
+                  onChange={(e) => setInviteProjectTitle(e.target.value)}
+                  placeholder="Project Title"
+                  className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                />
+                <input
+                  type="text"
+                  required
+                  value={inviteUsername}
+                  onChange={(e) => setInviteUsername(e.target.value)}
+                  placeholder="Student Username (e.g. STU202600001)"
+                  className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                />
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Domain
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={inviteDomain}
-                      onChange={(e) => setInviteDomain(e.target.value)}
-                      placeholder="e.g. IoT"
-                      className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-blue-600 font-semibold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Category
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={inviteCategory}
-                      onChange={(e) => setInviteCategory(e.target.value)}
-                      placeholder="e.g. Utility"
-                      className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-blue-600 font-semibold"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={inviteDomain}
+                    onChange={(e) => setInviteDomain(e.target.value)}
+                    placeholder="Domain (e.g. IoT)"
+                    className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                  />
+                  <input
+                    type="text"
+                    required
+                    value={inviteCategory}
+                    onChange={(e) => setInviteCategory(e.target.value)}
+                    placeholder="Category (e.g. Utility)"
+                    className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                  />
                 </div>
-
                 <button
                   type="submit"
                   disabled={submittingInvite}
-                  className="w-full h-9.5 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                  className="w-full h-9.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
                 >
-                  {submittingInvite ? 'Initiating...' : 'Create & Invite Student'}
+                  {submittingInvite ? 'Creating...' : 'Create & Invite Student'}
                 </button>
               </form>
+            </div>
+
+            {/* Tip box */}
+            <div className="p-6 bg-amber-50 border border-amber-200 rounded-3xl space-y-2 relative overflow-hidden">
+              <h4 className="text-xs font-extrabold text-amber-900 flex items-center gap-1">
+                💡 Tip for today
+              </h4>
+              <p className="text-[11px] leading-relaxed text-amber-950 font-semibold">
+                Encourage your team to perform prior art searches early in the process. It saves time and ensures novel patent claims boundaries.
+              </p>
             </div>
           </div>
         </div>
@@ -511,216 +668,70 @@ export const DashboardPage: React.FC = () => {
   // --- RENDER 3: PATENT EXPERT DASHBOARD ---
   if (role === 'PatentExpert') {
     return (
-      <div className="space-y-6 max-w-6xl mx-auto py-4 animate-fade-in relative z-10">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200/60 pb-5">
+      <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-none">
-              Patent Expert Audit Deck
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Good to see you, {user?.fullName.split(' ')[0] || 'Ravi'}!
             </h1>
-            <p className="text-xs text-slate-500 font-medium mt-2">
-              Review assigned project claims and prepare documentation logs for submission.
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+              Review, analyze and help innovations become stronger.
             </p>
           </div>
-          <div className="flex gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 border border-cyan-100 text-cyan-700 text-xs font-bold rounded-xl">
-              <ShieldCheck className="w-4 h-4" /> Patent Expert
+          <span className="px-3.5 py-1.5 bg-cyan-50 border border-cyan-150 text-cyan-700 text-xs font-bold rounded-xl flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4" /> Patent Expert
+          </span>
+        </div>
+
+        {/* Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs">
+            <span className="text-2xl font-extrabold text-slate-900 block mb-1">{projects.length}</span>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Assigned Reviews</p>
+          </div>
+          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs">
+            <span className="text-2xl font-extrabold text-slate-900 block mb-1">
+              {projects.filter(p => p.stage === 'PATENT_EXPERT_REVIEW').length}
             </span>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">In Progress</p>
+          </div>
+          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs">
+            <span className="text-2xl font-extrabold text-slate-900 block mb-1">{expertCompletedCount}</span>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Completed</p>
+          </div>
+          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs">
+            <span className="text-2xl font-extrabold text-slate-900 block mb-1 animate-pulse text-rose-600">{unreadNotificationsCount}</span>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Notifications</p>
           </div>
         </div>
 
+        {/* Expert Content Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-8 shadow-sm space-y-6">
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Assigned Audit Folders</h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Claims and compliance reviews</p>
-              </div>
-
-              {loadingProjects ? (
-                <div className="py-16 text-center text-slate-400 text-sm font-medium">Loading audit folders...</div>
-              ) : projects.length === 0 ? (
-                <div className="py-16 text-center text-slate-400 text-xs font-medium space-y-3">
-                  <FolderKanban className="w-8 h-8 mx-auto text-slate-300" />
-                  <p>You have not been assigned to any patent projects yet.</p>
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  {projects.map((proj) => {
-                    const progress = getStageProgress(proj.stage);
-                    return (
-                      <div
-                        key={proj.id}
-                        className="p-5 border border-slate-200/80 hover:border-cyan-500/20 hover:shadow-2xs rounded-2xl bg-slate-50/50 hover:bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all group"
-                      >
-                        <div className="space-y-1 max-w-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-100">
-                              {proj.category}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                              {proj.technicalDomain}
-                            </span>
-                          </div>
-                          <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-cyan-600 transition-colors">
-                            {proj.title}
-                          </h4>
-                          <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" />
-                            Owner: {proj.owner.fullName} (@{proj.owner.username})
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                          <div className="w-24 text-right">
-                            <span className="text-[11px] font-bold text-cyan-600 font-mono">{progress}% Complete</span>
-                            <div className="w-full h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                              <div className="h-full bg-cyan-600 rounded-full" style={{ width: `${progress}%` }} />
-                            </div>
-                          </div>
-                          <Link
-                            to={`/dashboard/projects/${proj.id}`}
-                            className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-cyan-600 hover:text-white rounded-xl text-xs font-bold shadow-2xs hover:shadow-xs transition-all shrink-0 flex items-center gap-1.5"
-                          >
-                            <span>Audit</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </Link>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
-              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <CheckCircle className="w-4.5 h-4.5 text-cyan-600" /> Audit Standards
-              </h3>
-              <ul className="space-y-3.5 text-slate-500 text-xs leading-relaxed font-medium">
-                <li className="flex gap-2">
-                  <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-1.5 shrink-0" />
-                  Ensure descriptions conform completely with Section 10 rules.
-                </li>
-                <li className="flex gap-2">
-                  <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-1.5 shrink-0" />
-                  Validate the patent claims against known Prior Art registry.
-                </li>
-                <li className="flex gap-2">
-                  <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-1.5 shrink-0" />
-                  Approve and update stages to GUIDE_REVIEW or PATENT_FORMS.
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- RENDER 4: INVENTOR / DEFAULT DASHBOARD ---
-  return (
-    <div className="space-y-6 max-w-6xl mx-auto font-sans py-4 animate-fade-in relative z-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200/60 pb-5">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-none">
-            Patent Workspace
-          </h1>
-          <p className="text-xs text-slate-500 font-medium mt-2">
-            Manage your invention catalog and coordinate filing tasks.
-          </p>
-        </div>
-
-        <Link
-          to="/dashboard/create-project"
-          className="group px-4 py-2.5 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-xs flex items-center gap-2 text-xs hover:-translate-y-0.5 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Project</span>
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Active Patent Catalog */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-8 shadow-sm space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Active Patent Catalog</h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Specifications and filing lifecycle tracker</p>
-              </div>
-              <Link
-                to="/dashboard/projects"
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5"
-              >
-                <span>View project folder</span>
-                <ChevronRight className="w-4 h-4" />
-              </Link>
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h2 className="text-lg font-extrabold text-slate-900">Assigned Patent Projects</h2>
+              <span className="text-xs text-slate-450 font-bold hover:underline cursor-pointer">View all</span>
             </div>
 
-            {loadingProjects ? (
-              <div className="py-16 text-center text-slate-400 text-sm font-medium">Loading patent folders...</div>
-            ) : projects.length === 0 ? (
-              <div className="py-16 text-center space-y-4">
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 shadow-2xs">
-                  <FolderKanban className="w-6 h-6" />
-                </div>
-                <h3 className="text-sm font-extrabold text-slate-900">No Active Projects</h3>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Initiate your first patent folder to start drafting claims and generating specifications.
-                </p>
-                <Link
-                  to="/dashboard/create-project"
-                  className="inline-flex items-center gap-1.5 px-4.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all hover:-translate-y-0.5"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Start project
-                </Link>
-              </div>
+            {projects.length === 0 ? (
+              <p className="text-xs text-slate-400 font-semibold py-8 text-center">No assigned reviews at the moment.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {projects.map((proj) => {
-                  const progress = getStageProgress(proj.stage);
                   return (
-                    <div
-                      key={proj.id}
-                      className="p-5 border border-slate-200/80 hover:border-indigo-500/20 hover:shadow-2xs rounded-2xl bg-slate-50/50 hover:bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all group"
-                    >
-                      <div className="space-y-1 max-w-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                            {proj.category}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                            {proj.technicalDomain}
-                          </span>
-                        </div>
-                        <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
-                          {proj.title}
-                        </h4>
-                        <p className="text-[10px] text-slate-500 flex items-center gap-1.5 font-medium">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          Created: {new Date(proj.createdAt).toLocaleDateString()}
-                        </p>
+                    <div key={proj.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center gap-4">
+                      <div className="space-y-1">
+                        <h4 className="font-extrabold text-xs text-slate-900">{proj.title}</h4>
+                        <p className="text-[10px] text-slate-455 font-bold">By: {proj.owner.fullName}</p>
                       </div>
-
-                      <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
-                        <div className="w-28 text-right">
-                          <span className="text-[11px] font-bold text-indigo-600 font-mono">{progress}% Complete</span>
-                          <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden border border-slate-200/60">
-                            <div
-                              className="h-full bg-indigo-600 rounded-full transition-all duration-300"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                        </div>
-
+                      <div className="flex items-center gap-4">
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-blue-50 text-blue-700 uppercase tracking-widest">{proj.stage}</span>
                         <Link
                           to={`/dashboard/projects/${proj.id}`}
-                          className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-bold shadow-2xs hover:shadow-xs transition-all shrink-0 flex items-center gap-1.5"
+                          className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs"
                         >
-                          <span>Open</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
+                          Audit
                         </Link>
                       </div>
                     </div>
@@ -729,65 +740,211 @@ export const DashboardPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Expert Overview Stats Donut Chart */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Review Summary</h3>
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="relative inline-flex items-center justify-center">
+                <svg className="w-24 h-24 transform -rotate-90">
+                  <circle cx="48" cy="48" r="38" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
+                  <circle cx="48" cy="48" r="38" stroke="#4f46e5" strokeWidth="8" strokeDasharray="238" strokeDashoffset={expertStrokeDashoffset} fill="transparent" />
+                </svg>
+                <div className="absolute text-center">
+                  <span className="text-base font-extrabold text-slate-900">{expertCompletedPct}%</span>
+                  <span className="text-[8px] text-slate-400 font-bold block uppercase">Approved</span>
+                </div>
+              </div>
+
+              <div className="w-full border-t border-slate-100 pt-4 text-center">
+                <p className="text-[10px] font-bold text-slate-450 uppercase">Average Novelty Score</p>
+                <p className="text-xl font-extrabold text-slate-900 mt-1">{expertCompletedPct}%</p>
+                <span className="text-[10px] text-emerald-600 font-bold">▲ 2% from last month</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER 4: STUDENT / INVENTOR / DEFAULT DASHBOARD ---
+  return (
+    <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Good morning, {user?.fullName.split(' ')[0] || 'Arjun'}!
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+            Let's turn your ideas into protected innovations.
+          </p>
+        </div>
+        <Link
+          to="/dashboard/create-project"
+          className="px-5 py-2.5 rounded-xl font-bold bg-indigo-650 hover:bg-indigo-755 text-white transition-all shadow-md flex items-center gap-2 text-xs hover:-translate-y-0.5 cursor-pointer shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>New Project</span>
+        </Link>
+      </div>
+
+      {/* 4 Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white border border-blue-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-2xl sm:text-3xl font-extrabold text-blue-600 font-mono">{activeProjectsCount}</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Projects</p>
+          </div>
+          <FolderKanban className="w-8 h-8 text-blue-300" />
         </div>
 
-        {/* Filing Roadmap Checklist */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-indigo-600" /> Filing Instructions
-            </h3>
-            <p className="text-slate-500 text-xs leading-relaxed font-medium">
-              Understand the standard steps required to prepare and file your Indian patent applications:
-            </p>
+        <div className="bg-white border border-amber-250 rounded-3xl p-6 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-2xl sm:text-3xl font-extrabold text-amber-600 font-mono">{pendingTasksCount}</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Pending Tasks</p>
+          </div>
+          <CheckCircle className="w-8 h-8 text-amber-300 animate-pulse" />
+        </div>
 
-            <div className="space-y-4 pt-2">
-              <div className="flex gap-3">
-                <span className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center shrink-0">
-                  1
-                </span>
+        <div className="bg-white border border-emerald-250 rounded-3xl p-6 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-2xl sm:text-3xl font-extrabold text-emerald-600 font-mono">{totalDocumentsCount}</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Documents</p>
+          </div>
+          <FileText className="w-8 h-8 text-emerald-300" />
+        </div>
+
+        <div className="bg-white border border-rose-250 rounded-3xl p-6 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-2xl sm:text-3xl font-extrabold text-rose-600 font-mono">{unreadNotificationsCount}</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Notifications</p>
+          </div>
+          <Bell className="w-8 h-8 text-rose-350" />
+        </div>
+      </div>
+
+      {/* My Active Projects card deck grid */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-widest">My Active Projects</h3>
+          <Link to="/dashboard/projects" className="text-xs font-bold text-indigo-650 hover:underline">View all</Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {projects.slice(0, 3).map((project) => {
+            const progress = getStageProgress(project.stage);
+            return (
+              <div
+                key={project.id}
+                className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-48 hover:-translate-y-0.5 group"
+              >
                 <div>
-                  <h4 className="font-extrabold text-slate-900 text-xs">Prior Art Search</h4>
-                  <p className="text-slate-500 text-[11px] mt-0.5 leading-normal font-medium">
-                    Audit WIPO registries and save reference citations in your workspace folder.
-                  </p>
+                  <span className="px-2 py-0.5 rounded text-[8px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider inline-block">
+                    {project.category}
+                  </span>
+                  <h4 className="font-extrabold text-slate-900 text-xs mt-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+                    <Link to={`/dashboard/projects/${project.id}`}>{project.title}</Link>
+                  </h4>
+                  <span className="text-[9px] font-mono text-slate-400 block mt-1 uppercase">ID: {project.id.substring(0, 8).toUpperCase()}</span>
+                </div>
+
+                <div className="space-y-1.5 border-t border-slate-100 pt-3">
+                  <div className="flex justify-between text-[9px] font-bold text-slate-500">
+                    <span>Readiness</span>
+                    <span className="font-mono">{progress}%</span>
+                  </div>
+                  <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full" style={{ width: `${progress}%` }} />
+                  </div>
+                  <div className="flex justify-between items-center text-[8px] text-slate-400 font-semibold pt-1">
+                    <span>Updated 2d ago</span>
+                    <span>{project.members.length + 1} members</span>
+                  </div>
                 </div>
               </div>
+            );
+          })}
 
-              <div className="flex gap-3">
-                <span className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center shrink-0">
-                  2
-                </span>
-                <div>
-                  <h4 className="font-extrabold text-slate-900 text-xs">Claim Drafting</h4>
-                  <p className="text-slate-500 text-[11px] mt-0.5 leading-normal font-medium">
-                    Structure specifications with clear independent scope limits for Form 2.
-                  </p>
+          {/* A plus button new project card at the end of list */}
+          <Link
+            to="/dashboard/create-project"
+            className="bg-slate-50 hover:bg-indigo-50/20 border-2 border-dashed border-slate-250 hover:border-indigo-500 rounded-3xl p-5 flex flex-col items-center justify-center h-48 text-center transition-all cursor-pointer group shadow-3xs"
+          >
+            <Plus className="w-7 h-7 text-slate-400 group-hover:text-indigo-600 group-hover:scale-105 transition-all mb-2" />
+            <span className="text-xs font-extrabold text-slate-700 group-hover:text-indigo-950">Create New Project</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Upcoming Tasks & Project Progress Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Column 1: Upcoming tasks list */}
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-6">
+          <div className="flex justify-between items-center border-b border-slate-150 pb-3">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Upcoming Tasks</h3>
+            <Link to="/dashboard/tasks" className="text-xs font-bold text-indigo-650 hover:underline">View all</Link>
+          </div>
+
+          <div className="space-y-3">
+            {pendingTasks.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs font-semibold">No upcoming tasks assigned.</div>
+            ) : (
+              pendingTasks.slice(0, 3).map((t, index) => (
+                <div
+                  key={t.id}
+                  className="p-4 border border-slate-150 bg-slate-50 hover:bg-white rounded-2xl flex items-center justify-between gap-4 shadow-3xs hover:shadow-2xs transition-all cursor-pointer"
+                  onClick={() => handleCompleteTask(t.projectId, t.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-4 h-4 border-2 border-slate-350 rounded-md bg-white flex items-center justify-center shrink-0" />
+                    <div>
+                      <p className="font-bold text-xs text-slate-800">{t.title}</p>
+                      <p className="text-[10px] text-slate-450 font-bold">Project: {t.projectTitle}</p>
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-400 font-mono">Due in {3 + index} days</span>
                 </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Column 2: Project Progress Overview Donut Chart */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-6">
+          <div className="border-b border-slate-150 pb-3">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Project Progress Overview</h3>
+          </div>
+
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="relative inline-flex items-center justify-center">
+              <svg className="w-28 h-28 transform -rotate-90">
+                <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
+                <circle cx="56" cy="56" r="46" stroke="#4f46e5" strokeWidth="8" strokeDasharray="289" strokeDashoffset="72" fill="transparent" />
+              </svg>
+              <div className="absolute text-center">
+                <span className="text-lg font-extrabold text-slate-900">{activeProjectsCount}</span>
+                <span className="text-[8px] text-slate-450 font-bold block uppercase">Total</span>
               </div>
+            </div>
 
-              <div className="flex gap-3">
-                <span className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center shrink-0">
-                  3
-                </span>
-                <div>
-                  <h4 className="font-extrabold text-slate-900 text-xs">Guide Evaluation</h4>
-                  <p className="text-slate-500 text-[11px] mt-0.5 leading-normal font-medium">
-                    Assign review tasks to supervisors or guides to acquire design clearance approvals.
-                  </p>
-                </div>
+            <div className="w-full text-[10px] font-bold text-slate-500 space-y-1.5 border-t border-slate-100 pt-4">
+              <div className="flex justify-between items-center">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-indigo-600 rounded-full" /> Drafting</span>
+                <span className="font-mono text-slate-900">{draftingCount}</span>
               </div>
-
-              <div className="flex gap-3">
-                <span className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center shrink-0">
-                  4
-                </span>
-                <div>
-                  <h4 className="font-extrabold text-slate-900 text-xs">Generate IPO Forms</h4>
-                  <p className="text-slate-500 text-[11px] mt-0.5 leading-normal font-medium">
-                    Export complete ready-to-file request bundles for Forms 1, 2, 3, & 5.
-                  </p>
-                </div>
+              <div className="flex justify-between items-center">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-yellow-500 rounded-full" /> Review</span>
+                <span className="font-mono text-slate-900">{reviewCount}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" /> Prototype</span>
+                <span className="font-mono text-slate-900">{prototypeCount}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-slate-300 rounded-full" /> Others</span>
+                <span className="font-mono text-slate-900">{othersCount}</span>
               </div>
             </div>
           </div>

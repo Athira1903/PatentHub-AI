@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Check, X, Clock, Mail } from 'lucide-react';
+import { Bell, Clock, Mail, CheckSquare, Search } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -34,6 +34,8 @@ export const NotificationsPage: React.FC = () => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'ALL' | 'UNREAD' | 'MENTIONS' | 'TASKS'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchInbox();
@@ -71,125 +73,225 @@ export const NotificationsPage: React.FC = () => {
       setNotifications((prev) =>
         prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
       );
+      toast.success('Notification marked as read');
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }
   };
 
+  // Consolidate both invites and notifications into a single chronological feed
+  const feedItems = [
+    ...invitations.map((invite) => ({
+      feedId: `invite-${invite.id}`,
+      type: 'INVITATION',
+      date: new Date(invite.createdAt),
+      isRead: invite.status !== 'PENDING',
+      raw: invite,
+    })),
+    ...notifications.map((n) => ({
+      feedId: `notif-${n.id}`,
+      type: n.type,
+      date: new Date(n.createdAt),
+      isRead: n.isRead,
+      raw: n,
+    })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  // Filter items based on activeTab
+  const filteredFeed = feedItems.filter((item) => {
+    // 1. Search Query filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      if (item.type === 'INVITATION') {
+        const inv = item.raw as Invitation;
+        if (
+          !inv.project.title.toLowerCase().includes(query) &&
+          !inv.sender.fullName.toLowerCase().includes(query) &&
+          !inv.sender.username.toLowerCase().includes(query)
+        ) {
+          return false;
+        }
+      } else {
+        const notif = item.raw as NotificationItem;
+        if (!notif.title.toLowerCase().includes(query) && !notif.message.toLowerCase().includes(query)) {
+          return false;
+        }
+      }
+    }
+
+    // 2. Category Tab filter
+    if (activeTab === 'UNREAD') {
+      return !item.isRead;
+    }
+    if (activeTab === 'MENTIONS') {
+      return item.type === 'MENTION' || (item.type !== 'INVITATION' && (item.raw as NotificationItem).message.toLowerCase().includes('mentioned'));
+    }
+    if (activeTab === 'TASKS') {
+      return item.type === 'TASK' || (item.type !== 'INVITATION' && (item.raw as NotificationItem).message.toLowerCase().includes('task'));
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto py-4 font-sans animate-fade-in relative z-10">
-      <div>
-        <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Collaboration Inbox</h2>
-        <p className="text-xs text-slate-500 font-semibold mt-0.5">
-          Accept project invitations and view recent activity updates
-        </p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Notifications</h2>
+          <p className="text-xs text-slate-500 font-semibold mt-0.5">
+            Accept project workspace invitations and audit active system alerts.
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-        {/* Left Column: Pending Invitations List */}
-        <div className="md:col-span-2 space-y-4">
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-4">
-            <h3 className="text-sm font-extrabold text-slate-900 tracking-tight uppercase tracking-wider flex items-center gap-2">
-              <Mail className="w-4 h-4 text-blue-600" /> Pending Invitations ({invitations.length})
-            </h3>
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+        {/* Navigation Tabs and Search bar */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
+          <div className="flex flex-wrap gap-2">
+            {(['ALL', 'UNREAD', 'MENTIONS', 'TASKS'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  activeTab === tab
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {tab === 'ALL'
+                  ? 'All Alerts'
+                  : tab === 'UNREAD'
+                  ? 'Unread'
+                  : tab === 'MENTIONS'
+                  ? 'Mentions'
+                  : 'Tasks'}
+              </button>
+            ))}
+          </div>
 
-            {loading ? (
-              <div className="py-12 text-center text-slate-400 text-xs font-semibold">Loading inbox...</div>
-            ) : invitations.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs font-semibold">
-                No pending project invitations.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {invitations.map((invite) => {
-                  const roleLabel = invite.role.toLowerCase().replace('_', ' ');
-                  return (
-                    <div
-                      key={invite.id}
-                      className="p-5 border border-slate-100 bg-slate-50/50 rounded-2xl flex flex-col justify-between gap-4 transition-all"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 font-bold text-[9px] uppercase rounded">
-                            Role: {roleLabel}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                            {invite.project.technicalDomain}
-                          </span>
-                        </div>
-                        <h4 className="font-extrabold text-slate-900 text-sm">
-                          {invite.project.title}
-                        </h4>
-                        <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
-                          Invited by <strong className="text-slate-700">@{invite.sender.username}</strong> ({invite.sender.fullName}) 
-                          {invite.sender.institution && ` from ${invite.sender.institution}`}.
-                        </p>
+          <div className="relative w-full md:w-64">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search notifications..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-9 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+            />
+          </div>
+        </div>
+
+        {/* Dynamic Inbox List Feed */}
+        {loading ? (
+          <div className="py-16 text-center text-slate-400 text-xs font-semibold">Loading inbox feed...</div>
+        ) : filteredFeed.length === 0 ? (
+          <div className="py-16 text-center text-slate-400 text-xs font-semibold space-y-2">
+            <Bell className="w-10 h-10 mx-auto text-slate-300" />
+            <p>No notifications found matching this filter.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredFeed.map((item) => {
+              if (item.type === 'INVITATION') {
+                const invite = item.raw as Invitation;
+                const roleLabel = invite.role.toLowerCase().replace('_', ' ');
+                return (
+                  <div
+                    key={item.feedId}
+                    className="p-5 border border-slate-200 bg-slate-50/30 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-indigo-400/30 transition-colors shadow-3xs"
+                  >
+                    <div className="space-y-1.5 max-w-xl">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-150 text-[9px] font-bold uppercase tracking-wider">
+                          <Mail className="w-3 h-3" /> Project Invitation
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">• {invite.project.technicalDomain}</span>
                       </div>
+                      <h4 className="font-extrabold text-sm text-slate-900 leading-tight">
+                        Join Workspace: "{invite.project.title}"
+                      </h4>
+                      <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                        You have been invited by <strong className="text-slate-700">@{invite.sender.username}</strong> ({invite.sender.fullName}) 
+                        to collaborate as a <strong className="text-slate-750">{roleLabel}</strong>.
+                      </p>
+                      <div className="text-[10px] text-slate-400 flex items-center gap-1 font-bold pt-1">
+                        <Clock className="w-3.5 h-3.5" /> {item.date.toLocaleDateString()}
+                      </div>
+                    </div>
 
-                      <div className="flex items-center gap-2 pt-2 border-t border-slate-100/60 justify-end">
+                    {invite.status === 'PENDING' ? (
+                      <div className="flex items-center gap-2 w-full md:w-auto justify-end shrink-0">
                         <button
                           type="button"
                           onClick={() => handleRespond(invite.id, 'REJECTED')}
-                          className="px-3.5 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 rounded-xl text-xs font-extrabold shadow-2xs hover:border-rose-100 border border-transparent transition-all flex items-center gap-1.5 cursor-pointer"
+                          className="px-3.5 py-2 bg-white hover:bg-rose-50 text-rose-650 hover:text-rose-700 rounded-xl text-xs font-bold border border-slate-200 hover:border-rose-200 shadow-3xs transition-all cursor-pointer"
                         >
-                          <X className="w-3.5 h-3.5" /> Decline
+                          Decline
                         </button>
                         <button
                           type="button"
                           onClick={() => handleRespond(invite.id, 'ACCEPTED')}
-                          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                          className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer"
                         >
-                          <Check className="w-3.5 h-3.5" /> Accept Invite
+                          Accept
                         </button>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Activity Notifications List */}
-        <div className="md:col-span-1 space-y-4">
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-4">
-            <h3 className="text-sm font-extrabold text-slate-900 tracking-tight uppercase tracking-wider flex items-center gap-2">
-              <Bell className="w-4 h-4 text-blue-600" /> Notifications Inbox
-            </h3>
-
-            {loading ? (
-              <div className="py-12 text-center text-slate-400 text-xs font-semibold">Loading notifications...</div>
-            ) : notifications.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs font-semibold">
-                No activity alerts.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {notifications.map((n) => (
+                    ) : (
+                      <span className="px-3 py-1 bg-slate-100 text-slate-450 border border-slate-200 rounded-xl text-xs font-bold">
+                        {invite.status}
+                      </span>
+                    )}
+                  </div>
+                );
+              } else {
+                const notif = item.raw as NotificationItem;
+                const isTask = notif.type === 'TASK' || notif.message.toLowerCase().includes('task');
+                return (
                   <div
-                    key={n.id}
-                    onClick={() => !n.isRead && handleMarkAsRead(n.id)}
-                    className={`p-3.5 rounded-xl border transition-all text-xs font-medium cursor-pointer ${
-                      n.isRead
-                        ? 'bg-white border-slate-100 text-slate-500'
-                        : 'bg-blue-50/40 border-blue-100/60 text-slate-800 font-semibold'
+                    key={item.feedId}
+                    className={`p-4 border rounded-2xl flex justify-between items-start gap-4 transition-all shadow-3xs ${
+                      notif.isRead
+                        ? 'bg-white border-slate-200 text-slate-500'
+                        : 'bg-indigo-50/20 border-indigo-100/70 text-slate-800'
                     }`}
                   >
-                    <div className="flex justify-between items-start gap-1">
-                      <span className="font-extrabold text-slate-900 leading-tight">{n.title}</span>
-                      {!n.isRead && <span className="w-1.5 h-1.5 bg-blue-600 rounded-full shrink-0" />}
+                    <div className="flex gap-3">
+                      <div className="mt-0.5 shrink-0">
+                        {isTask ? (
+                          <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                            <CheckSquare className="w-4 h-4" />
+                          </div>
+                        ) : (
+                          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                            <Bell className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className={`font-extrabold text-xs text-slate-900 ${notif.isRead ? '' : 'font-bold text-slate-950'}`}>
+                          {notif.title}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-0.5">{notif.message}</p>
+                        <div className="text-[9px] text-slate-400 flex items-center gap-1 font-bold mt-2">
+                          <Clock className="w-3 h-3" /> {item.date.toLocaleDateString()}
+                        </div>
+                      </div>
                     </div>
-                    <p className="mt-1 text-slate-500 leading-relaxed text-[11px]">{n.message}</p>
-                    <div className="mt-2 text-[10px] text-slate-400 flex items-center gap-1 font-bold">
-                      <Clock className="w-3 h-3 text-slate-300" />
-                      {new Date(n.createdAt).toLocaleDateString()}
-                    </div>
+
+                    {!notif.isRead && (
+                      <button
+                        onClick={() => handleMarkAsRead(notif.id)}
+                        className="px-2.5 py-1 text-[9px] font-bold border border-indigo-200 hover:border-indigo-500 bg-white text-indigo-700 hover:bg-indigo-50 rounded-lg shrink-0 transition-colors cursor-pointer"
+                      >
+                        Mark Read
+                      </button>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              }
+            })}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

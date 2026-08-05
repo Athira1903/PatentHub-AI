@@ -175,8 +175,13 @@ class AuthService {
         };
     }
     static async login(input) {
-        const user = await db_1.prisma.user.findUnique({
-            where: { username: input.emailOrUsername },
+        const user = await db_1.prisma.user.findFirst({
+            where: {
+                OR: [
+                    { username: input.emailOrUsername },
+                    { email: input.emailOrUsername.toLowerCase() }
+                ]
+            },
             include: { role: true },
         });
         if (!user) {

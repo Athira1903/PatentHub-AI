@@ -207,8 +207,13 @@ export class AuthService {
   }
 
   static async login(input: LoginInput) {
-    const user = await prisma.user.findUnique({
-      where: { username: input.emailOrUsername },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: input.emailOrUsername },
+          { email: input.emailOrUsername.toLowerCase() }
+        ]
+      },
       include: { role: true },
     });
 

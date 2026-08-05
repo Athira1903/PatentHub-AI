@@ -1,0 +1,984 @@
+﻿diff --git a/client/src/pages/HomePage.tsx b/client/src/pages/HomePage.tsx
+index a911993..0f73faa 100644
+--- a/client/src/pages/HomePage.tsx
++++ b/client/src/pages/HomePage.tsx
+@@ -1,203 +1,846 @@
+-import React from 'react';
++import React, { useState } from 'react';
+ import { Link } from 'react-router-dom';
+ import { motion } from 'framer-motion';
+-import { 
+-  FileCode, 
++import {
++  FileText,
+   ShieldCheck,
+-  Sparkles,
+   Users,
+-  Compass,
+-  Search
++  Search,
++  BookOpen,
++  X,
++  Play,
++  Cpu,
++  Lock,
++  Layers,
++  Briefcase,
++  CheckCircle2,
++  MessageSquare,
++  ChevronRight,
++  Sparkles,
+ } from 'lucide-react';
++import { SplitText } from '../components/ui/SplitText';
++import { ShinyText } from '../components/ui/ShinyText';
++import { DecryptedText } from '../components/ui/DecryptedText';
++import { SpotlightCard } from '../components/ui/SpotlightCard';
++import { BorderBeam } from '../components/ui/BorderBeam';
++import { Magnet } from '../components/ui/Magnet';
+ 
+ export const HomePage: React.FC = () => {
++  // Navigation & Interactive Tabs state
++  const [activePreviewTab, setActivePreviewTab] = useState<'student' | 'guide' | 'expert' | 'admin'>('student');
++  const [sandboxSection, setSandboxSection] = useState<'abstract' | 'claims' | 'schematics'>('abstract');
++  const [openFaq, setOpenFaq] = useState<number | null>(null);
++  const [showVideoModal, setShowVideoModal] = useState(false);
++
++  const stats = [
++    { value: '25M+', label: 'Patent Records Scanned' },
++    { value: '100K+', label: 'Researchers Onboarded' },
++    { value: '99%', label: 'Secure Sandbox Workspace' },
++    { value: '6', label: 'Specification Engines' },
++    { value: '10+', label: 'Patent Workflow Stages' },
++  ];
++
++  const features = [
++    { title: 'Prior-Art Index Mapping', desc: 'Scan global database registries instantly for prior art references using semantic query matching.', icon: Search },
++    { title: 'Secure Multi-Role Sandbox', desc: 'Dedicated portals with customized permissions for inventors, co-inventors, and faculty guides.', icon: Users },
++    { title: 'Patent Stage Progression', desc: 'Interactive visual workflow tracking drafts from initial concept disclosures to filing-ready packages.', icon: Layers },
++    { title: 'Specification Compliance Audits', desc: 'Automated compliance engines checking your drafts against official patent guidelines and format requirements.', icon: FileText },
++    { title: 'Institutional Controls', desc: 'Centralized administrative controls for engineering universities, research labs, and academic departments.', icon: Briefcase },
++    { title: 'Enterprise Data Isolation', desc: 'Robust data isolation protocols ensuring unpublished drafts remain fully confidential and private.', icon: Lock },
++  ];
++
++  const aiModules = [
++    { tag: 'Interactive Companion', title: 'Specification Drafting Assistant', desc: 'Preloaded outlines and prompts to structure claims and specification summaries.' },
++    { tag: 'Registry Scanner', title: 'Prior-Art Mapping Engine', desc: 'Evaluates claim abstracts against USPTO, WIPO, and IPO database archives.' },
++    { tag: 'Novelty Indexer', title: 'Overlap Diagnostic Audit', desc: 'Compares text blocks to calculate similarity scores and highlight overlap citations.' },
++    { tag: 'Claims Builder', title: 'Claims Schema Drafter', desc: 'Helps construct legally compliant independent and dependent claim trees.' },
++    { tag: 'Blueprint Converter', title: 'Schematic Vector Engine', desc: 'Transforms engineering draft sketches into clean, compliant technical line drawings.' },
++    { tag: 'IPO Packager', title: 'Filing Package Compiler', desc: 'Generates ready-to-file Indian IPO Forms 1, 2, 3, 5, and 26 specification packages.' },
++  ];
++
++  const steps = [
++    { num: '01', title: 'Setup Workspace', desc: 'Register inventor profile and configure specific institutional domain routing.' },
++    { num: '02', title: 'Define Project', desc: 'Establish the project directory, keywords, and invite authorized co-inventors.' },
++    { num: '03', title: 'Draft Specifications', desc: 'Build claims, write abstract descriptions, and compile technical drawings.' },
++    { num: '04', title: 'Supervisor Review', desc: 'Submit drafts for guide annotation, review feedback, and official sign-off.' },
++  ];
++
++  const techStack = [
++    { name: 'React', desc: 'Frontend Framework' },
++    { name: 'Node.js', desc: 'API Endpoint Server' },
++    { name: 'PostgreSQL', desc: 'Relational Database Store' },
++    { name: 'Gemini AI', desc: 'Semantic Prompt Engine' },
++    { name: 'Firebase', desc: 'Identity Provider' },
++    { name: 'Lens API', desc: 'Patent Index Registry' },
++    { name: 'OCR Processor', desc: 'Specification Reader' },
++    { name: 'REST APIs', desc: 'Client Communication' },
++  ];
++
++  const testimonials = [
++    { quote: "PatentHub AI took our lab sketch blueprints and turned them into ready-to-file Form 2 sheets in days. The prior art scanner is exceptionally detailed.", author: "Dr. Athira Biju", role: "Student Innovator, CET" },
++    { quote: "Being able to review my research team's drafts, leave inline comments, and track their timeline in one workspace has saved us hours of meetings.", author: "Prof. Rajesh Nair", role: "Faculty Research Guide" },
++    { quote: "The claims bypass recommendations highlight overlaps that keyword searches miss entirely. It gives our inventors a massive head start.", author: "Adv. Meera Sen", role: "Patent Expert Coordinator" },
++  ];
++
++  const faqs = [
++    { q: 'What is PatentHub AI?', a: 'PatentHub AI is an enterprise-grade collaborative workspace designed to streamline patent preparation from concept drafting to filing-ready IPO package compilation.' },
++    { q: 'Who can use the platform?', a: 'Engineering universities, research laboratories, individual inventors, co-inventors, and faculty guides.' },
++    { q: 'Does it file patents automatically?', a: 'It compiles pre-populated, official IPO Forms 1, 2, 3, 5, and 26 specification PDFs. Users download these for agent signature and submission.' },
++    { q: 'How does AI similarity checking work?', a: 'It runs semantic models comparing your disclosure texts with USPTO/WIPO data records to calculate overlap indicators.' },
++    { q: 'Can multiple inventors collaborate?', a: 'Yes. Inventors can invite co-inventors and faculty supervisors to review drafts, complete tasks, and sign off on timeline stages.' },
++  ];
++
+   return (
+-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-600 selection:text-white relative">
++    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-600 selection:text-white relative overflow-hidden">
+       {/* Decorative Grid Mesh */}
+-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none opacity-50 -z-10" />
++      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none opacity-40 -z-10" />
++
++      {/* 1. NAVIGATION BAR */}
++      <header className="sticky top-0 z-50 w-full px-4 sm:px-6 lg:px-8 pt-4 pb-2 transition-all duration-300 pointer-events-none">
++        <nav className="max-w-7xl mx-auto bg-white/85 backdrop-blur-xl border border-slate-200/80 shadow-xs rounded-full px-6 py-2.5 flex items-center justify-between pointer-events-auto">
++          {/* Logo */}
++          <Link to="/" className="flex items-center gap-2 group font-heading">
++            <span className="font-extrabold text-lg tracking-tight text-slate-950 lowercase">
++              patenthub<span className="text-cyan-500 font-extrabold">.</span>
++            </span>
++          </Link>
++
++          {/* Links */}
++          <div className="hidden lg:flex items-center gap-8 text-[11px] font-bold uppercase tracking-wider text-slate-600">
++            <Link to="/" className="hover:text-indigo-600 transition-colors">Home</Link>
++            <Link to="/about" className="hover:text-indigo-600 transition-colors">About</Link>
++            <Link to="/patents" className="hover:text-indigo-600 transition-colors">Patents</Link>
++            <Link to="/ai-assistant" className="hover:text-indigo-600 transition-colors">AI Assistant</Link>
++          </div>
++
++          {/* Actions */}
++          <div className="flex items-center gap-3">
++            <Link
++              to="/register"
++              className="px-5 py-2.5 text-xs font-extrabold bg-slate-950 hover:bg-slate-900 text-white rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer"
++            >
++              Get Started
++            </Link>
++          </div>
++        </nav>
++      </header>
+ 
+-      {/* Hero Section */}
+-      <section className="pt-28 pb-16 px-6 max-w-7xl mx-auto text-center relative z-10">
++      {/* 2. HERO SECTION */}
++      <section id="home" className="pt-20 pb-16 px-6 max-w-7xl mx-auto text-center relative z-10 space-y-8">
+         <motion.div
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ duration: 0.5 }}
++          className="space-y-6"
+         >
+-          {/* Version Pill */}
+-          <div className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold bg-slate-100 border border-slate-200/80 text-slate-500 mb-8 shadow-2xs tracking-tight">
+-            <span>Secure & IPO-Compliant Patent Workspace</span>
++          <div className="inline-flex items-center px-3.5 py-1 rounded-full text-[10px] font-bold bg-indigo-50 border border-indigo-150 text-indigo-700 shadow-3xs tracking-wider uppercase">
++            Γ£ª <DecryptedText text="Institutional Patent Collaboration Sandbox" speed={30} sequential={true} />
+           </div>
+ 
+-          {/* Large Hero Title */}
+-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-slate-950 tracking-tight leading-[1.08] max-w-4xl mx-auto font-heading">
+-            From lab notebook to <br className="hidden sm:inline" />
+-            filing-ready patent
++          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-slate-955 tracking-tight leading-[1.08] max-w-4xl mx-auto font-heading">
++            <SplitText text="Transform Research Blueprints into" delay={40} className="justify-center" /> <br className="hidden sm:inline" />
++            <ShinyText text="Compliance-Verified Patents" speed={4} className="font-extrabold" />
+           </h1>
+ 
+-          {/* Subtitle description */}
+-          <p className="mt-8 text-base sm:text-lg text-slate-600 max-w-3xl mx-auto leading-relaxed font-semibold">
+-            One workspace where inventors, co-inventors and faculty guides prepare an Indian patent application together ΓÇö with AI doing the searching, summarising and checking.
++          <p className="mt-4 text-sm sm:text-base text-slate-655 max-w-2xl mx-auto leading-relaxed font-semibold">
++            The integrated workspace for innovators, faculty guides, and patent experts. Streamline prior-art registry checks, build claims schemas, coordinate review comments, and audit Indian IPO compliance.
+           </p>
+ 
+-          {/* CTA Buttons */}
+-          <div className="mt-10 flex flex-wrap justify-center gap-4">
+-            <Link to="/register" className="px-7 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-full transition-all duration-300 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/35 hover:-translate-y-0.5">
+-              <span>Create your account</span>
+-            </Link>
++          <div className="flex flex-wrap justify-center gap-3.5 pt-4">
++            <Magnet magnetStrength={0.25}>
++              <Link
++                to="/register"
++                className="px-7 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-full transition-all shadow-md cursor-pointer hover:-translate-y-0.5 inline-block"
++              >
++                Get Started
++              </Link>
++            </Magnet>
++            <Magnet magnetStrength={0.2}>
++              <button
++                onClick={() => setShowVideoModal(true)}
++                className="px-7 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-extrabold rounded-full transition-all shadow-2xs cursor-pointer flex items-center gap-2"
++              >
++                <Play className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
++                <span>Watch Demo</span>
++              </button>
++            </Magnet>
+           </div>
+         </motion.div>
+-      </section>
+ 
+-      {/* Three Value Proposition Cards (Matches Screenshot layout exactly) */}
+-      <section className="pb-24 px-6 max-w-7xl mx-auto relative z-10">
+-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+-          {/* Card 1 */}
+-          <div className="p-8 rounded-3xl bg-white border border-slate-200/80 shadow-xs flex flex-col items-start text-left gap-5 hover:border-blue-500/35 hover:shadow-md transition-all duration-300 group">
+-            <div className="p-3 rounded-2xl bg-blue-50 text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
+-              <Users className="w-5 h-5" />
++        {/* Interactive Patent Workspace Sandbox */}
++        <div className="max-w-5xl mx-auto pt-8">
++          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-1 shadow-2xl relative overflow-hidden transition-all duration-350 hover:border-slate-700/60">
++            {/* Top Bar / Navigation tabs */}
++            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-slate-950 px-5 py-3.5 border-b border-slate-800 gap-3">
++              <div className="flex items-center gap-1.5">
++                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
++                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
++                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
++                <span className="text-[10px] text-slate-500 font-bold ml-2 font-mono">patent_draft_v3.spec</span>
++              </div>
++              <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-xl border border-slate-800">
++                {(['abstract', 'claims', 'schematics'] as const).map((sec) => (
++                  <button
++                    key={sec}
++                    onClick={() => setSandboxSection(sec)}
++                    className={`px-3.5 py-1.5 text-[10px] uppercase font-bold tracking-wider rounded-lg transition-all cursor-pointer ${sandboxSection === sec
++                        ? 'bg-slate-800 text-white shadow-sm'
++                        : 'text-slate-400 hover:text-slate-200'
++                      }`}
++                  >
++                    {sec}
++                  </button>
++                ))}
++              </div>
+             </div>
+-            <div>
+-              <h3 className="font-extrabold text-slate-900 text-sm mb-2 tracking-tight">Co-inventors & guides</h3>
+-              <p className="text-slate-600 text-xs leading-relaxed font-semibold">
+-                Invite by username, set per-member permissions, and let guides accept supervision requests.
+-              </p>
++
++            {/* Editor Workspace Layout */}
++            <div className="grid grid-cols-1 lg:grid-cols-12 text-left bg-slate-950/80 min-h-[380px]">
++              {/* Left Navigation Tree */}
++              <div className="lg:col-span-3 border-r border-slate-900 p-4 space-y-4 hidden lg:block">
++                <div className="space-y-1">
++                  <span className="text-[9px] font-bold text-slate-550 block uppercase tracking-widest">Workspace Project</span>
++                  <h4 className="font-extrabold text-[11px] text-slate-200 truncate">Decentered IoT Grid Controller</h4>
++                </div>
++                <div className="space-y-1.5 pt-2">
++                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block mb-2">IPO Draft Forms</span>
++                  <div className="flex items-center gap-2 p-1.5 bg-slate-900 rounded-lg text-slate-200 text-[10px] font-bold border border-slate-850 cursor-pointer">
++                    <FileText className="w-3.5 h-3.5 text-cyan-400" />
++                    <span>IPO Form 1 (Metadata)</span>
++                  </div>
++                  <div className="flex items-center gap-2 p-1.5 bg-slate-900/40 hover:bg-slate-900 rounded-lg text-slate-350 text-[10px] font-bold cursor-pointer">
++                    <FileText className="w-3.5 h-3.5 text-slate-500" />
++                    <span>IPO Form 2 (Complete Spec)</span>
++                  </div>
++                  <div className="flex items-center gap-2 p-1.5 bg-slate-900/40 hover:bg-slate-900 rounded-lg text-slate-350 text-[10px] font-bold cursor-pointer">
++                    <FileText className="w-3.5 h-3.5 text-slate-500" />
++                    <span>IPO Form 3 (Statement)</span>
++                  </div>
++                </div>
++              </div>
++
++              {/* Center Editor Console */}
++              <div className="lg:col-span-6 p-6 flex flex-col justify-between border-r border-slate-900 bg-slate-950/30">
++                <div className="space-y-4">
++                  <div className="flex items-center justify-between">
++                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Active Spec Section</span>
++                    <span className="text-[9px] font-bold text-cyan-400 uppercase tracking-widest bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-900/30">
++                      EDITING STAGE
++                    </span>
++                  </div>
++
++                  {sandboxSection === 'abstract' && (
++                    <div className="space-y-3">
++                      <h4 className="text-xs font-bold text-slate-200">Abstract of the Disclosure</h4>
++                      <p className="text-[11px] text-slate-400 leading-relaxed font-mono bg-slate-900/60 p-3.5 rounded-xl border border-slate-900">
++                        A decentralized <span className="bg-indigo-950 text-indigo-350 px-1 rounded border border-indigo-900 font-bold">IoT grid controller</span> operating via secure distributed ledger state verification. The controller minimizes propagation delays by mapping routes across node clusters...
++                      </p>
++                      <div className="p-3 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center justify-between">
++                        <div className="flex items-center gap-2">
++                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
++                          <span className="text-[10px] font-bold text-slate-300">Semantic Prior-Art Index Matching</span>
++                        </div>
++                        <span className="text-[10px] font-bold text-emerald-400">12% Overlap Risk</span>
++                      </div>
++                    </div>
++                  )}
++
++                  {sandboxSection === 'claims' && (
++                    <div className="space-y-3">
++                      <h4 className="text-xs font-bold text-slate-200 font-sans">Patent Claims Schema</h4>
++                      <div className="space-y-2 text-[10px] font-mono text-slate-450">
++                        <div className="p-2.5 bg-slate-900/50 rounded-lg border border-slate-900">
++                          <p className="text-slate-250 font-bold">Claim 1 (Independent):</p>
++                          <p className="mt-1">A decentralized controller comprising a processor, a communication interface, and a validation module...</p>
++                        </div>
++                        <div className="p-2.5 bg-slate-900/50 rounded-lg border border-slate-900 pl-6">
++                          <p className="text-slate-300 font-bold">Claim 2 (Dependent):</p>
++                          <p className="mt-1">The controller of Claim 1, wherein said validation module verifies ledger epoch hashes...</p>
++                        </div>
++                      </div>
++                    </div>
++                  )}
++
++                  {sandboxSection === 'schematics' && (
++                    <div className="space-y-3">
++                      <h4 className="text-xs font-bold text-slate-200">Schematic Blueprint Vector</h4>
++                      <div className="h-28 bg-slate-900/60 rounded-xl border border-slate-900 flex items-center justify-center relative overflow-hidden">
++                        <svg className="w-full h-full max-w-[280px]" viewBox="0 0 200 100">
++                          <circle cx="30" cy="50" r="8" fill="none" stroke="#007d88" strokeWidth="1.5" />
++                          <text x="30" y="53" fill="#007d88" fontSize="6" textAnchor="middle" fontWeight="bold">N01</text>
++                          <line x1="38" y1="50" x2="82" y2="35" stroke="#476865" strokeWidth="1" strokeDasharray="2" />
++
++                          <circle cx="90" cy="30" r="8" fill="none" stroke="#14b8a6" strokeWidth="1.5" />
++                          <text x="90" y="33" fill="#14b8a6" fontSize="6" textAnchor="middle" fontWeight="bold">N02</text>
++                          <line x1="98" y1="30" x2="142" y2="45" stroke="#476865" strokeWidth="1" />
++
++                          <circle cx="150" cy="50" r="8" fill="#14b8a6" fillOpacity="0.1" stroke="#14b8a6" strokeWidth="1.5" />
++                          <text x="150" y="53" fill="#14b8a6" fontSize="6" textAnchor="middle" fontWeight="bold">N03</text>
++                        </svg>
++                        <span className="absolute bottom-2 right-2 text-[8px] font-mono text-slate-500">IPO DRAWING SPEC COMPLIANT</span>
++                      </div>
++                    </div>
++                  )}
++                </div>
++
++                <div className="pt-4 border-t border-slate-900 flex justify-between items-center text-[10px]">
++                  <span className="text-slate-500 font-bold font-mono">FILE_STATUS: IN_REVIEW</span>
++                  <button className="text-cyan-400 font-bold hover:underline cursor-pointer flex items-center gap-1">
++                    <span>Export Specs Bundle</span>
++                    <ChevronRight className="w-3 h-3" />
++                  </button>
++                </div>
++              </div>
++
++              {/* Right Collaboration Timeline & Comments */}
++              <div className="lg:col-span-3 p-4 space-y-5 flex flex-col justify-between">
++                <div className="space-y-4">
++                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Supervisor Annotations</span>
++                  <div className="space-y-3">
++                    <div className="p-3 bg-slate-900/60 border border-slate-900 rounded-xl space-y-1.5">
++                      <div className="flex items-center gap-1.5">
++                        <span className="w-4 h-4 rounded-full bg-slate-800 text-slate-200 text-[8px] font-bold flex items-center justify-center">R</span>
++                        <span className="text-[9px] font-bold text-slate-300">Prof. Rajesh Nair</span>
++                      </div>
++                      <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
++                        "The scope of claim 2 looks unique. Verify it overlaps with citation US-988."
++                      </p>
++                    </div>
++                  </div>
++                </div>
++
++                <div className="space-y-2 pt-4 border-t border-slate-900">
++                  <div className="flex justify-between items-center text-[9px] font-bold text-slate-550">
++                    <span>COMPLIANCE INDEX</span>
++                    <span className="text-emerald-400">92%</span>
++                  </div>
++                  <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
++                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '92%' }} />
++                  </div>
++                </div>
++              </div>
+             </div>
+           </div>
++        </div>
++      </section>
+ 
+-          {/* Card 2 */}
+-          <div className="p-8 rounded-3xl bg-white border border-slate-200/80 shadow-xs flex flex-col items-start text-left gap-5 hover:border-blue-500/35 hover:shadow-md transition-all duration-300 group">
+-            <div className="p-3 rounded-2xl bg-blue-50 text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
+-              <Search className="w-5 h-5" />
+-            </div>
+-            <div>
+-              <h3 className="font-extrabold text-slate-900 text-sm mb-2 tracking-tight">Semantic prior-art search</h3>
+-              <p className="text-slate-600 text-xs leading-relaxed font-semibold">
+-                Find conceptually similar patents, not just keyword matches, before you draft a claim.
++      {/* 3. STATISTICS SECTION */}
++      <section className="py-12 bg-white border-y border-slate-200 relative z-10">
++        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
++          {stats.map((stat, i) => (
++            <div key={i} className="space-y-1">
++              <h3 className="text-3xl sm:text-4xl font-extrabold text-indigo-600 tracking-tight font-mono">{stat.value}</h3>
++              <p className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
++                <DecryptedText text={stat.label} speed={35} sequential={true} />
+               </p>
+             </div>
++          ))}
++        </div>
++      </section>
++
++      {/* 4. WHY PATENTHUB AI */}
++      <section id="features" className="py-24 max-w-7xl mx-auto px-6 space-y-16 relative z-10">
++        <div className="text-center space-y-3">
++          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full w-fit">
++            Why PatentHub AI?
++          </span>
++          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight max-w-xl mx-auto leading-tight">
++            Designed for institutional intellectual property workflows
++          </h2>
++          <p className="text-slate-655 text-xs sm:text-sm max-w-lg mx-auto font-semibold">
++            Everything you need to secure your patent specifications, collaborate with guides, and compile ready-to-file IPO forms.
++          </p>
++        </div>
++
++        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
++          {features.map((f, i) => {
++            const Icon = f.icon;
++            return (
++              <SpotlightCard key={i} className="p-8 flex flex-col justify-between group">
++                {i === 0 && <BorderBeam duration={7} delay={0} />}
++                <div className="space-y-4">
++                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl w-fit group-hover:scale-105 transition-transform">
++                    <Icon className="w-5 h-5" />
++                  </div>
++                  <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">{f.title}</h3>
++                  <p className="text-slate-600 text-xs leading-relaxed font-semibold">{f.desc}</p>
++                </div>
++              </SpotlightCard>
++            );
++          })}
++        </div>
++      </section>
++
++      {/* 5. AI MODULES SHOWCASE */}
++      <section id="ai-modules" className="py-24 border-t border-slate-200 bg-slate-50/50 relative z-10">
++        <div className="max-w-7xl mx-auto px-6 space-y-16">
++          <div className="text-center space-y-3">
++            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full w-fit">
++              AI Modules
++            </span>
++            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-tight">
++              Powerful modules trained on patent registries
++            </h2>
++            <p className="text-slate-600 text-xs sm:text-sm font-semibold max-w-md mx-auto">
++              SaaS integrations mapping raw concept ideas into legal specifications and diagnostics audits.
++            </p>
+           </div>
+ 
+-          {/* Card 3 */}
+-          <div className="p-8 rounded-3xl bg-white border border-slate-200/80 shadow-xs flex flex-col items-start text-left gap-5 hover:border-blue-500/35 hover:shadow-md transition-all duration-300 group">
+-            <div className="p-3 rounded-2xl bg-blue-50 text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
+-              <Sparkles className="w-5 h-5" />
+-            </div>
+-            <div>
+-              <h3 className="font-extrabold text-slate-900 text-sm mb-2 tracking-tight">Ask your documents</h3>
+-              <p className="text-slate-600 text-xs leading-relaxed font-semibold">
+-                Summaries, keyword and domain extraction, and grounded answers across every file you upload.
+-              </p>
+-            </div>
++          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
++            {aiModules.map((m, i) => (
++              <SpotlightCard key={i} className="p-6 space-y-4">
++                {i === 0 && <BorderBeam duration={8} colorFrom="#14b8a6" colorTo="#007d88" />}
++                <span className="inline-block px-2.5 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-[10px] font-bold text-indigo-700">
++                  <DecryptedText text={m.tag} speed={25} sequential={true} />
++                </span>
++                <div className="space-y-1">
++                  <h4 className="font-extrabold text-slate-900 text-xs tracking-tight">{m.title}</h4>
++                  <p className="text-slate-600 text-[11px] leading-relaxed font-semibold">{m.desc}</p>
++                </div>
++              </SpotlightCard>
++            ))}
+           </div>
+         </div>
+       </section>
+ 
+-      {/* Introduction / Platform Overview Section */}
+-      <section className="py-16 px-6 max-w-5xl mx-auto border-t border-slate-200/60 relative z-10">
+-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+-          <div className="md:col-span-5 space-y-3">
+-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full w-fit">
+-              Platform Overview
++      {/* 6. PATENT WORKFLOW */}
++      <section id="workflow" className="py-24 border-t border-slate-200 max-w-7xl mx-auto px-6 space-y-16 relative z-10">
++        <div className="text-center space-y-3">
++          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full w-fit">
++            Patent Workflow
++          </span>
++          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-tight">
++            Visual stage progression timeline
++          </h2>
++          <p className="text-slate-655 text-xs sm:text-sm font-semibold max-w-md mx-auto">
++            From the initial spark to filing-ready IPO submission. How our workflow sandbox secures each node:
++          </p>
++        </div>
++
++        {/* Visual Stepper Timeline */}
++        <div className="max-w-4xl mx-auto">
++          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 text-center">
++            {[
++              { key: 'Idea', label: 'Idea', color: 'bg-indigo-500' },
++              { key: 'Research', label: 'Research', color: 'bg-indigo-500' },
++              { key: 'Prior Art', label: 'Prior Art Search', color: 'bg-indigo-500' },
++              { key: 'Novelty', label: 'Novelty Analysis', color: 'bg-indigo-500' },
++              { key: 'Prototype', label: 'Prototype Draft', color: 'bg-indigo-500' },
++              { key: 'Claims', label: 'Claim Generation', color: 'bg-indigo-500' },
++              { key: 'Review', label: 'Expert Review', color: 'bg-indigo-500' },
++              { key: 'Filing', label: 'Patent Filing', color: 'bg-indigo-600 animate-pulse' },
++            ].map((step, index) => (
++              <div key={index} className="flex flex-col items-center space-y-2.5 relative group">
++                <div className={`w-10 h-10 rounded-2xl ${step.color} text-white flex items-center justify-center font-extrabold text-xs shadow-md shadow-indigo-500/10`}>
++                  {index + 1}
++                </div>
++                <div>
++                  <h4 className="font-extrabold text-slate-900 text-[11px] tracking-tight">{step.label}</h4>
++                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Stage {step.key}</p>
++                </div>
++              </div>
++            ))}
++          </div>
++        </div>
++      </section>
++
++      {/* 7. PLATFORM ROLES */}
++      <section id="about" className="py-24 border-t border-slate-200 bg-slate-50/50 relative z-10">
++        <div className="max-w-7xl mx-auto px-6 space-y-16">
++          <div className="text-center space-y-3">
++            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full w-fit">
++              Platform Roles
+             </span>
+-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight leading-tight">
+-              About PatentHub
++            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-tight">
++              Integrated spaces for every contributor
+             </h2>
+-            <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
+-              Accelerating Intellectual Property Creation
++            <p className="text-slate-600 text-xs sm:text-sm font-semibold max-w-md mx-auto">
++              Assigned permissions route users to specific workspaces matching their requirements:
+             </p>
+           </div>
+-          <div className="md:col-span-7">
+-            <p className="text-slate-600 text-xs leading-relaxed font-semibold">
+-              PatentHub is a secure, end-to-end web workspace designed specifically for universities, engineering departments, and independent inventors in India. We bridge the gap between complex research ideas and official Indian Patent Office (IPO) filing protocols. By providing integrated tools like prior art search history, claims configuration tables, and guided roadmap checklists, we simplify the path to utility patent filings.
+-            </p>
+-            <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-slate-200/60 text-center">
+-              <div>
+-                <h4 className="text-lg font-extrabold text-blue-600">Γé╣0 Cost</h4>
+-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">For Students & Labs</p>
++
++          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
++            {[
++              { role: 'Student / Inventor', icon: Users, desc: 'Draft descriptions, generate drawings, collaborate with co-inventors, and request guide sign-off.' },
++              { role: 'Faculty Guide', icon: BookOpen, desc: 'Review student specifications, leave review comments, approve workflow stages, and assign tasks.' },
++              { role: 'Patent Expert', icon: ShieldCheck, desc: 'Run prior art scans, check claims infringements risk logs, and export validated IPO compliant reports.' },
++              { role: 'Administrator', icon: Cpu, desc: 'Configure institution domains, invite faculty guides, verify users accounts, and audit metrics.' },
++            ].map((r, i) => {
++              const Icon = r.icon;
++              return (
++                <div key={i} className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-3xs">
++                  <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl w-fit">
++                    <Icon className="w-4.5 h-4.5" />
++                  </div>
++                  <div>
++                    <h4 className="font-extrabold text-slate-900 text-xs tracking-tight">{r.role}</h4>
++                    <p className="text-slate-600 text-[11px] leading-relaxed font-semibold mt-1">{r.desc}</p>
++                  </div>
++                </div>
++              );
++            })}
++          </div>
++        </div>
++      </section>
++
++      {/* 8. DASHBOARD PREVIEW */}
++      <section className="py-24 border-t border-slate-200 max-w-7xl mx-auto px-6 space-y-12 relative z-10">
++        <div className="text-center space-y-3">
++          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full w-fit">
++            Workspace Previews
++          </span>
++          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-tight">
++            Experience role-specific consoles
++          </h2>
++          <p className="text-slate-655 text-xs sm:text-sm font-semibold max-w-md mx-auto">
++            Click tabs below to see how layouts customize dynamically depending on user access credentials:
++          </p>
++        </div>
++
++        {/* Tab switcher */}
++        <div className="max-w-5xl mx-auto bg-white border border-slate-250 rounded-3xl overflow-hidden shadow-md">
++          {/* Preview Navigation */}
++          <div className="flex border-b border-slate-150 p-2.5 gap-2 bg-slate-50">
++            {['student', 'guide', 'expert', 'admin'].map((tab) => (
++              <button
++                key={tab}
++                onClick={() => setActivePreviewTab(tab as any)}
++                className={`px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer ${activePreviewTab === tab
++                    ? 'bg-indigo-600 text-white shadow-2xs font-extrabold'
++                    : 'text-slate-550 hover:bg-slate-100'
++                  }`}
++              >
++                {tab} Workspace
++              </button>
++            ))}
++          </div>
++
++          {/* Preview Details */}
++          <div className="p-8 space-y-5 text-left min-h-[260px] flex flex-col justify-between">
++            {activePreviewTab === 'student' && (
++              <div className="space-y-4">
++                <div className="flex justify-between items-center">
++                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inventor Console</span>
++                  <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-750 font-bold border border-blue-150">Active Idea Draft</span>
++                </div>
++                <h4 className="text-base font-extrabold text-slate-900">Project: Decentered IoT Grid controller</h4>
++                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
++                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl">
++                    <p className="text-[10px] font-bold text-slate-400">PENDING ASSIGNED TASKS</p>
++                    <p className="text-xs font-bold text-slate-800 mt-1">Γ£ô Complete Abstract specification details</p>
++                    <p className="text-xs font-bold text-slate-400 mt-1">ΓÿÉ Upload schematic drawings block</p>
++                  </div>
++                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl flex items-center justify-between">
++                    <div>
++                      <p className="text-[10px] font-bold text-slate-400">READINESS INDEX</p>
++                      <p className="text-base font-extrabold text-indigo-600 mt-1">45% (Prototype Stage)</p>
++                    </div>
++                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
++                  </div>
++                </div>
++              </div>
++            )}
++
++            {activePreviewTab === 'guide' && (
++              <div className="space-y-4">
++                <div className="flex justify-between items-center">
++                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Faculty Supervisor Deck</span>
++                  <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-purple-50 text-purple-750 font-bold border border-purple-150">Active Reviews Backlog</span>
++                </div>
++                <h4 className="text-base font-extrabold text-slate-900">Research Group: IoT Wireless nodes</h4>
++                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
++                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl space-y-1">
++                    <p className="text-[10px] font-bold text-slate-400 uppercase">PENDING SUBMISSIONS</p>
++                    <div className="flex justify-between items-center text-xs">
++                      <span className="font-bold text-slate-800">Decentered IoT grid (Student: Athira)</span>
++                      <button className="text-[10px] text-indigo-600 font-bold hover:underline cursor-pointer">Open Review</button>
++                    </div>
++                  </div>
++                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl">
++                    <p className="text-[10px] font-bold text-slate-400">LAST COMMENTS LEFT</p>
++                    <p className="text-xs font-semibold text-slate-600 italic mt-1">"Improve technical claims details to differentiate from citation..."</p>
++                  </div>
++                </div>
+               </div>
+-              <div>
+-                <h4 className="text-lg font-extrabold text-blue-600">100% Secure</h4>
+-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Data Isolation</p>
++            )}
++
++            {activePreviewTab === 'expert' && (
++              <div className="space-y-4">
++                <div className="flex justify-between items-center">
++                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Patent Consultant Deck</span>
++                  <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-750 font-bold border border-emerald-150">Prior Art Auditing</span>
++                </div>
++                <h4 className="text-base font-extrabold text-slate-900">Registry Search: USPTO & WIPO database indexes</h4>
++                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
++                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl">
++                    <p className="text-[10px] font-bold text-slate-400 uppercase">SIMILARITY OVERLAPS SCAN</p>
++                    <p className="text-xs font-extrabold text-emerald-655 mt-1">18% Match Index - Low Infringement Risk</p>
++                  </div>
++                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl">
++                    <p className="text-[10px] font-bold text-slate-400 uppercase">CITATIONS IDENTIFIED</p>
++                    <p className="text-xs font-bold text-slate-800 mt-1">US-88912-B: Static feedback loop</p>
++                  </div>
++                </div>
+               </div>
+-              <div>
+-                <h4 className="text-lg font-extrabold text-blue-600">IPO Compliant</h4>
+-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Forms 1, 2, 3, & 5</p>
++            )}
++
++            {activePreviewTab === 'admin' && (
++              <div className="space-y-4">
++                <div className="flex justify-between items-center">
++                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">University Admin Dashboard</span>
++                  <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-700 font-bold border border-slate-200">System Metrics</span>
++                </div>
++                <h4 className="text-base font-extrabold text-slate-900">Institution: College of Engineering, Trivandrum</h4>
++                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
++                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl">
++                    <p className="text-[10px] font-bold text-slate-400">TOTAL PROJECTS</p>
++                    <p className="text-lg font-extrabold text-indigo-600 mt-0.5 font-mono">148</p>
++                  </div>
++                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl">
++                    <p className="text-[10px] font-bold text-slate-400">ACTIVE GUIDES</p>
++                    <p className="text-lg font-extrabold text-indigo-600 mt-0.5 font-mono">24</p>
++                  </div>
++                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl">
++                    <p className="text-[10px] font-bold text-slate-400">FILINGS COMPLETED</p>
++                    <p className="text-lg font-extrabold text-emerald-600 mt-0.5 font-mono">36</p>
++                  </div>
++                </div>
+               </div>
++            )}
++
++            <div className="flex justify-end pt-4 border-t border-slate-100">
++              <Link
++                to="/register"
++                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-755 text-white font-bold text-xs rounded-xl shadow-2xs cursor-pointer"
++              >
++                See Workspace
++              </Link>
+             </div>
+           </div>
+         </div>
+       </section>
+ 
+-      {/* Value Proposition Grid */}
+-      <section id="features" className="py-24 border-t border-slate-200/60 max-w-7xl mx-auto px-6 relative z-10">
+-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
+-          <div className="lg:col-span-1 space-y-4">
+-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
+-              Platform Features
++      {/* 9. HOW IT WORKS */}
++      <section className="py-24 border-t border-slate-200 bg-slate-50/50 relative z-10">
++        <div className="max-w-7xl mx-auto px-6 space-y-16">
++          <div className="text-center space-y-3">
++            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full w-fit">
++              How It Works
+             </span>
+-            <h2 className="text-3xl font-extrabold text-slate-950 tracking-tight leading-tight">
+-              An Editorial Workspace Built for University Research Labs
++            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-tight">
++              Get started in four simple stages
+             </h2>
+-            <p className="text-slate-600 text-xs leading-relaxed font-semibold">
+-              We coordinate patent preparation tasks among research guides, supervisors, co-inventors, and legal advisers, saving countless review loops.
++            <p className="text-slate-600 text-xs sm:text-sm font-semibold max-w-md mx-auto">
++              No complex setup files or manual paper routing. Everything is handled dynamically within the cloud sandbox:
+             </p>
+           </div>
+ 
+-          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-8">
+-            <div className="space-y-3">
+-              <div className="p-2.5 rounded-xl bg-slate-100 text-slate-800 w-fit shadow-2xs">
+-                <FileCode className="w-5 h-5" />
++          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
++            {steps.map((s, i) => (
++              <div key={i} className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-3xs relative overflow-hidden">
++                <span className="absolute -top-4 -right-2 text-6xl font-extrabold font-mono text-slate-100 select-none">
++                  {s.num}
++                </span>
++                <div className="space-y-1.5 pt-2">
++                  <h4 className="font-extrabold text-slate-900 text-xs tracking-tight">{s.title}</h4>
++                  <p className="text-slate-600 text-[11px] leading-relaxed font-semibold">{s.desc}</p>
++                </div>
+               </div>
+-              <h3 className="font-extrabold text-slate-900 text-sm">Specification Exporter</h3>
+-              <p className="text-slate-600 text-xs leading-relaxed">
+-                Generates ready-to-file legal specifications formatted directly to the standards of the Indian Patent Office (IPO).
+-              </p>
+-            </div>
++            ))}
++          </div>
++        </div>
++      </section>
+ 
+-            <div className="space-y-3">
+-              <div className="p-2.5 rounded-xl bg-slate-100 text-slate-800 w-fit shadow-2xs">
+-                <Users className="w-5 h-5" />
+-              </div>
+-              <h3 className="font-extrabold text-slate-900 text-sm">Collaborative Workspaces</h3>
+-              <p className="text-slate-600 text-xs leading-relaxed">
+-                Separate portals and task streams for Inventors, Guides, Co-inventors, and Patent Experts with approval flows.
+-              </p>
++      {/* 10. TECHNOLOGY STACK */}
++      <section className="py-24 border-t border-slate-200 max-w-7xl mx-auto px-6 space-y-16 relative z-10">
++        <div className="text-center space-y-3">
++          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full w-fit">
++            Tech Stack
++          </span>
++          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-955 tracking-tight leading-tight">
++            High-performance stack powering searches
++          </h2>
++          <p className="text-slate-655 text-xs sm:text-sm font-semibold max-w-md mx-auto">
++            Our infrastructure maintains zero retention records of unpublished invention briefs to satisfy IPO security protocols.
++          </p>
++        </div>
++
++        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-4xl mx-auto">
++          {techStack.map((tech, i) => (
++            <div key={i} className="p-4 bg-white border border-slate-200 rounded-2xl text-center space-y-1 hover:border-indigo-400 transition-colors shadow-3xs">
++              <h4 className="font-extrabold text-slate-900 text-xs tracking-tight">{tech.name}</h4>
++              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{tech.desc}</p>
+             </div>
++          ))}
++        </div>
++      </section>
+ 
+-            <div className="space-y-3">
+-              <div className="p-2.5 rounded-xl bg-slate-100 text-slate-800 w-fit shadow-2xs">
+-                <ShieldCheck className="w-5 h-5" />
++      {/* 11. TESTIMONIALS */}
++      <section className="py-24 border-t border-slate-200 bg-slate-50/50 relative z-10">
++        <div className="max-w-7xl mx-auto px-6 space-y-16">
++          <div className="text-center space-y-3">
++            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full w-fit">
++              Testimonials
++            </span>
++            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-tight">
++              Endorsed by research leads and experts
++            </h2>
++          </div>
++
++          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
++            {testimonials.map((t, i) => (
++              <div key={i} className="p-8 bg-white border border-slate-200 rounded-3xl shadow-3xs flex flex-col justify-between space-y-6 hover:border-indigo-300 transition-colors">
++                <p className="text-slate-655 text-xs leading-relaxed italic font-medium">
++                  "{t.quote}"
++                </p>
++                <div>
++                  <h4 className="font-extrabold text-slate-900 text-xs tracking-tight">{t.author}</h4>
++                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{t.role}</p>
++                </div>
+               </div>
+-              <h3 className="font-extrabold text-slate-900 text-sm">Enterprise Security</h3>
+-              <p className="text-slate-600 text-xs leading-relaxed">
+-                Role-based access controls and tokenized document management protecting unpublished invention disclosures.
+-              </p>
+-            </div>
++            ))}
++          </div>
++        </div>
++      </section>
+ 
+-            <div className="space-y-3">
+-              <div className="p-2.5 rounded-xl bg-slate-100 text-slate-800 w-fit shadow-2xs">
+-                <Compass className="w-5 h-5" />
++      {/* 12. FREQUENTLY ASKED QUESTIONS */}
++      <section className="py-24 border-t border-slate-200 max-w-4xl mx-auto px-6 space-y-16 relative z-10">
++        <div className="text-center space-y-3">
++          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full w-fit">
++            FAQ Desk
++          </span>
++          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-955 tracking-tight leading-tight">
++            Frequently Asked Questions
++          </h2>
++        </div>
++
++        <div className="space-y-3">
++          {faqs.map((faq, i) => {
++            const isOpen = openFaq === i;
++            return (
++              <div key={i} className="bg-white border border-slate-200 rounded-2xl overflow-hidden transition-all shadow-3xs">
++                <button
++                  onClick={() => setOpenFaq(isOpen ? null : i)}
++                  className="w-full p-5 text-left font-bold text-xs flex justify-between items-center text-slate-900 cursor-pointer hover:bg-slate-50"
++                >
++                  <span>{faq.q}</span>
++                  <span className="text-slate-400 font-semibold text-sm">{isOpen ? 'ΓêÆ' : '+'}</span>
++                </button>
++                {isOpen && (
++                  <div className="p-5 pt-0 border-t border-slate-100 text-[11px] text-slate-655 leading-relaxed font-semibold">
++                    {faq.a}
++                  </div>
++                )}
+               </div>
+-              <h3 className="font-extrabold text-slate-900 text-sm">Prior Art Scanning</h3>
+-              <p className="text-slate-600 text-xs leading-relaxed">
+-                Log and document prior art search references across USPTO, WIPO, and Indian Registry databases.
+-              </p>
+-            </div>
++            );
++          })}
++        </div>
++      </section>
++
++      {/* 13. CALL TO ACTION */}
++      <section className="py-24 bg-gradient-to-r from-slate-950 to-indigo-950 text-white relative z-10 text-center px-6 overflow-hidden">
++        <div className="max-w-4xl mx-auto space-y-8 relative z-20">
++          <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
++            Ready to Protect Your <ShinyText text="Innovation?" speed={3} className="from-white via-cyan-300 to-indigo-400" />
++          </h2>
++          <p className="text-slate-350 text-sm max-w-xl mx-auto font-medium">
++            Join other leading universities and laboratories in India using PatentHub AI to streamline their patent filing pipelines.
++          </p>
++          <div className="flex justify-center gap-3.5 pt-2">
++            <Magnet magnetStrength={0.3}>
++              <Link
++                to="/register"
++                className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-full transition-all shadow-lg shadow-indigo-600/30 cursor-pointer hover:-translate-y-0.5 inline-block"
++              >
++                Get Started
++              </Link>
++            </Magnet>
+           </div>
+         </div>
+       </section>
+ 
+-      {/* Simple Clean Footer */}
+-      <footer className="border-t border-slate-200/70 bg-white/60 py-12 text-center text-[11px] font-bold text-slate-500">
+-        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+-          <p>┬⌐ {new Date().getFullYear()} PatentHub AI Inc. All rights reserved. Registered under Indian Patent Office guidelines.</p>
+-          <div className="flex gap-6">
+-            <a href="#" className="hover:text-slate-900">Privacy Policy</a>
+-            <a href="#" className="hover:text-slate-900">Terms of Service</a>
+-            <a href="mailto:support@patenthub.ai" className="hover:text-slate-900">Support</a>
++      {/* 14. FOOTER */}
++      <footer className="border-t border-slate-200 bg-white py-16 text-xs text-slate-600 relative z-10">
++        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-5 gap-8">
++          <div className="col-span-2 space-y-4">
++            <span className="font-extrabold text-base tracking-tight text-slate-900 lowercase">
++              patenthub<span className="text-cyan-500 font-extrabold">.</span>
++            </span>
++            <p className="text-[11px] leading-relaxed max-w-xs font-semibold text-slate-455">
++              Indian Patent Office e-filing compliant sandbox workspace. Bridging labs sketches to verified specifications papers.
++            </p>
++          </div>
++
++          <div className="space-y-3">
++            <h5 className="font-bold text-slate-900 text-[11px] uppercase tracking-wider">Features</h5>
++            <ul className="space-y-2 text-[11px] font-semibold text-slate-500">
++              <li><a href="#features" className="hover:text-slate-900">AI Prior Art Search</a></li>
++              <li><a href="#features" className="hover:text-slate-900">Document Management</a></li>
++              <li><a href="#features" className="hover:text-slate-900">Lifecycle Timelines</a></li>
++            </ul>
++          </div>
++
++          <div className="space-y-3">
++            <h5 className="font-bold text-slate-900 text-[11px] uppercase tracking-wider">AI Modules</h5>
++            <ul className="space-y-2 text-[11px] font-semibold text-slate-500">
++              <li><a href="#ai-modules" className="hover:text-slate-900">AI Assistant</a></li>
++              <li><a href="#ai-modules" className="hover:text-slate-900">Drawing Generator</a></li>
++              <li><a href="#ai-modules" className="hover:text-slate-900">Similarity Scanner</a></li>
++            </ul>
++          </div>
++
++          <div className="space-y-3">
++            <h5 className="font-bold text-slate-905 text-[11px] uppercase tracking-wider">Company</h5>
++            <ul className="space-y-2 text-[11px] font-semibold text-slate-500">
++              <li><a href="#" className="hover:text-slate-900">Privacy Policy</a></li>
++              <li><a href="#" className="hover:text-slate-900">Terms & Conditions</a></li>
++              <li><a href="mailto:support@patenthub.ai" className="hover:text-slate-900">Email Support</a></li>
++            </ul>
++          </div>
++        </div>
++
++        <div className="max-w-7xl mx-auto px-6 border-t border-slate-100 mt-12 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
++          <p>┬⌐ {new Date().getFullYear()} PatentHub AI Inc. All rights reserved.</p>
++          <div className="flex gap-4">
++            <a href="https://github.com" target="_blank" rel="noreferrer" className="hover:text-slate-900">GitHub</a>
++            <a href="https://linkedin.com" target="_blank" rel="noreferrer" className="hover:text-slate-900">LinkedIn</a>
+           </div>
+         </div>
+       </footer>
++
++      {/* WATCH DEMO MOCK VIDEO MODAL */}
++      {showVideoModal && (
++        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
++          <div className="bg-white border border-slate-200 rounded-3xl shadow-xl w-full max-w-xl overflow-hidden animate-fade-in">
++            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
++              <span className="text-xs font-bold text-slate-900 uppercase">PatentHub Workspace Walkthrough</span>
++              <button
++                onClick={() => setShowVideoModal(false)}
++                className="p-1 hover:bg-slate-200 rounded-xl cursor-pointer transition-colors"
++              >
++                <X className="w-4 h-4 text-slate-400 hover:text-slate-700" />
++              </button>
++            </div>
++            <div className="p-8 text-center space-y-4">
++              <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
++                <Play className="w-6 h-6 animate-pulse" />
++              </div>
++              <h4 className="font-extrabold text-sm text-slate-900">Demo Video Stream Simulator</h4>
++              <p className="text-xs text-slate-500 max-w-sm mx-auto font-medium">
++                This is a simulation trigger. It walks inventors through creating a project, running prior art scans, inviting co-inventors and guide reviewers, and downloading Forms PDFs.
++              </p>
++            </div>
++            <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
++              <button
++                onClick={() => setShowVideoModal(false)}
++                className="px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-2xs cursor-pointer"
++              >
++                Close Video
++              </button>
++            </div>
++          </div>
++        </div>
++      )}
+     </div>
+   );
+ };

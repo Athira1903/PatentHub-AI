@@ -1,14 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.archiveProject = exports.inviteMember = exports.deleteProject = exports.updateProject = exports.getProjectById = exports.getProjects = exports.createProject = void 0;
+exports.deleteTask = exports.updateTask = exports.createTask = exports.archiveProject = exports.inviteMember = exports.deleteProject = exports.updateProject = exports.getProjectById = exports.getProjects = exports.createProject = void 0;
 const zod_1 = require("zod");
 const projectService_1 = require("../services/projectService");
 const createProjectSchema = zod_1.z.object({
     title: zod_1.z.string().trim().min(3, 'Title must be at least 3 characters'),
     innovationIdea: zod_1.z.string().trim().min(10, 'Innovation abstract must be at least 10 characters'),
     problemStatement: zod_1.z.string().trim().min(10, 'Problem statement must be at least 10 characters'),
+    existingSolutions: zod_1.z.string().trim().optional(),
+    drawbacks: zod_1.z.string().trim().optional(),
     proposedSolution: zod_1.z.string().trim().min(10, 'Proposed solution must be at least 10 characters'),
     objectives: zod_1.z.string().trim().optional(),
+    novelFeatures: zod_1.z.string().trim().optional(),
     technicalDomain: zod_1.z.string().trim().min(2, 'Technical domain is required'),
     keywords: zod_1.z.string().trim().optional(),
     category: zod_1.z.string().trim().min(2, 'Category is required'),
@@ -20,8 +23,11 @@ const updateProjectSchema = zod_1.z.object({
     title: zod_1.z.string().trim().min(3).optional(),
     innovationIdea: zod_1.z.string().trim().min(10).optional(),
     problemStatement: zod_1.z.string().trim().min(10).optional(),
+    existingSolutions: zod_1.z.string().trim().optional(),
+    drawbacks: zod_1.z.string().trim().optional(),
     proposedSolution: zod_1.z.string().trim().min(10).optional(),
     objectives: zod_1.z.string().trim().optional(),
+    novelFeatures: zod_1.z.string().trim().optional(),
     technicalDomain: zod_1.z.string().trim().min(2).optional(),
     keywords: zod_1.z.string().trim().optional(),
     category: zod_1.z.string().trim().min(2).optional(),
@@ -34,6 +40,7 @@ const updateProjectSchema = zod_1.z.object({
         'GUIDE_REVIEW',
         'PATENT_EXPERT_REVIEW',
         'FILING_READY',
+        'FILED',
     ]).optional(),
     expectedFilingDate: zod_1.z.string().optional().transform((val) => val ? new Date(val) : undefined),
     patentType: zod_1.z.string().trim().optional(),
@@ -167,3 +174,71 @@ const archiveProject = async (req, res) => {
     }
 };
 exports.archiveProject = archiveProject;
+const createTaskSchema = zod_1.z.object({
+    title: zod_1.z.string().trim().min(3, 'Title must be at least 3 characters'),
+    description: zod_1.z.string().trim().optional(),
+    assignedToUsername: zod_1.z.string().trim().optional(),
+});
+const updateTaskSchema = zod_1.z.object({
+    title: zod_1.z.string().trim().optional(),
+    description: zod_1.z.string().trim().optional(),
+    status: zod_1.z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']).optional(),
+    assignedToId: zod_1.z.string().trim().optional().nullable(),
+});
+const createTask = async (req, res) => {
+    try {
+        if (!req.user?.userId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const projectId = req.params.id;
+        const validatedData = createTaskSchema.parse(req.body);
+        const task = await projectService_1.ProjectService.createTask(projectId, req.user.userId, validatedData.title, validatedData.description, validatedData.assignedToUsername);
+        res.status(201).json({ message: 'Task created successfully', task });
+    }
+    catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
+            return;
+        }
+        res.status(400).json({ message: error.message || 'Failed to create task' });
+    }
+};
+exports.createTask = createTask;
+const updateTask = async (req, res) => {
+    try {
+        if (!req.user?.userId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const projectId = req.params.id;
+        const taskId = req.params.taskId;
+        const validatedData = updateTaskSchema.parse(req.body);
+        const task = await projectService_1.ProjectService.updateTask(projectId, taskId, req.user.userId, validatedData);
+        res.status(200).json({ message: 'Task updated successfully', task });
+    }
+    catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
+            return;
+        }
+        res.status(400).json({ message: error.message || 'Failed to update task' });
+    }
+};
+exports.updateTask = updateTask;
+const deleteTask = async (req, res) => {
+    try {
+        if (!req.user?.userId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const projectId = req.params.id;
+        const taskId = req.params.taskId;
+        await projectService_1.ProjectService.deleteTask(projectId, taskId, req.user.userId);
+        res.status(200).json({ message: 'Task deleted successfully' });
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message || 'Failed to delete task' });
+    }
+};
+exports.deleteTask = deleteTask;

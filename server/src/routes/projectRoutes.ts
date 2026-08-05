@@ -7,6 +7,9 @@ import {
   deleteProject,
   inviteMember,
   archiveProject,
+  createTask,
+  updateTask,
+  deleteTask,
 } from '../controllers/projectController';
 import {
   generateInnovationAi,
@@ -27,6 +30,11 @@ router.put('/:id', updateProject);
 router.put('/:id/archive', archiveProject);
 router.delete('/:id', deleteProject);
 router.post('/:id/members', inviteMember);
+
+// Task Management Endpoints
+router.post('/:id/tasks', createTask as any);
+router.put('/:id/tasks/:taskId', updateTask as any);
+router.delete('/:id/tasks/:taskId', deleteTask as any);
 
 // Simulated AI Innovation & Diagnostics endpoints
 router.post('/:id/ai/innovation', generateInnovationAi as any);
