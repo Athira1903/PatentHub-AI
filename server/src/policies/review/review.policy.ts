@@ -1,0 +1,97 @@
+import { PatentFormPolicy } from '../forms/patent-form.policy';
+
+export class ReviewPolicy {
+  /**
+   * Determine if the user can review the project.
+   * Guides and experts assigned to the project can review.
+   */
+  static canReview(user: any, project: any): boolean {
+    if (!user) return false;
+    if (user.role === 'Admin') return true;
+
+    const projectMember = project.members?.find((m: any) => m.userId === user.userId);
+    const role = projectMember?.role;
+
+    return (
+      role === 'GUIDE' ||
+      role === 'PATENT_EXPERT'
+    );
+  }
+
+  /**
+   * Determine if the user can approve a project review stage.
+   * - Inventors cannot approve their own projects.
+   * - Guide approval requires mandatory forms (Form 1, 2, 3, 5) to be complete.
+   */
+  static canApprove(user: any, project: any): boolean {
+    if (!user) return false;
+    if (user.role === 'Admin') return true;
+
+    // Inventors/owners cannot approve their own projects
+    if (project.ownerId === user.userId) return false;
+
+    const projectMember = project.members?.find((m: any) => m.userId === user.userId);
+    const role = projectMember?.role;
+
+    if (role === 'INVENTOR' || role === 'CO_INVENTOR') return false;
+
+    if (project.stage === 'GUIDE_REVIEW') {
+      if (role !== 'GUIDE') return false;
+      return PatentFormPolicy.areMandatoryFormsComplete(project);
+    }
+
+    if (project.stage === 'PATENT_EXPERT_REVIEW') {
+      if (role !== 'PATENT_EXPERT') return false;
+      return PatentFormPolicy.areMandatoryFormsComplete(project);
+    }
+
+    return false;
+  }
+
+  /**
+   * Determine if the user can reject / request changes.
+   * Only authorized reviewers (who are not the inventors) can reject or request changes.
+   */
+  static canReject(user: any, project: any): boolean {
+    if (!user) return false;
+    if (user.role === 'Admin') return true;
+
+    if (project.ownerId === user.userId) return false;
+
+    const projectMember = project.members?.find((m: any) => m.userId === user.userId);
+    const role = projectMember?.role;
+
+    if (role === 'INVENTOR' || role === 'CO_INVENTOR') return false;
+
+    if (project.stage === 'GUIDE_REVIEW') {
+      return role === 'GUIDE';
+    }
+
+    if (project.stage === 'PATENT_EXPERT_REVIEW') {
+      return role === 'PATENT_EXPERT';
+    }
+
+    return false;
+  }
+
+  /**
+   * Determine if the user can request changes.
+   */
+  static canRequestChanges(user: any, project: any): boolean {
+    return this.canReject(user, project);
+  }
+
+  /**
+   * Determine if the user can comment.
+   * Any project member or Admin can add comments.
+   */
+  static canComment(user: any, project: any): boolean {
+    if (!user) return false;
+    if (user.role === 'Admin') return true;
+
+    const isOwner = project.ownerId === user.userId;
+    const isMember = project.members?.some((m: any) => m.userId === user.userId);
+
+    return isOwner || isMember;
+  }
+}

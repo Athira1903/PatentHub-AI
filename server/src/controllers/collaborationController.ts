@@ -18,28 +18,21 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
-    // Verify role value is valid ProjectRole enum
     if (!Object.values(ProjectRole).includes(role as ProjectRole)) {
       res.status(400).json({ message: `Invalid project role: ${role}` });
       return;
     }
 
-    // Check project exists
     const project = await prisma.patentProject.findUnique({
       where: { id: projectId },
-      include: { owner: true },
     });
-    if (!project) {
-      res.status(404).json({ message: 'Project not found.' });
-      return;
-    }
 
-    // Check receiver exists
     const receiver = await prisma.user.findUnique({
       where: { username },
     });
-    if (!receiver) {
-      res.status(404).json({ message: `User with username '${username}' not found.` });
+
+    if (!project || !receiver) {
+      res.status(404).json({ message: 'Project or receiver not found.' });
       return;
     }
 
@@ -48,7 +41,6 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
-    // Check if receiver is already a member
     const existingMember = await prisma.projectMember.findUnique({
       where: {
         projectId_userId: {
@@ -62,7 +54,6 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
-    // Check if there is already a pending invitation
     const existingInvite = await prisma.invitation.findFirst({
       where: {
         projectId,
@@ -150,34 +141,57 @@ export const respondToInvitation = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    if (invitation.receiverId !== receiverId) {
-      res.status(403).json({ message: 'Access denied. You are not the recipient of this invitation.' });
-      return;
-    }
-
     if (invitation.status !== 'PENDING') {
       res.status(400).json({ message: `This invitation has already been ${invitation.status.toLowerCase()}.` });
       return;
     }
 
-    // Update invitation status
-    await prisma.invitation.update({
-      where: { id: invitationId },
-      data: { status },
+    if (invitation.receiverId !== receiverId) {
+      res.status(403).json({ message: 'Access denied. This invitation was sent to another user.' });
+      return;
+    }
+
+    if (!invitation.project) {
+      res.status(404).json({ message: 'The associated project no longer exists.' });
+      return;
+    }
+
+    if (status === 'ACCEPTED') {
+      const existingMember = await prisma.projectMember.findUnique({
+        where: {
+          projectId_userId: {
+            projectId: invitation.projectId,
+            userId: receiverId,
+          },
+        },
+      });
+      if (existingMember) {
+        res.status(400).json({ message: 'You are already a member of this project.' });
+        return;
+      }
+    }
+
+    // Atomically update invitation status and create membership
+    await prisma.$transaction(async (tx) => {
+      await tx.invitation.update({
+        where: { id: invitationId },
+        data: { status },
+      });
+
+      if (status === 'ACCEPTED') {
+        await tx.projectMember.create({
+          data: {
+            projectId: invitation.projectId,
+            userId: receiverId,
+            role: invitation.role,
+          },
+        });
+      }
     });
 
     const cleanRoleName = invitation.role.toLowerCase().replace('_', ' ');
 
     if (status === 'ACCEPTED') {
-      // Add to Project Members
-      await prisma.projectMember.create({
-        data: {
-          projectId: invitation.projectId,
-          userId: receiverId,
-          role: invitation.role,
-        },
-      });
-
       // Notify the sender
       await prisma.notification.create({
         data: {
@@ -291,11 +305,6 @@ export const markNotificationAsRead = async (req: AuthenticatedRequest, res: Res
 
     if (!notification) {
       res.status(404).json({ message: 'Notification not found.' });
-      return;
-    }
-
-    if (notification.userId !== userId) {
-      res.status(403).json({ message: 'Access denied.' });
       return;
     }
 

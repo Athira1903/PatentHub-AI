@@ -1,7 +1,8 @@
 import { Response } from 'express';
 import { z } from 'zod';
 import { ProjectService } from '../services/projectService';
-import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import { prisma } from '../config/db';
+import { WorkflowPolicy } from '../policies/workflow/workflow.policy';
 
 const createProjectSchema = z.object({
   title: z.string().trim().min(3, 'Title must be at least 3 characters'),
@@ -54,13 +55,8 @@ const inviteMemberSchema = z.object({
   role: z.enum(['CO_INVENTOR', 'GUIDE', 'PATENT_EXPERT']).optional().default('CO_INVENTOR'),
 });
 
-export const createProject = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const createProject = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
     const validatedData = createProjectSchema.parse(req.body);
 
     const project = await ProjectService.createProject({
@@ -78,13 +74,8 @@ export const createProject = async (req: AuthenticatedRequest, res: Response): P
   }
 };
 
-export const getProjects = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const getProjects = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
     const includeArchived = req.query.archived === 'true';
     const projects = await ProjectService.getUserProjects(req.user.userId, req.user.role, includeArchived);
     res.status(200).json({ projects });
@@ -93,33 +84,30 @@ export const getProjects = async (req: AuthenticatedRequest, res: Response): Pro
   }
 };
 
-export const getProjectById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const getProjectById = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const projectId = req.params.id as string;
-    const project = await ProjectService.getProjectById(projectId, req.user.userId, req.user.role);
-    res.status(200).json({ project });
+    const isOwner = req.project.ownerId === req.user.userId || req.user.role === 'Admin';
+    res.status(200).json({ project: { ...req.project, isOwner } });
   } catch (error: any) {
-    res.status(404).json({ message: error.message || 'Project not found' });
+    res.status(500).json({ message: error.message || 'Failed to fetch project' });
   }
 };
 
-export const updateProject = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const updateProject = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const projectId = req.params.id as string;
     const validatedData = updateProjectSchema.parse(req.body);
 
+    // Validate workflow stage transition if requested
+    if (validatedData.stage) {
+      const isAllowed = await WorkflowPolicy.canMoveToStage(req.user, req.project, validatedData.stage as any);
+      if (!isAllowed) {
+        res.status(403).json({ message: `Workflow stage transition to ${validatedData.stage} is not allowed.` });
+        return;
+      }
+    }
+
     const project = await ProjectService.updateProject(
-      projectId,
+      req.project.id,
       req.user.userId,
       validatedData
     );
@@ -134,33 +122,21 @@ export const updateProject = async (req: AuthenticatedRequest, res: Response): P
   }
 };
 
-export const deleteProject = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const deleteProject = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const projectId = req.params.id as string;
-    await ProjectService.deleteProject(projectId, req.user.userId);
+    await ProjectService.deleteProject(req.project.id, req.user.userId);
     res.status(200).json({ message: 'Project deleted successfully' });
   } catch (error: any) {
     res.status(400).json({ message: error.message || 'Failed to delete project' });
   }
 };
 
-export const inviteMember = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const inviteMember = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const projectId = req.params.id as string;
     const validatedData = inviteMemberSchema.parse(req.body);
 
     const member = await ProjectService.inviteMemberByUsername(
-      projectId,
+      req.project.id,
       req.user.userId,
       validatedData.username,
       validatedData.role as any
@@ -176,17 +152,10 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
   }
 };
 
-export const archiveProject = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const archiveProject = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const projectId = req.params.id as string;
     const isArchived = req.body.isArchived !== false; // defaults to true
-
-    await ProjectService.archiveProject(projectId, req.user.userId, isArchived);
+    await ProjectService.archiveProject(req.project.id, req.user.userId, isArchived);
     res.status(200).json({ message: `Project ${isArchived ? 'archived' : 'unarchived'} successfully` });
   } catch (error: any) {
     res.status(400).json({ message: error.message || 'Failed to update archive status' });
@@ -206,18 +175,12 @@ const updateTaskSchema = z.object({
   assignedToId: z.string().trim().optional().nullable(),
 });
 
-export const createTask = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const createTask = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const projectId = req.params.id as string;
     const validatedData = createTaskSchema.parse(req.body);
 
     const task = await ProjectService.createTask(
-      projectId,
+      req.project.id,
       req.user.userId,
       validatedData.title,
       validatedData.description,
@@ -234,19 +197,13 @@ export const createTask = async (req: AuthenticatedRequest, res: Response): Prom
   }
 };
 
-export const updateTask = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const updateTask = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const projectId = req.params.id as string;
     const taskId = req.params.taskId as string;
     const validatedData = updateTaskSchema.parse(req.body);
 
     const task = await ProjectService.updateTask(
-      projectId,
+      req.project.id,
       taskId,
       req.user.userId,
       validatedData as any
@@ -262,19 +219,47 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response): Prom
   }
 };
 
-export const deleteTask = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const deleteTask = async (req: any, res: Response): Promise<void> => {
   try {
-    if (!req.user?.userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const projectId = req.params.id as string;
     const taskId = req.params.taskId as string;
 
-    await ProjectService.deleteTask(projectId, taskId, req.user.userId);
+    await ProjectService.deleteTask(req.project.id, taskId, req.user.userId);
     res.status(200).json({ message: 'Task deleted successfully' });
   } catch (error: any) {
     res.status(400).json({ message: error.message || 'Failed to delete task' });
+  }
+};
+
+export const createComment = async (req: any, res: Response): Promise<void> => {
+  try {
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+      res.status(400).json({ message: 'Comment content is required.' });
+      return;
+    }
+
+    const comment = await prisma.comment.create({
+      data: {
+        content: content.trim(),
+        projectId: req.project.id,
+        userId: req.user.userId,
+      },
+      include: {
+        user: { select: { id: true, fullName: true, username: true, role: true } },
+      },
+    });
+
+    // Log Activity
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.userId,
+        projectId: req.project.id,
+        action: `Added review comment: "${content.trim().substring(0, 60)}${content.trim().length > 60 ? '...' : ''}"`,
+      },
+    });
+
+    res.status(201).json({ message: 'Comment added successfully.', comment });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to add comment.' });
   }
 };

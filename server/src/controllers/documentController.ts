@@ -3,6 +3,7 @@ import { prisma } from '../config/db';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import path from 'path';
 import fs from 'fs';
+import { NotificationPolicy } from '../policies/notification/notification.policy';
 
 export const uploadDocument = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -23,7 +24,7 @@ export const uploadDocument = async (req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    // Verify project exists and user has access
+    // Verify project exists
     const project = await prisma.patentProject.findUnique({
       where: { id: projectId },
       include: { members: true },
@@ -31,15 +32,6 @@ export const uploadDocument = async (req: AuthenticatedRequest, res: Response): 
 
     if (!project) {
       res.status(404).json({ message: 'Project not found.' });
-      return;
-    }
-
-    const isOwner = project.ownerId === userId;
-    const isMember = project.members.some((m) => m.userId === userId);
-    const isAdmin = req.user?.role === 'Admin';
-
-    if (!isOwner && !isMember && !isAdmin) {
-      res.status(403).json({ message: 'Access denied. You are not a member of this project.' });
       return;
     }
 
@@ -79,7 +71,7 @@ export const uploadDocument = async (req: AuthenticatedRequest, res: Response): 
     
     // Notify others if the owner uploaded, or notify owner/others if a member uploaded
     const notificationPromises = [];
-    if (project.ownerId !== userId) {
+    if (NotificationPolicy.shouldNotifyDocumentUploaded(userId, project.ownerId)) {
       notificationPromises.push(
         prisma.notification.create({
           data: {
@@ -94,17 +86,19 @@ export const uploadDocument = async (req: AuthenticatedRequest, res: Response): 
     }
 
     for (const member of membersToNotify) {
-      notificationPromises.push(
-        prisma.notification.create({
-          data: {
-            userId: member.userId,
-            title: 'New Document Uploaded',
-            message: `${sender?.fullName || sender?.username} uploaded "${originalName}" to project "${project.title}".`,
-            type: 'GENERAL',
-            referenceId: projectId,
-          },
-        })
-      );
+      if (NotificationPolicy.shouldNotifyDocumentUploaded(userId, member.userId)) {
+        notificationPromises.push(
+          prisma.notification.create({
+            data: {
+              userId: member.userId,
+              title: 'New Document Uploaded',
+              message: `${sender?.fullName || sender?.username} uploaded "${originalName}" to project "${project.title}".`,
+              type: 'GENERAL',
+              referenceId: projectId,
+            },
+          })
+        );
+      }
     }
 
     // Log Activity
@@ -142,29 +136,13 @@ export const deleteDocument = async (req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    // Fetch document and associated project
+    // Fetch document
     const document = await prisma.document.findUnique({
       where: { id },
-      include: {
-        project: {
-          include: { members: true },
-        },
-      },
     });
 
     if (!document) {
       res.status(404).json({ message: 'Document not found.' });
-      return;
-    }
-
-    const docWithRelations = document as any;
-
-    const isOwner = docWithRelations.project.ownerId === userId;
-    const isMember = docWithRelations.project.members.some((m: any) => m.userId === userId);
-    const isAdmin = req.user?.role === 'Admin';
-
-    if (!isOwner && !isMember && !isAdmin) {
-      res.status(403).json({ message: 'Access denied. You do not have permission to delete this file.' });
       return;
     }
 

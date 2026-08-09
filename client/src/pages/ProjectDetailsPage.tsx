@@ -98,6 +98,9 @@ export const ProjectDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useOutletContext<{ user: any }>() || {};
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const projectMemberRecord = project?.members?.find((m: any) => m.user.id === user?.id || m.user.id === user?.userId);
+  const userProjectRole = projectMemberRecord?.role; // 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
+  const isProjectReviewer = userProjectRole === 'GUIDE' || userProjectRole === 'PATENT_EXPERT' || user?.role === 'Admin';
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
     | 'Overview'
@@ -2151,7 +2154,7 @@ export const ProjectDetailsPage: React.FC = () => {
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">
-                  {user?.role === 'PatentExpert' ? 'Patent Expert Legal Review Deck' : 'Faculty Supervisor Review Deck'}
+                  {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW') ? 'Patent Expert Legal Review Deck' : 'Faculty Supervisor Review Deck'}
                 </h3>
                 <p className="text-xs text-slate-500 font-semibold mt-0.5">Endorsements, legal checklists, and supervisor sign-offs</p>
               </div>
@@ -2160,11 +2163,11 @@ export const ProjectDetailsPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Left Column Guide/Expert Comment inputs */}
               <div className="md:col-span-1 space-y-4">
-                {(user?.role === 'Guide' || user?.role === 'PatentExpert' || user?.role === 'Admin') ? (
+                {isProjectReviewer ? (
                   <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl shadow-3xs space-y-4">
                     <h4 className="text-xs font-bold text-slate-900 uppercase">Review Feedback Actions</h4>
                     <p className="text-[11px] text-slate-500 leading-normal font-semibold">
-                      {user?.role === 'PatentExpert'
+                      {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW')
                         ? 'Log legal observations, approve applications, or reject drafts.'
                         : 'Submit guidance reviews and optionally advance workflow stage nodes.'}
                     </p>
@@ -2180,7 +2183,7 @@ export const ProjectDetailsPage: React.FC = () => {
                       />
 
                       <div className="flex flex-col gap-2">
-                        {user?.role === 'PatentExpert' ? (
+                        {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW') ? (
                           <>
                             <button
                               type="submit"
