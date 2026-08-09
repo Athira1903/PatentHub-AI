@@ -11,6 +11,13 @@ import { PatentFormPolicy } from '../policies/forms/patent-form.policy';
 import { InvitationPolicy } from '../policies/invitation/invitation.policy';
 import { ReportPolicy } from '../policies/report/report.policy';
 import { prisma } from '../config/db';
+import { AiService } from '../services/aiService';
+import {
+  generateInnovationAi,
+  getSimilarityAnalysis,
+  getNoveltyAssessment,
+  generatePatentDrawing
+} from '../controllers/aiController';
 
 // Simple Test Runner framework
 let passedTests = 0;
@@ -602,6 +609,261 @@ test('Service: inviteMemberByUsername rejects if active invitation exists', asyn
   (prisma.user as any).findUnique = originalFindUniqueUser;
   (prisma.projectMember as any).findUnique = originalMemberFindUnique;
   (prisma.invitation as any).findFirst = originalInvitationFindFirst;
+});
+
+// ----------------------------------------------------
+// 7. AI & Gemini Integration Tests
+// ----------------------------------------------------
+test('Controller: generateInnovationAi suggests title successfully', async () => {
+  const originalFindUnique = prisma.patentProject.findUnique;
+  const originalSuggestions = AiService.generateInnovationSuggestions;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Smart Ingestor',
+    innovationIdea: 'A smart ingestor system',
+    proposedSolution: 'Using distributed feedback queues',
+    category: 'Software',
+    technicalDomain: 'Computing'
+  });
+
+  (AiService as any).generateInnovationSuggestions = async () => 'Suggested Patent Title';
+
+  let statusVal = 0;
+  let jsonVal: any = null;
+  const req = {
+    params: { id: 'p1' },
+    body: { action: 'title' }
+  } as any;
+  const res = {
+    status: (s: number) => { statusVal = s; return res; },
+    json: (j: any) => { jsonVal = j; }
+  } as any;
+
+  await generateInnovationAi(req, res);
+
+  assert.strictEqual(statusVal, 200);
+  assert.strictEqual(jsonVal.success, true);
+  assert.strictEqual(jsonVal.suggestion, 'Suggested Patent Title');
+
+  (prisma.patentProject as any).findUnique = originalFindUnique;
+  (AiService as any).generateInnovationSuggestions = originalSuggestions;
+});
+
+test('Controller: getSimilarityAnalysis returns similarity response without fabricated prior art', async () => {
+  const originalFindUnique = prisma.patentProject.findUnique;
+  const originalSimilarity = AiService.analyzeSimilarity;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Smart Ingestor',
+    innovationIdea: 'A smart ingestor system',
+    proposedSolution: 'Using distributed feedback queues',
+    category: 'Software',
+    technicalDomain: 'Computing'
+  });
+
+  const mockAnalysis = {
+    score: 15,
+    riskLevel: 'Low Risk',
+    matchingConcepts: ['Concept A'],
+    overlappingFeatures: ['Feature B'],
+    priorArtReferences: [],
+    explanation: 'Conceptual overlap is low.',
+    disclaimer: 'AI-assisted conceptual comparison rather than a verified prior-art search.'
+  };
+
+  (AiService as any).analyzeSimilarity = async () => mockAnalysis;
+
+  let statusVal = 0;
+  let jsonVal: any = null;
+  const req = {
+    params: { id: 'p1' }
+  } as any;
+  const res = {
+    status: (s: number) => { statusVal = s; return res; },
+    json: (j: any) => { jsonVal = j; }
+  } as any;
+
+  await getSimilarityAnalysis(req, res);
+
+  assert.strictEqual(statusVal, 200);
+  assert.strictEqual(jsonVal.success, true);
+  assert.strictEqual(jsonVal.score, 15);
+  assert.strictEqual(jsonVal.riskLevel, 'Low Risk');
+  assert.deepStrictEqual(jsonVal.priorArtReferences, []);
+
+  (prisma.patentProject as any).findUnique = originalFindUnique;
+  (AiService as any).analyzeSimilarity = originalSimilarity;
+});
+
+test('Controller: getNoveltyAssessment returns novelty response with proper disclaimer', async () => {
+  const originalFindUnique = prisma.patentProject.findUnique;
+  const originalNovelty = AiService.analyzeNovelty;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Smart Ingestor',
+    innovationIdea: 'A smart ingestor system',
+    proposedSolution: 'Using distributed feedback queues',
+    category: 'Software',
+    technicalDomain: 'Computing'
+  });
+
+  const mockNovelty = {
+    score: 85,
+    assessment: 'High',
+    strongAreas: ['Area A'],
+    weakAreas: ['Area B'],
+    recommendations: ['Rec C'],
+    explanation: 'Novelty is strong.',
+    disclaimer: 'AI-assisted preliminary assessment. This is not a legal opinion or a definitive patentability determination.'
+  };
+
+  (AiService as any).analyzeNovelty = async () => mockNovelty;
+
+  let statusVal = 0;
+  let jsonVal: any = null;
+  const req = {
+    params: { id: 'p1' }
+  } as any;
+  const res = {
+    status: (s: number) => { statusVal = s; return res; },
+    json: (j: any) => { jsonVal = j; }
+  } as any;
+
+  await getNoveltyAssessment(req, res);
+
+  assert.strictEqual(statusVal, 200);
+  assert.strictEqual(jsonVal.success, true);
+  assert.strictEqual(jsonVal.score, 85);
+  assert.strictEqual(jsonVal.assessment, 'High');
+
+  (prisma.patentProject as any).findUnique = originalFindUnique;
+  (AiService as any).analyzeNovelty = originalNovelty;
+});
+
+test('Controller: generatePatentDrawing returns drawing component annotations metadata', async () => {
+  const originalFindUnique = prisma.patentProject.findUnique;
+  const originalDrawing = AiService.generatePatentDrawingAnalysis;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Smart Ingestor',
+    innovationIdea: 'A smart ingestor system',
+    proposedSolution: 'Using distributed feedback queues',
+    category: 'Software',
+    technicalDomain: 'Computing'
+  });
+
+  const mockDrawing = {
+    figNum: 'FIG. 1',
+    components: [{ number: '102', label: 'Primary Port' }]
+  };
+
+  (AiService as any).generatePatentDrawingAnalysis = async () => mockDrawing;
+
+  let statusVal = 0;
+  let jsonVal: any = null;
+  const req = {
+    params: { id: 'p1' },
+    body: { originalUrl: 'https://images.unsplash.com/test' }
+  } as any;
+  const res = {
+    status: (s: number) => { statusVal = s; return res; },
+    json: (j: any) => { jsonVal = j; }
+  } as any;
+
+  await generatePatentDrawing(req, res);
+
+  assert.strictEqual(statusVal, 200);
+  assert.strictEqual(jsonVal.success, true);
+  assert.strictEqual(jsonVal.drawingMetadata.figNum, 'FIG. 1');
+  assert.strictEqual(jsonVal.drawingMetadata.components[0].label, 'Primary Port');
+
+  (prisma.patentProject as any).findUnique = originalFindUnique;
+  (AiService as any).generatePatentDrawingAnalysis = originalDrawing;
+});
+
+test('Controller: AI endpoints return 404 for missing project', async () => {
+  const originalFindUnique = prisma.patentProject.findUnique;
+  (prisma.patentProject as any).findUnique = async () => null;
+
+  let statusVal = 0;
+  let jsonVal: any = null;
+  const req = {
+    params: { id: 'missing_id' },
+    body: { action: 'title' }
+  } as any;
+  const res = {
+    status: (s: number) => { statusVal = s; return res; },
+    json: (j: any) => { jsonVal = j; }
+  } as any;
+
+  await generateInnovationAi(req, res);
+  assert.strictEqual(statusVal, 404);
+
+  (prisma.patentProject as any).findUnique = originalFindUnique;
+});
+
+test('Controller: AI endpoints return 400 for empty project content', async () => {
+  const originalFindUnique = prisma.patentProject.findUnique;
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: '',
+    innovationIdea: '',
+    proposedSolution: ''
+  });
+
+  let statusVal = 0;
+  let jsonVal: any = null;
+  const req = {
+    params: { id: 'p1' },
+    body: { action: 'title' }
+  } as any;
+  const res = {
+    status: (s: number) => { statusVal = s; return res; },
+    json: (j: any) => { jsonVal = j; }
+  } as any;
+
+  await generateInnovationAi(req, res);
+  assert.strictEqual(statusVal, 400);
+  assert.ok(jsonVal.message.includes('must have a title'));
+
+  (prisma.patentProject as any).findUnique = originalFindUnique;
+});
+
+test('Controller: AI endpoints handle Gemini service failure gracefully with 502', async () => {
+  const originalFindUnique = prisma.patentProject.findUnique;
+  const originalNovelty = AiService.analyzeNovelty;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Smart Ingestor',
+    innovationIdea: 'A smart ingestor system',
+    proposedSolution: 'Using distributed feedback queues'
+  });
+
+  (AiService as any).analyzeNovelty = async () => {
+    throw new Error('Gemini quota exceeded or server timeout.');
+  };
+
+  let statusVal = 0;
+  let jsonVal: any = null;
+  const req = {
+    params: { id: 'p1' }
+  } as any;
+  const res = {
+    status: (s: number) => { statusVal = s; return res; },
+    json: (j: any) => { jsonVal = j; }
+  } as any;
+
+  await getNoveltyAssessment(req, res);
+  assert.strictEqual(statusVal, 502);
+  assert.ok(jsonVal.message.includes('currently unavailable'));
+
+  (prisma.patentProject as any).findUnique = originalFindUnique;
+  (AiService as any).analyzeNovelty = originalNovelty;
 });
 
 // Summary reporting and sequential execution

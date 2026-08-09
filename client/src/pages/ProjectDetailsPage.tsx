@@ -216,10 +216,12 @@ export const ProjectDetailsPage: React.FC = () => {
   // Similarity states
   const [similarityData, setSimilarityData] = useState<any>(null);
   const [loadingSimilarity, setLoadingSimilarity] = useState(false);
+  const [similarityError, setSimilarityError] = useState<string | null>(null);
 
   // Novelty states
   const [noveltyData, setNoveltyData] = useState<any>(null);
   const [loadingNovelty, setLoadingNovelty] = useState(false);
+  const [noveltyError, setNoveltyError] = useState<string | null>(null);
 
   // Forms checklist wizard
   const [activeFormIndex, setActiveFormIndex] = useState<string | null>(null);
@@ -697,12 +699,15 @@ export const ProjectDetailsPage: React.FC = () => {
   // Run Similarity Check
   const runSimilarityCheck = async () => {
     setLoadingSimilarity(true);
+    setSimilarityError(null);
     try {
       const res = await api.get(`/projects/${id}/ai/similarity`);
       setSimilarityData(res.data);
       toast.success('Prior art index search completed successfully!');
-    } catch (e) {
-      toast.error('Prior art check failed.');
+    } catch (e: any) {
+      const errMsg = e.response?.data?.message || 'Google Gemini AI similarity analysis is currently unavailable.';
+      setSimilarityError(errMsg);
+      toast.error(errMsg);
     } finally {
       setLoadingSimilarity(false);
     }
@@ -711,12 +716,15 @@ export const ProjectDetailsPage: React.FC = () => {
   // Run Novelty assessment
   const runNoveltyAssessment = async () => {
     setLoadingNovelty(true);
+    setNoveltyError(null);
     try {
       const res = await api.get(`/projects/${id}/ai/novelty`);
       setNoveltyData(res.data);
       toast.success('Claims novelty assessment completed!');
-    } catch (e) {
-      toast.error('Novelty audit check failed.');
+    } catch (e: any) {
+      const errMsg = e.response?.data?.message || 'Google Gemini AI novelty assessment is currently unavailable.';
+      setNoveltyError(errMsg);
+      toast.error(errMsg);
     } finally {
       setLoadingNovelty(false);
     }
@@ -1659,7 +1667,11 @@ export const ProjectDetailsPage: React.FC = () => {
                   </button>
                 </div>
 
-                {!similarityData ? (
+                {similarityError ? (
+                  <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-bold leading-normal">
+                    ❌ {similarityError}
+                  </div>
+                ) : !similarityData ? (
                   <div className="py-12 text-center text-slate-400 text-xs font-semibold">
                     Click "Audit Registry" to inspect database matches.
                   </div>
@@ -1693,40 +1705,55 @@ export const ProjectDetailsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                      {similarityData.matches.map((m: any, idx: number) => {
-                        const isExpanded = expandedMatchIndex === idx;
-                        return (
-                          <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
-                            <div className="flex justify-between items-center">
-                              <span className="font-extrabold text-[10px] text-indigo-700">{m.patentId}</span>
-                              <span className="text-[9px] font-bold text-slate-450 font-mono">{m.similarityPercent}% match</span>
-                            </div>
-                            <h6 className="font-bold text-[11px] text-slate-900">{m.title}</h6>
-                            <p className="text-[10px] text-slate-500 leading-normal italic bg-white p-2 rounded border border-slate-150">
-                              {m.drawbackOverlap}
-                            </p>
-                            <div className="flex items-center justify-between pt-1">
-                              <a href={m.url} target="_blank" rel="noreferrer" className="text-[9px] text-indigo-650 font-bold hover:underline">
-                                Registry entry →
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => setExpandedMatchIndex(isExpanded ? null : idx)}
-                                className="text-[9px] text-indigo-700 font-extrabold hover:underline"
-                              >
-                                {isExpanded ? 'Hide strategy' : 'Bypass strategy'}
-                              </button>
-                            </div>
-                            {isExpanded && (
-                              <p className="p-2.5 bg-indigo-50 border border-indigo-200 rounded text-[10px] leading-relaxed text-indigo-950 font-semibold mt-1">
-                                💡 Claim modification strategy populated in specifications drafter companion workspace.
+                    {similarityData.matches && similarityData.matches.length > 0 && (
+                      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        {similarityData.matches.map((m: any, idx: number) => {
+                          const isExpanded = expandedMatchIndex === idx;
+                          return (
+                            <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                              <div className="flex justify-between items-center">
+                                <span className="font-extrabold text-[10px] text-indigo-700">{m.patentId}</span>
+                                <span className="text-[9px] font-bold text-slate-450 font-mono">{m.similarityPercent}% match</span>
+                              </div>
+                              <h6 className="font-bold text-[11px] text-slate-900">{m.title}</h6>
+                              <p className="text-[10px] text-slate-500 leading-normal italic bg-white p-2 rounded border border-slate-150">
+                                {m.drawbackOverlap}
                               </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                              <div className="flex items-center justify-between pt-1">
+                                <a href={m.url} target="_blank" rel="noreferrer" className="text-[9px] text-indigo-650 font-bold hover:underline">
+                                  Registry entry →
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedMatchIndex(isExpanded ? null : idx)}
+                                  className="text-[9px] text-indigo-700 font-extrabold hover:underline"
+                                >
+                                  {isExpanded ? 'Hide strategy' : 'Bypass strategy'}
+                                </button>
+                              </div>
+                              {isExpanded && (
+                                <p className="p-2.5 bg-indigo-50 border border-indigo-200 rounded text-[10px] leading-relaxed text-indigo-950 font-semibold mt-1">
+                                  💡 Claim modification strategy populated in specifications drafter companion workspace.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {similarityData.explanation && (
+                      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+                        <h6 className="font-extrabold text-[10px] text-slate-800 uppercase tracking-wider">AI Comparison Explanation:</h6>
+                        <p className="text-[10px] text-slate-600 leading-relaxed font-semibold">{similarityData.explanation}</p>
+                      </div>
+                    )}
+
+                    {similarityData.disclaimer && (
+                      <div className="text-[9px] text-slate-450 italic font-bold leading-normal">
+                        ⚠ {similarityData.disclaimer}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1757,7 +1784,11 @@ export const ProjectDetailsPage: React.FC = () => {
                   </button>
                 </div>
 
-                {!noveltyData ? (
+                {noveltyError ? (
+                  <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-bold leading-normal">
+                    ❌ {noveltyError}
+                  </div>
+                ) : !noveltyData ? (
                   <div className="py-12 text-center text-slate-400 text-xs font-semibold">
                     Click "Audit Claims" to evaluate non-obviousness metrics.
                   </div>
@@ -1794,7 +1825,7 @@ export const ProjectDetailsPage: React.FC = () => {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="p-3 bg-emerald-50/20 border border-emerald-200 rounded-xl space-y-1">
                         <h6 className="font-bold text-[10px] text-emerald-950 uppercase">Strong Area claims:</h6>
-                        <ul className="list-disc pl-4 text-[9px] text-slate-650 leading-relaxed font-semibold">
+                        <ul className="list-disc pl-4 text-[9px] text-slate-655 leading-relaxed font-semibold">
                           {noveltyData.strongAreas.slice(0, 2).map((sa: string, si: number) => (
                             <li key={si}>{sa}</li>
                           ))}
@@ -1809,6 +1840,30 @@ export const ProjectDetailsPage: React.FC = () => {
                         </ul>
                       </div>
                     </div>
+
+                    {noveltyData.explanation && (
+                      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+                        <h6 className="font-extrabold text-[10px] text-slate-800 uppercase tracking-wider">AI Novelty Explanation:</h6>
+                        <p className="text-[10px] text-slate-600 leading-relaxed font-semibold">{noveltyData.explanation}</p>
+                      </div>
+                    )}
+
+                    {noveltyData.recommendations && noveltyData.recommendations.length > 0 && (
+                      <div className="p-3.5 bg-indigo-50/30 border border-indigo-150 rounded-2xl space-y-1">
+                        <h6 className="font-extrabold text-[10px] text-indigo-950 uppercase tracking-wider">Recommendations:</h6>
+                        <ul className="list-disc pl-4 text-[9px] text-slate-600 leading-relaxed font-bold">
+                          {noveltyData.recommendations.map((rec: string, ri: number) => (
+                            <li key={ri}>{rec}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {noveltyData.disclaimer && (
+                      <div className="text-[9px] text-slate-450 italic font-bold leading-normal">
+                        ⚠ {noveltyData.disclaimer}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
