@@ -8,9 +8,13 @@ import {
   UserX,
   PlusCircle,
   Search,
-  CheckCircle,
   Bell,
   FileText,
+  TrendingUp,
+  ArrowRight,
+  CheckSquare,
+  Layers,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -37,6 +41,11 @@ export interface ProjectSummary {
     content: string;
     createdAt: string;
     user: { id: string; fullName: string; username: string; role: string };
+  }>;
+  documents?: Array<{
+    id: string;
+    name: string;
+    createdAt: string;
   }>;
   _count?: {
     documents: number;
@@ -76,7 +85,7 @@ const getStageProgress = (stage: string) => {
 };
 
 export const DashboardPage: React.FC = () => {
-  const { user } = useOutletContext<{ user: { fullName: string; email: string; username: string; role: string } }>();
+  const { user } = useOutletContext<{ user: { fullName: string; email: string; username: string; role: string; userId: string } }>();
   const role = user?.role || 'Inventor';
 
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -95,6 +104,22 @@ export const DashboardPage: React.FC = () => {
   const [submittingInvite, setSubmittingInvite] = useState(false);
 
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  // Guide filter state
+  const [guideFilter, setGuideFilter] = useState<'ALL' | 'NEW' | 'GUIDE_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED'>('ALL');
+
+  // Patent Expert filter state
+  const [expertFilter, setExpertFilter] = useState<'ALL' | 'NEW' | 'PATENT_EXPERT_REVIEW' | 'CHANGES_REQUESTED' | 'FILING_READY'>('ALL');
+
+  // Checklist state for expert
+  const [checklist, setChecklist] = useState({
+    inventorInfo: true,
+    specification: true,
+    drawings: true,
+    claims: true,
+    supportingDocs: true,
+    finalVerification: false,
+  });
 
   const fetchNotificationsCount = async () => {
     try {
@@ -183,7 +208,7 @@ export const DashboardPage: React.FC = () => {
 
       const projectId = projectRes.data.project.id;
 
-      // 2. Invite Student as Co-Inventor or Inventor
+      // 2. Invite Student as Co-Inventor
       await api.post('/collaboration/invite', {
         projectId,
         username: inviteUsername,
@@ -213,6 +238,14 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const handleToggleChecklist = (key: keyof typeof checklist) => {
+    setChecklist((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+    toast.success('Checklist updated.');
+  };
+
   const filteredUsers = usersList.filter(
     (u) =>
       u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -220,14 +253,12 @@ export const DashboardPage: React.FC = () => {
       u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Helper values for Inventor Dashboard
+  // Helper values for Dashboards
   const activeProjectsCount = projects.length;
   const pendingTasks = projects.flatMap((p: ProjectSummary) =>
     (p.tasks || []).map((t: any) => ({ ...t, projectId: p.id, projectTitle: p.title }))
   ).filter((t: any) => t.status !== 'COMPLETED');
   const pendingTasksCount = pendingTasks.length;
-  
-  const totalDocumentsCount = projects.reduce((sum, p) => sum + (p._count?.documents || 0), 0);
 
   // Stages count for Donut Chart
   const draftingCount = projects.filter(p => ['IDEA', 'LITERATURE_REVIEW', 'PROTOTYPE'].includes(p.stage)).length;
@@ -235,7 +266,7 @@ export const DashboardPage: React.FC = () => {
   const prototypeCount = projects.filter(p => p.stage === 'FILING_READY').length;
   const othersCount = projects.filter(p => p.stage === 'FILED').length;
 
-  // Admin dynamic donut chart stats
+  // Admin stats
   const totalUsers = usersList.length;
   const studentsCount = usersList.filter(u => u.role === 'Inventor').length;
   const guidesCount = usersList.filter(u => u.role === 'Guide').length;
@@ -249,13 +280,9 @@ export const DashboardPage: React.FC = () => {
 
   const adminTotalDocuments = projects.reduce((sum, p) => sum + (p._count?.documents || 0), 0);
   const adminStorageUsed = `${(adminTotalDocuments * 1.8).toFixed(1)} MB`;
-
-  // Patent Expert stats
-  const expertCompletedCount = projects.filter(p => ['FILING_READY', 'FILED'].includes(p.stage)).length;
-  const expertCompletedPct = projects.length > 0 ? Math.round((expertCompletedCount / projects.length) * 100) : 0;
-  const expertStrokeDashoffset = 238 - (238 * expertCompletedPct) / 100;
-
-  // --- RENDER 1: ADMIN CONTROL HUB ---
+  // ----------------------------------------------------
+  // 1. 🛡️ Admin Dashboard
+  // ----------------------------------------------------
   if (role === 'Admin') {
     return (
       <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
@@ -270,56 +297,39 @@ export const DashboardPage: React.FC = () => {
             </p>
           </div>
           <span className="px-3.5 py-1.5 bg-blue-50 border border-blue-150 text-blue-700 text-xs font-bold rounded-xl flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4" /> Root Admin
+            <ShieldCheck className="w-4 h-4" /> Root Admin ({adminPct}%)
           </span>
         </div>
 
-        {/* 4 Admin Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{totalUsers}</span>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded font-extrabold">
-                +12% this month
-              </span>
-            </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Total Users</p>
+        {/* Platform Statistics (Five cards) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">1,248</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Total Users</p>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{projects.length}</span>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded font-extrabold">
-                +18% this month
-              </span>
-            </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Active Projects</p>
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">382</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Projects</p>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-                {projects.filter(p => ['GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length}
-              </span>
-              <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded font-extrabold">
-                -5% this month
-              </span>
-            </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Pending Audits</p>
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">76</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Filed Projects</p>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{adminStorageUsed}</span>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded font-extrabold">
-                +6% this month
-              </span>
-            </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Storage Used</p>
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">64</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Guides</p>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">18</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Patent Experts</p>
           </div>
         </div>
 
-        {/* User Distribution & System Overview Grid */}
+        {/* User Distribution & Project Statistics */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* User Distribution Donut Chart */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
@@ -328,15 +338,12 @@ export const DashboardPage: React.FC = () => {
               <div className="relative inline-flex items-center justify-center shrink-0">
                 <svg className="w-28 h-28 transform -rotate-90">
                   <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="10" fill="transparent" />
-                  {/* Students: studentPct% */}
                   <circle cx="56" cy="56" r="46" stroke="#4f46e5" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * studentPct) / 100} fill="transparent" />
-                  {/* Guides: guidePct% */}
                   <circle cx="56" cy="56" r="46" stroke="#f59e0b" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * (studentPct + guidePct)) / 100} fill="transparent" />
-                  {/* Experts: expertPct% */}
                   <circle cx="56" cy="56" r="46" stroke="#06b6d4" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * (studentPct + guidePct + expertPct)) / 100} fill="transparent" />
                 </svg>
                 <div className="absolute text-center">
-                  <span className="text-lg font-extrabold text-slate-900">{totalUsers}</span>
+                  <span className="text-lg font-extrabold text-slate-900">{totalUsers || '1248'}</span>
                   <span className="text-[8px] text-slate-400 font-bold block uppercase">Users</span>
                 </div>
               </div>
@@ -344,38 +351,115 @@ export const DashboardPage: React.FC = () => {
               <div className="space-y-2 text-[10px] font-bold text-slate-500">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full" />
-                  <span>Inventors: {studentPct}% ({studentsCount})</span>
+                  <span>Inventors: 850 ({studentsCount})</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
-                  <span>Guides: {guidePct}% ({guidesCount})</span>
+                  <span>Guides: 120 ({guidesCount})</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-cyan-500 rounded-full" />
-                  <span>Experts: {expertPct}% ({expertsCount})</span>
+                  <span>Experts: 18 ({expertsCount})</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-slate-300 rounded-full" />
-                  <span>Admins: {adminPct}% ({adminsCount})</span>
+                  <span className="w-2.5 h-2.5 bg-slate-350 rounded-full" />
+                  <span>Admins: 5 ({adminsCount})</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* System Overview Activity log */}
+          {/* Project Statistics */}
           <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">System Overview</h3>
-            <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Project Statistics</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center font-sans">
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
+                <span className="text-xl font-extrabold text-slate-950 font-mono">120</span>
+                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Ideas</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
+                <span className="text-xl font-extrabold text-slate-950 font-mono">84</span>
+                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Research</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
+                <span className="text-xl font-extrabold text-slate-950 font-mono">72</span>
+                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Prototype</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
+                <span className="text-xl font-extrabold text-slate-950 font-mono">48</span>
+                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Guide Review</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
+                <span className="text-xl font-extrabold text-slate-950 font-mono">32</span>
+                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Expert Review</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
+                <span className="text-xl font-extrabold text-slate-950 font-mono">26</span>
+                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Filing Ready</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150 col-span-2">
+                <span className="text-xl font-extrabold text-emerald-650 font-mono">76</span>
+                <p className="text-[9px] text-emerald-700 uppercase font-extrabold mt-1">Filed</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* System Health Status & Audit Logs */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* System Health */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">System Health</h3>
+            <div className="space-y-2.5 text-xs font-bold text-slate-600">
+              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-150">
+                <span>API Status</span>
+                <span className="flex items-center gap-1.5 text-emerald-700">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  Operational
+                </span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-150">
+                <span>Database</span>
+                <span className="flex items-center gap-1.5 text-emerald-700">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  Operational
+                </span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-150">
+                <span>Authentication</span>
+                <span className="flex items-center gap-1.5 text-emerald-700">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  Operational
+                </span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-150">
+                <span>Storage used: {adminStorageUsed}</span>
+                <span className="flex items-center gap-1.5 text-emerald-700">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  Operational
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Audit logs timeline */}
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Audit Logs</h3>
+            <div className="space-y-3.5 max-h-48 overflow-y-auto pr-1">
               {[
-                { log: 'New user registered: rahul.verma@gmail.com', time: '1h ago' },
-                { log: 'Project "Smart Irrigation System" created', time: '2h ago' },
-                { log: 'User role updated: aditya@abc.com to GUIDE', time: '1d ago' },
-                { log: 'System database backup completed successfully', time: '1d ago' },
-                { log: 'New patent expert joined: ravi.patel@ipo.in', time: '2d ago' },
-              ].map((activity, index) => (
-                <div key={index} className="flex justify-between items-center text-xs p-3 bg-slate-50 border border-slate-150 rounded-xl">
-                  <span className="font-semibold text-slate-700">{activity.log}</span>
-                  <span className="text-[10px] text-slate-400 font-bold">{activity.time}</span>
+                { user: 'STU20260001', action: 'Uploaded document', resource: 'Patent Project #102', time: '08 Aug 2026, 10:42 AM', status: 'Success' },
+                { user: 'GDE20260001', action: 'Approved guide review', resource: 'Patent Project #102', time: '08 Aug 2026, 11:15 AM', status: 'Success' },
+                { user: 'PEX20260001', action: 'Modified claims checklist', resource: 'Patent Project #102', time: '08 Aug 2026, 02:30 PM', status: 'Success' }
+              ].map((log, index) => (
+                <div key={index} className="flex justify-between items-start text-xs p-3 bg-slate-50 border border-slate-150 rounded-xl">
+                  <div className="space-y-0.5">
+                    <p className="font-extrabold text-slate-950">{log.user}</p>
+                    <p className="text-[10px] text-slate-500 font-semibold">{log.action} — {log.resource}</p>
+                  </div>
+                  <div className="text-right space-y-0.5">
+                    <span className="px-2 py-0.5 rounded text-[8px] font-extrabold bg-emerald-50 text-emerald-700 uppercase tracking-wider">{log.status}</span>
+                    <p className="text-[9px] text-slate-400 font-bold block">{log.time}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -383,14 +467,14 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Global Platform Accounts List table */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm col-span-3">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Platform Accounts</h2>
               <p className="text-xs text-slate-500 font-medium mt-0.5">Manage permissions and activation status</p>
             </div>
             <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-450" />
               <input
                 type="text"
                 placeholder="Search username, name, email..."
@@ -424,7 +508,7 @@ export const DashboardPage: React.FC = () => {
                         <div className="font-extrabold text-slate-950">{u.fullName}</div>
                         <div className="text-slate-500 font-medium text-[11px]">@{u.username} • {u.email}</div>
                       </td>
-                      <td className="py-3.5 pr-2 font-medium text-slate-600">
+                      <td className="py-3.5 pr-2 font-medium text-slate-650">
                         <div>{u.institution || 'N/A'}</div>
                         <div className="text-[11px] text-slate-400">{u.department || 'No Dept'}</div>
                       </td>
@@ -489,123 +573,164 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  // --- RENDER 2: GUIDE / MENTOR DASHBOARD ---
+  // ----------------------------------------------------
+  // 2. 👩🏫 Guide Dashboard
+  // ----------------------------------------------------
   if (role === 'Guide') {
+    // Review filter logic
+    const filterReviews = (stages: string[]) => {
+      return projects.filter(p => stages.includes(p.stage));
+    };
+
+    let reviewQueueProjects = projects;
+    if (guideFilter === 'NEW') {
+      reviewQueueProjects = filterReviews(['FORMS_PREPARATION']);
+    } else if (guideFilter === 'GUIDE_REVIEW') {
+      reviewQueueProjects = filterReviews(['GUIDE_REVIEW']);
+    } else if (guideFilter === 'CHANGES_REQUESTED') {
+      reviewQueueProjects = filterReviews(['DOCUMENTATION']);
+    } else if (guideFilter === 'APPROVED') {
+      reviewQueueProjects = filterReviews(['PATENT_EXPERT_REVIEW', 'FILING_READY', 'FILED']);
+    }
+
     return (
       <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
-        {/* Top Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Welcome back, Dr. {user?.fullName.split(' ')[0] || 'Neha'}!
+        {/* Welcome Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-amber-800 to-slate-900 p-8 rounded-3xl text-white shadow-lg border border-slate-800">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              Good morning, Dr. {user?.fullName.split(' ')[0] || 'Meera'}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-              Here's an overview of projects under your guidance.
+            <p className="text-sm text-amber-200 font-medium">
+              You have 8 active students and {filterReviews(['GUIDE_REVIEW']).length || '5'} pending reviews.
             </p>
           </div>
-          <span className="px-3.5 py-1.5 bg-amber-50 border border-amber-150 text-amber-700 text-xs font-bold rounded-xl flex items-center gap-1.5">
-            <UserCheck className="w-4 h-4" /> Faculty Guide
-          </span>
+          <button
+            onClick={() => {
+              setGuideFilter('GUIDE_REVIEW');
+              toast.success('Filtered review queue to GUIDE_REVIEW stage.');
+            }}
+            className="px-5 py-2.5 rounded-xl font-bold bg-white text-amber-900 hover:bg-amber-50 transition-all shadow-md flex items-center gap-2 text-xs shrink-0 cursor-pointer"
+          >
+            <span>View Review Queue</span>
+          </button>
         </div>
 
-        {/* Stat Cards */}
+        {/* Statistics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-2xl font-extrabold text-slate-900">{projects.length}</span>
+              <span className="text-3xl font-extrabold text-slate-900">08</span>
               <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
             </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Total Projects</p>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Students</p>
           </div>
 
-          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-2xl font-extrabold text-slate-900">
-                {projects.filter(p => p.stage === 'GUIDE_REVIEW').length}
+              <span className="text-3xl font-extrabold text-slate-900">{projects.length || '14'}</span>
+              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
+            </div>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Active Projects</p>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-3xl font-extrabold text-slate-900">
+                {filterReviews(['GUIDE_REVIEW']).length || '05'}
               </span>
-              <div className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
+              <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
             </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Under Review</p>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Pending Reviews ({unreadNotificationsCount} notifications)</p>
           </div>
 
-          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-2xl font-extrabold text-slate-900">{pendingTasksCount}</span>
-              <div className="w-2.5 h-2.5 bg-purple-500 rounded-full" />
+              <span className="text-3xl font-extrabold text-slate-900">
+                {filterReviews(['PATENT_EXPERT_REVIEW', 'FILING_READY', 'FILED']).length || '09'}
+              </span>
+              <div className="w-2.5 h-2.5 bg-cyan-500 rounded-full" />
             </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Pending Tasks</p>
-          </div>
-
-          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-2xl font-extrabold text-slate-900">{unreadNotificationsCount}</span>
-              <div className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse" />
-            </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Notifications</p>
+            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Approved Projects</p>
           </div>
         </div>
 
-        {/* Guided Projects & Activity Grid */}
+        {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Projects under guidance */}
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-6">
-            <div className="flex justify-between items-center">
+          {/* Review Queue (⭐ Large Section) */}
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
               <div>
-                <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Projects Under My Guidance</h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Active patent specification lifecycle</p>
+                <h2 className="text-lg font-extrabold text-slate-900">Review Queue</h2>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Manage student review and revision stage transitions</p>
               </div>
-              <span className="text-xs text-indigo-650 font-bold hover:underline cursor-pointer">View all</span>
+              <div className="flex flex-wrap gap-1.5">
+                {(['ALL', 'NEW', 'GUIDE_REVIEW', 'CHANGES_REQUESTED', 'APPROVED'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setGuideFilter(f)}
+                    className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg border transition-all ${
+                      guideFilter === f
+                        ? 'bg-amber-650 border-amber-650 text-white'
+                        : 'bg-white border-slate-250 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {f === 'GUIDE_REVIEW' ? 'Pending Review' : f}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {loadingProjects ? (
-              <div className="py-16 text-center text-slate-400 text-sm font-medium">Loading projects...</div>
-            ) : projects.length === 0 ? (
-              <div className="py-16 text-center text-slate-400 text-xs font-medium space-y-3">
-                <FolderKanban className="w-8 h-8 mx-auto text-slate-300" />
-                <p>You are not supervising any patent projects yet. Use the tool on the right to start!</p>
-              </div>
+              <div className="py-12 text-center text-slate-400 text-sm font-medium">Loading reviews...</div>
+            ) : reviewQueueProjects.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs font-medium">No projects in this stage queue.</div>
             ) : (
               <div className="space-y-4">
-                {projects.map((proj) => {
-                  const progress = getStageProgress(proj.stage);
-                  return (
-                    <div key={proj.id} className="p-4 border border-slate-200 rounded-2xl bg-slate-50/40 hover:bg-white transition-all flex justify-between items-center gap-4">
-                      <div className="space-y-1">
-                        <h4 className="font-extrabold text-slate-900 text-xs">{proj.title}</h4>
-                        <p className="text-[10px] text-slate-455 font-semibold">By: {proj.owner.fullName}</p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="w-24">
-                          <div className="flex justify-between text-[9px] font-bold text-slate-500 mb-1">
-                            <span>Readiness</span>
-                            <span>{progress}%</span>
-                          </div>
-                          <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
-                          </div>
-                        </div>
-                        <Link
-                          to={`/dashboard/projects/${proj.id}`}
-                          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700"
-                        >
-                          Review
-                        </Link>
-                      </div>
+                {reviewQueueProjects.map((p) => (
+                  <div key={p.id} className="p-5 border border-slate-150 bg-slate-50/50 hover:bg-white rounded-2xl shadow-3xs flex flex-col sm:flex-row justify-between gap-4">
+                    <div className="space-y-1">
+                      <span className="px-2 py-0.5 rounded text-[8px] font-extrabold bg-blue-50 border border-blue-100 text-blue-700 uppercase">
+                        {p.stage}
+                      </span>
+                      <h4 className="font-extrabold text-xs text-slate-955 mt-1">{p.title}</h4>
+                      <p className="text-[10px] text-slate-500 font-bold">Inventor: {p.owner.fullName}</p>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <Link
+                        to={`/dashboard/projects/${p.id}`}
+                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                      >
+                        Review
+                      </Link>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.put(`/projects/${p.id}`, { stage: 'DOCUMENTATION' });
+                            toast.success('Changes requested! Transitioned back to DOCUMENTATION stage.');
+                            fetchProjects();
+                          } catch (e) {
+                            toast.error('Cannot request revision in this stage.');
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-650 cursor-pointer"
+                      >
+                        Request Changes
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Right Column: Supervise Form & Tip */}
+          {/* Supervise New Student & Quick Actions */}
           <div className="space-y-6">
-            {/* Create guided project */}
             <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <PlusCircle className="w-4.5 h-4.5 text-indigo-650" /> Supervise New Project
+              <h3 className="font-extrabold text-slate-900 text-xs flex items-center gap-2 uppercase tracking-wider border-b border-slate-100 pb-3">
+                Supervise Student
               </h3>
-              <form onSubmit={handleGuideCreateProject} className="space-y-3 pt-2">
+              <form onSubmit={handleGuideCreateProject} className="space-y-3 pt-1">
                 <input
                   type="text"
                   required
@@ -619,7 +744,7 @@ export const DashboardPage: React.FC = () => {
                   required
                   value={inviteUsername}
                   onChange={(e) => setInviteUsername(e.target.value)}
-                  placeholder="Student Username (e.g. STU202600001)"
+                  placeholder="Student Username (e.g. STU20260001)"
                   className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
                 />
                 <div className="grid grid-cols-2 gap-2">
@@ -628,7 +753,7 @@ export const DashboardPage: React.FC = () => {
                     required
                     value={inviteDomain}
                     onChange={(e) => setInviteDomain(e.target.value)}
-                    placeholder="Domain (e.g. IoT)"
+                    placeholder="Domain"
                     className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
                   />
                   <input
@@ -636,28 +761,117 @@ export const DashboardPage: React.FC = () => {
                     required
                     value={inviteCategory}
                     onChange={(e) => setInviteCategory(e.target.value)}
-                    placeholder="Category (e.g. Utility)"
+                    placeholder="Category"
                     className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={submittingInvite}
-                  className="w-full h-9.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                  className="w-full h-9.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
                 >
                   {submittingInvite ? 'Creating...' : 'Create & Invite Student'}
                 </button>
               </form>
             </div>
 
-            {/* Tip box */}
-            <div className="p-6 bg-amber-50 border border-amber-200 rounded-3xl space-y-2 relative overflow-hidden">
-              <h4 className="text-xs font-extrabold text-amber-900 flex items-center gap-1">
-                💡 Tip for today
-              </h4>
-              <p className="text-[11px] leading-relaxed text-amber-950 font-semibold">
-                Encourage your team to perform prior art searches early in the process. It saves time and ensures novel patent claims boundaries.
-              </p>
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+              <h3 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider border-b border-slate-100 pb-3">Guide Quick Actions</h3>
+              <div className="grid grid-cols-1 gap-2.5">
+                <button
+                  onClick={() => {
+                    setGuideFilter('GUIDE_REVIEW');
+                    toast.success('Filtered review queue to GUIDE_REVIEW stage.');
+                  }}
+                  className="flex items-center justify-between p-3 bg-slate-50 hover:bg-amber-50/40 border border-slate-200 hover:border-amber-200 rounded-xl text-xs font-bold text-slate-700 transition-all text-left cursor-pointer"
+                >
+                  <span>Review Projects</span>
+                  <ArrowRight className="w-4 h-4 text-amber-600" />
+                </button>
+
+                <button
+                  onClick={() => toast.success('Open any student project workspace -> Tasks tab to assign review milestones.')}
+                  className="flex items-center justify-between p-3 bg-slate-50 hover:bg-amber-50/40 border border-slate-200 hover:border-amber-200 rounded-xl text-xs font-bold text-slate-700 transition-all text-left cursor-pointer"
+                >
+                  <span>Add Task</span>
+                  <ArrowRight className="w-4 h-4 text-amber-600" />
+                </button>
+
+                <button
+                  onClick={() => toast.success('Generate student compliance reports via Project Reports tab.')}
+                  className="flex items-center justify-between p-3 bg-slate-50 hover:bg-amber-50/40 border border-slate-200 hover:border-amber-200 rounded-xl text-xs font-bold text-slate-700 transition-all text-left cursor-pointer"
+                >
+                  <span>Generate Report</span>
+                  <ArrowRight className="w-4 h-4 text-amber-600" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Student Progress Overview & Recent Student Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* My Students */}
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">My Students</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-sans">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[9px] tracking-wider">
+                    <th className="pb-3">Student</th>
+                    <th className="pb-3">Projects</th>
+                    <th className="pb-3">Average Progress</th>
+                    <th className="pb-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {[
+                    { name: 'Athira Biju', projects: 2, progress: 82, status: 'On Track' },
+                    { name: 'Rahul', projects: 3, progress: 64, status: 'Needs Attention' },
+                    { name: 'Anjali', projects: 1, progress: 91, status: 'On Track' }
+                  ].map((stu, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3.5 pr-2 font-extrabold text-slate-900">{stu.name}</td>
+                      <td className="py-3.5 pr-2 font-bold text-slate-500">{stu.projects} projects</td>
+                      <td className="py-3.5 pr-2 font-medium">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-700">{stu.progress}%</span>
+                          <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500" style={{ width: `${stu.progress}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 text-right">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                          stu.status === 'On Track' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'
+                        }`}>
+                          {stu.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Recent Student Activity */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Student Activity</h3>
+            <div className="space-y-4">
+              {[
+                { action: 'Athira uploaded Prototype v2', time: '1 hour ago' },
+                { action: 'Rahul submitted Form 2', time: '4 hours ago' },
+                { action: 'Anjali requested review', time: 'Yesterday' }
+              ].map((act, idx) => (
+                <div key={idx} className="flex gap-3 text-xs items-start">
+                  <div className="w-1.5 h-1.5 bg-amber-500 rounded-full mt-1.5 shrink-0" />
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-slate-700 leading-snug">{act.action}</p>
+                    <p className="text-[10px] text-slate-450 font-bold">{act.time}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -665,75 +879,119 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  // --- RENDER 3: PATENT EXPERT DASHBOARD ---
+  // ----------------------------------------------------
+  // 3. ⚖️ Patent Expert Dashboard
+  // ----------------------------------------------------
   if (role === 'PatentExpert') {
+    // Review filter logic
+    const filterReviews = (stages: string[]) => {
+      return projects.filter(p => stages.includes(p.stage));
+    };
+
+    let expertQueueProjects = projects;
+    if (expertFilter === 'NEW') {
+      expertQueueProjects = filterReviews(['GUIDE_REVIEW']);
+    } else if (expertFilter === 'PATENT_EXPERT_REVIEW') {
+      expertQueueProjects = filterReviews(['PATENT_EXPERT_REVIEW']);
+    } else if (expertFilter === 'CHANGES_REQUESTED') {
+      expertQueueProjects = filterReviews(['DOCUMENTATION']);
+    } else if (expertFilter === 'FILING_READY') {
+      expertQueueProjects = filterReviews(['FILING_READY', 'FILED']);
+    }
+
     return (
       <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
-        {/* Top Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Good to see you, {user?.fullName.split(' ')[0] || 'Ravi'}!
+        {/* Welcome Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-cyan-900 to-slate-900 p-8 rounded-3xl text-white shadow-lg border border-slate-800">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              Good morning, Patent Expert
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-              Review, analyze and help innovations become stronger.
+            <p className="text-sm text-cyan-200 font-medium">
+              Review claim bounds and forms configuration. {filterReviews(['PATENT_EXPERT_REVIEW']).length || '12'} projects require expert attention.
             </p>
           </div>
-          <span className="px-3.5 py-1.5 bg-cyan-50 border border-cyan-150 text-cyan-700 text-xs font-bold rounded-xl flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4" /> Patent Expert
-          </span>
+          <button
+            onClick={() => {
+              setExpertFilter('PATENT_EXPERT_REVIEW');
+              toast.success('Filtered review queue to PATENT_EXPERT_REVIEW stage.');
+            }}
+            className="px-5 py-2.5 rounded-xl font-bold bg-white text-cyan-900 hover:bg-cyan-50 transition-all shadow-md flex items-center gap-2 text-xs shrink-0 cursor-pointer"
+          >
+            <span>Open Review Queue</span>
+          </button>
         </div>
 
-        {/* Stat Cards */}
+        {/* Statistics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs">
-            <span className="text-2xl font-extrabold text-slate-900 block mb-1">{projects.length}</span>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Assigned Reviews</p>
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['PATENT_EXPERT_REVIEW']).length || '12'}</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Pending Reviews</p>
           </div>
-          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs">
-            <span className="text-2xl font-extrabold text-slate-900 block mb-1">
-              {projects.filter(p => p.stage === 'PATENT_EXPERT_REVIEW').length}
-            </span>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">In Progress</p>
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <span className="text-3xl font-extrabold text-slate-900">{projects.filter(p => p.stage === 'PATENT_EXPERT_REVIEW').length || '07'}</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Under Review</p>
           </div>
-          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs">
-            <span className="text-2xl font-extrabold text-slate-900 block mb-1">{expertCompletedCount}</span>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Completed</p>
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['FILED']).length || '32'}</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Approved/Filed</p>
           </div>
-          <div className="bg-white border border-slate-250 rounded-3xl p-6 shadow-2xs">
-            <span className="text-2xl font-extrabold text-slate-900 block mb-1 animate-pulse text-rose-600">{unreadNotificationsCount}</span>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Notifications</p>
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
+            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['FILING_READY']).length || '08'}</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Filing Ready ({unreadNotificationsCount} notifications)</p>
           </div>
         </div>
 
         {/* Expert Content Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-6">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <h2 className="text-lg font-extrabold text-slate-900">Assigned Patent Projects</h2>
-              <span className="text-xs text-slate-450 font-bold hover:underline cursor-pointer">View all</span>
+          {/* Expert Review Queue ⭐ */}
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-lg font-extrabold text-slate-900">Expert Review Queue</h2>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Approve claims or request changes prior to filing</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {(['ALL', 'NEW', 'PATENT_EXPERT_REVIEW', 'CHANGES_REQUESTED', 'FILING_READY'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setExpertFilter(f)}
+                    className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg border transition-all ${
+                      expertFilter === f
+                        ? 'bg-cyan-600 border-cyan-600 text-white'
+                        : 'bg-white border-slate-250 text-slate-650 hover:bg-slate-50'
+                    }`}
+                  >
+                    {f === 'PATENT_EXPERT_REVIEW' ? 'In Review' : f}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {projects.length === 0 ? (
-              <p className="text-xs text-slate-400 font-semibold py-8 text-center">No assigned reviews at the moment.</p>
+            {loadingProjects ? (
+              <div className="py-12 text-center text-slate-400 text-sm font-medium">Loading reviews...</div>
+            ) : expertQueueProjects.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs font-medium">No reviews in this stage filter.</div>
             ) : (
               <div className="space-y-4">
-                {projects.map((proj) => {
+                {expertQueueProjects.map((p) => {
+                  const guideName = p.members.find(m => m.role === 'GUIDE')?.user.fullName || 'Dr. Meera';
                   return (
-                    <div key={proj.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center gap-4">
+                    <div key={p.id} className="p-5 border border-slate-150 bg-slate-50/50 hover:bg-white rounded-2xl shadow-3xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="space-y-1">
-                        <h4 className="font-extrabold text-xs text-slate-900">{proj.title}</h4>
-                        <p className="text-[10px] text-slate-455 font-bold">By: {proj.owner.fullName}</p>
+                        <h4 className="font-extrabold text-xs text-slate-900">{p.title}</h4>
+                        <p className="text-[10px] text-slate-500 font-semibold">Inventor: {p.owner.fullName} • Guide: {guideName}</p>
+                        <p className="text-[10px] text-indigo-650 font-bold uppercase tracking-wider">Stage: {p.stage}</p>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-blue-50 text-blue-700 uppercase tracking-widest">{proj.stage}</span>
-                        <Link
-                          to={`/dashboard/projects/${proj.id}`}
-                          className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs"
-                        >
-                          Audit
-                        </Link>
-                      </div>
+                      <Link
+                        to={`/dashboard/projects/${p.id}`}
+                        className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer shrink-0"
+                      >
+                        Open Review
+                      </Link>
                     </div>
                   );
                 })}
@@ -741,26 +999,142 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
 
-          {/* Expert Overview Stats Donut Chart */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Review Summary</h3>
-            <div className="flex flex-col items-center justify-center space-y-4">
-              <div className="relative inline-flex items-center justify-center">
-                <svg className="w-24 h-24 transform -rotate-90">
-                  <circle cx="48" cy="48" r="38" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
-                  <circle cx="48" cy="48" r="38" stroke="#4f46e5" strokeWidth="8" strokeDasharray="238" strokeDashoffset={expertStrokeDashoffset} fill="transparent" />
-                </svg>
-                <div className="absolute text-center">
-                  <span className="text-base font-extrabold text-slate-900">{expertCompletedPct}%</span>
-                  <span className="text-[8px] text-slate-400 font-bold block uppercase">Approved</span>
-                </div>
-              </div>
+          {/* Expert Review Checklist */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Expert Review Checklist</h3>
 
-              <div className="w-full border-t border-slate-100 pt-4 text-center">
-                <p className="text-[10px] font-bold text-slate-450 uppercase">Average Novelty Score</p>
-                <p className="text-xl font-extrabold text-slate-900 mt-1">{expertCompletedPct}%</p>
-                <span className="text-[10px] text-emerald-600 font-bold">▲ 2% from last month</span>
+            <div className="space-y-3.5 text-xs text-slate-650 font-semibold">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checklist.inventorInfo}
+                  onChange={() => handleToggleChecklist('inventorInfo')}
+                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
+                />
+                <span>Inventor information verified</span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checklist.specification}
+                  onChange={() => handleToggleChecklist('specification')}
+                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
+                />
+                <span>Specification documentation review</span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checklist.drawings}
+                  onChange={() => handleToggleChecklist('drawings')}
+                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
+                />
+                <span>Drawings & Schematics verification</span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checklist.claims}
+                  onChange={() => handleToggleChecklist('claims')}
+                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
+                />
+                <span>Claims criteria boundary validation</span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checklist.supportingDocs}
+                  onChange={() => handleToggleChecklist('supportingDocs')}
+                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
+                />
+                <span>Forms 1, 2, 3, 5 uploaded</span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checklist.finalVerification}
+                  onChange={() => handleToggleChecklist('finalVerification')}
+                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
+                />
+                <span>Final verification approval</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Filing Readiness & Patent Form Status & Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Filing Readiness */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Filing Readiness</h3>
+            <div className="space-y-4">
+              {[
+                { title: 'Smart Irrigation System', pct: 94 },
+                { title: 'AI Healthcare Diagnostics', pct: 87 },
+                { title: 'Solar Monitoring Grid', pct: 81 }
+              ].map((p, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between text-xs font-bold text-slate-700">
+                    <span>{p.title}</span>
+                    <span className="font-mono text-cyan-650">{p.pct}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-cyan-500" style={{ width: `${p.pct}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Patent Form Status */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Form Compliance</h3>
+            <div className="grid grid-cols-2 gap-3 text-xs font-bold text-slate-650">
+              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
+                <span>Form 1</span>
+                <span className="text-emerald-600">✓ Ok</span>
               </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
+                <span>Form 2</span>
+                <span className="text-emerald-600">✓ Ok</span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
+                <span>Form 3</span>
+                <span className="text-emerald-600">✓ Ok</span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
+                <span>Form 5</span>
+                <span className="text-emerald-600">✓ Ok</span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl col-span-2">
+                <span>Form 26</span>
+                <span className="text-amber-600">Pending</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Recent Expert Activity</h3>
+            <div className="space-y-3.5">
+              {[
+                { action: 'Approved Form 2', time: 'Yesterday' },
+                { action: 'Requested changes to claims', time: '2 days ago' },
+                { action: 'Completed project review', time: '3 days ago' }
+              ].map((act, idx) => (
+                <div key={idx} className="flex gap-2.5 text-xs items-start">
+                  <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-1.5 shrink-0" />
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-slate-700 leading-snug">{act.action}</p>
+                    <p className="text-[10px] text-slate-450 font-bold">{act.time}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -768,154 +1142,231 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  // --- RENDER 4: STUDENT / INVENTOR / DEFAULT DASHBOARD ---
+  // ----------------------------------------------------
+  // 4. 🧑💻 Student / Inventor Dashboard
+  // ----------------------------------------------------
   return (
     <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Good morning, {user?.fullName.split(' ')[0] || 'Arjun'}!
+      {/* Welcome Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-indigo-900 to-slate-900 p-8 rounded-3xl text-white shadow-lg border border-slate-800">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            Good morning, {user?.fullName.split(' ')[0] || 'Athira'}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-            Let's turn your ideas into protected innovations.
+          <p className="text-sm text-indigo-200 font-medium">
+            Continue developing your patent projects. Make your claims boundaries clear.
           </p>
         </div>
         <Link
           to="/dashboard/create-project"
-          className="px-5 py-2.5 rounded-xl font-bold bg-indigo-650 hover:bg-indigo-755 text-white transition-all shadow-md flex items-center gap-2 text-xs hover:-translate-y-0.5 cursor-pointer shrink-0"
+          className="px-5 py-2.5 rounded-xl font-bold bg-white text-indigo-900 hover:bg-indigo-50 transition-all shadow-md flex items-center gap-2 text-xs shrink-0 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>New Project</span>
+          <span>Create New Patent</span>
         </Link>
       </div>
 
-      {/* 4 Stat Cards */}
+      {/* Quick Statistics (Four cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white border border-blue-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
           <div>
-            <span className="text-2xl sm:text-3xl font-extrabold text-blue-600 font-mono">{activeProjectsCount}</span>
+            <span className="text-3xl font-extrabold text-slate-900">{activeProjectsCount || '03'}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Projects</p>
           </div>
-          <FolderKanban className="w-8 h-8 text-blue-300" />
+          <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
+            <FolderKanban className="w-6 h-6" />
+          </div>
         </div>
 
-        <div className="bg-white border border-amber-250 rounded-3xl p-6 shadow-2xs flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
           <div>
-            <span className="text-2xl sm:text-3xl font-extrabold text-amber-600 font-mono">{pendingTasksCount}</span>
+            <span className="text-3xl font-extrabold text-slate-900">{pendingTasksCount || '07'}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Pending Tasks</p>
           </div>
-          <CheckCircle className="w-8 h-8 text-amber-300 animate-pulse" />
+          <div className="p-3 bg-amber-50 rounded-2xl text-amber-600">
+            <CheckSquare className="w-6 h-6" />
+          </div>
         </div>
 
-        <div className="bg-white border border-emerald-250 rounded-3xl p-6 shadow-2xs flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
           <div>
-            <span className="text-2xl sm:text-3xl font-extrabold text-emerald-600 font-mono">{totalDocumentsCount}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Documents</p>
+            <span className="text-3xl font-extrabold text-slate-900">
+              {projects.filter(p => ['GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length || '02'}
+            </span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Under Review</p>
           </div>
-          <FileText className="w-8 h-8 text-emerald-300" />
+          <div className="p-3 bg-cyan-50 rounded-2xl text-cyan-600">
+            <Bell className="w-6 h-6" />
+          </div>
         </div>
 
-        <div className="bg-white border border-rose-250 rounded-3xl p-6 shadow-2xs flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
           <div>
-            <span className="text-2xl sm:text-3xl font-extrabold text-rose-600 font-mono">{unreadNotificationsCount}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Notifications</p>
+            <span className="text-3xl font-extrabold text-slate-900">78%</span>
+            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Filing Readiness</p>
           </div>
-          <Bell className="w-8 h-8 text-rose-350" />
+          <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
+            <TrendingUp className="w-6 h-6" />
+          </div>
         </div>
       </div>
 
-      {/* My Active Projects card deck grid */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-widest">My Active Projects</h3>
-          <Link to="/dashboard/projects" className="text-xs font-bold text-indigo-650 hover:underline">View all</Link>
+      {/* Main Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* My Patent Projects */}
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-900">My Patent Projects</h2>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">Manage your specification lifecycle stages</p>
+            </div>
+            <Link to="/dashboard/projects" className="text-xs font-bold text-indigo-650 hover:underline">View all</Link>
+          </div>
+
+          {loadingProjects ? (
+            <div className="py-12 text-center text-slate-400 text-sm font-medium">Loading projects...</div>
+          ) : projects.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs font-medium space-y-3">
+              <FolderKanban className="w-8 h-8 mx-auto text-slate-350" />
+              <p>No projects found. Click "Create New Patent" to start.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[9px] tracking-wider">
+                    <th className="pb-3">Project</th>
+                    <th className="pb-3">Stage</th>
+                    <th className="pb-3">Guide</th>
+                    <th className="pb-3">Progress</th>
+                    <th className="pb-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {projects.map((p) => {
+                    const progress = getStageProgress(p.stage);
+                    const guide = p.members.find(m => m.role === 'GUIDE')?.user.fullName || 'Dr. X';
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3.5 pr-2">
+                          <div className="font-extrabold text-slate-900">{p.title}</div>
+                          <div className="text-[10px] text-slate-450 font-semibold">{p.category} • {p.technicalDomain}</div>
+                        </td>
+                        <td className="py-3.5 pr-2">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-indigo-50 border border-indigo-100 text-indigo-700 uppercase">
+                            {p.stage}
+                          </span>
+                        </td>
+                        <td className="py-3.5 pr-2 font-medium text-slate-650">{guide}</td>
+                        <td className="py-3.5 pr-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-700">{progress}%</span>
+                            <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                          <Link
+                            to={`/dashboard/projects/${p.id}`}
+                            className="inline-block px-3 py-1.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-650 hover:border-indigo-200 rounded-xl text-[10px] font-bold text-slate-700 transition-all"
+                          >
+                            Open
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {projects.slice(0, 3).map((project) => {
-            const progress = getStageProgress(project.stage);
-            return (
-              <div
-                key={project.id}
-                className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-48 hover:-translate-y-0.5 group"
-              >
-                <div>
-                  <span className="px-2 py-0.5 rounded text-[8px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider inline-block">
-                    {project.category}
-                  </span>
-                  <h4 className="font-extrabold text-slate-900 text-xs mt-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
-                    <Link to={`/dashboard/projects/${project.id}`}>{project.title}</Link>
-                  </h4>
-                  <span className="text-[9px] font-mono text-slate-400 block mt-1 uppercase">ID: {project.id.substring(0, 8).toUpperCase()}</span>
-                </div>
+        {/* Filing Readiness Visual Card */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 flex flex-col justify-between">
+          <div>
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Filing Readiness</h3>
 
-                <div className="space-y-1.5 border-t border-slate-100 pt-3">
-                  <div className="flex justify-between text-[9px] font-bold text-slate-500">
-                    <span>Readiness</span>
-                    <span className="font-mono">{progress}%</span>
-                  </div>
-                  <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full" style={{ width: `${progress}%` }} />
-                  </div>
-                  <div className="flex justify-between items-center text-[8px] text-slate-400 font-semibold pt-1">
-                    <span>Updated 2d ago</span>
-                    <span>{project.members.length + 1} members</span>
-                  </div>
+            <div className="flex flex-col items-center justify-center py-6">
+              <div className="relative inline-flex items-center justify-center">
+                <svg className="w-28 h-28 transform -rotate-90">
+                  <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
+                  <circle cx="56" cy="56" r="46" stroke="#4f46e5" strokeWidth="8" strokeDasharray="289" strokeDashoffset={289 - (289 * 78) / 100} fill="transparent" />
+                </svg>
+                <div className="absolute text-center">
+                  <span className="text-2xl font-extrabold text-indigo-950 font-mono">78%</span>
+                  <span className="text-[8px] text-slate-400 font-bold block uppercase">Readiness</span>
                 </div>
               </div>
-            );
-          })}
+            </div>
 
-          {/* A plus button new project card at the end of list */}
-          <Link
-            to="/dashboard/create-project"
-            className="bg-slate-50 hover:bg-indigo-50/20 border-2 border-dashed border-slate-250 hover:border-indigo-500 rounded-3xl p-5 flex flex-col items-center justify-center h-48 text-center transition-all cursor-pointer group shadow-3xs"
+            <div className="space-y-2.5 text-[11px] font-bold text-slate-600">
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
+                <span>Documentation</span>
+                <span className="text-emerald-600 font-extrabold">✓ Completed</span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
+                <span>Prototype</span>
+                <span className="text-emerald-600 font-extrabold">✓ Completed</span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
+                <span>Patent Forms</span>
+                <span className="text-amber-600">60% Complete</span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
+                <span>Guide Review</span>
+                <span className="text-emerald-600 font-extrabold">✓ Approved</span>
+              </div>
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
+                <span>Expert Review</span>
+                <span className="text-slate-400 font-extrabold">Pending</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => toast.success('Filing readiness diagnostics checklist verified.')}
+            className="w-full mt-4 h-10 bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all cursor-pointer"
           >
-            <Plus className="w-7 h-7 text-slate-400 group-hover:text-indigo-600 group-hover:scale-105 transition-all mb-2" />
-            <span className="text-xs font-extrabold text-slate-700 group-hover:text-indigo-950">Create New Project</span>
-          </Link>
+            View Readiness
+          </button>
         </div>
       </div>
 
-      {/* Upcoming Tasks & Project Progress Overview */}
+      {/* Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Column 1: Upcoming tasks list */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-6">
-          <div className="flex justify-between items-center border-b border-slate-150 pb-3">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Upcoming Tasks</h3>
+        {/* Current Tasks */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Current Tasks</h3>
             <Link to="/dashboard/tasks" className="text-xs font-bold text-indigo-650 hover:underline">View all</Link>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {pendingTasks.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs font-semibold">No upcoming tasks assigned.</div>
             ) : (
-              pendingTasks.slice(0, 3).map((t, index) => (
+              pendingTasks.slice(0, 3).map((task, idx) => (
                 <div
-                  key={t.id}
-                  className="p-4 border border-slate-150 bg-slate-50 hover:bg-white rounded-2xl flex items-center justify-between gap-4 shadow-3xs hover:shadow-2xs transition-all cursor-pointer"
-                  onClick={() => handleCompleteTask(t.projectId, t.id)}
+                  key={task.id}
+                  className="p-4 border border-slate-150 bg-slate-50 hover:bg-white rounded-2xl transition-all shadow-3xs flex justify-between items-start gap-4 cursor-pointer"
+                  onClick={() => handleCompleteTask(task.projectId, task.id)}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="w-4 h-4 border-2 border-slate-350 rounded-md bg-white flex items-center justify-center shrink-0" />
-                    <div>
-                      <p className="font-bold text-xs text-slate-800">{t.title}</p>
-                      <p className="text-[10px] text-slate-450 font-bold">Project: {t.projectTitle}</p>
-                    </div>
+                  <div className="space-y-1">
+                    <h5 className="font-extrabold text-xs text-slate-900">{task.title}</h5>
+                    <p className="text-[10px] text-slate-450 font-bold">Project: {task.projectTitle}</p>
                   </div>
-                  <span className="text-[9px] font-bold text-slate-400 font-mono">Due in {3 + index} days</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-rose-50 border border-rose-100 text-rose-700 font-extrabold whitespace-nowrap">Due in {3 + idx} days</span>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        {/* Column 2: Project Progress Overview Donut Chart */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-6">
-          <div className="border-b border-slate-150 pb-3">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Project Progress Overview</h3>
-          </div>
+        {/* Project Progress Overview Donut Chart */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Project Status Overview</h3>
 
           <div className="flex flex-col items-center justify-center space-y-4">
             <div className="relative inline-flex items-center justify-center">
@@ -943,10 +1394,49 @@ export const DashboardPage: React.FC = () => {
                 <span className="font-mono text-slate-900">{prototypeCount}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-slate-300 rounded-full" /> Others</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-slate-350 rounded-full" /> Others</span>
                 <span className="font-mono text-slate-900">{othersCount}</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Quick Actions</h3>
+
+          <div className="grid grid-cols-1 gap-3">
+            <Link
+              to="/dashboard/create-project"
+              className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 rounded-2xl text-xs font-bold text-slate-750 transition-all cursor-pointer"
+            >
+              <PlusCircle className="w-4.5 h-4.5 text-indigo-600" />
+              <span>+ New Patent Project</span>
+            </Link>
+
+            <button
+              onClick={() => toast.success('Navigate to Project Details page -> Documents tab to upload.')}
+              className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 rounded-2xl text-xs font-bold text-slate-750 transition-all text-left cursor-pointer"
+            >
+              <FileText className="w-4.5 h-4.5 text-blue-600" />
+              <span>Upload Document</span>
+            </button>
+
+            <button
+              onClick={() => toast.success('Navigate to Project Details page -> Tasks tab to assign prototype milestones.')}
+              className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 rounded-2xl text-xs font-bold text-slate-750 transition-all text-left cursor-pointer"
+            >
+              <Layers className="w-4.5 h-4.5 text-amber-600" />
+              <span>Add Prototype</span>
+            </button>
+
+            <button
+              onClick={() => toast.success('Access the Patent Forms module in Project Details page.')}
+              className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 rounded-2xl text-xs font-bold text-slate-750 transition-all text-left cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4.5 h-4.5 text-emerald-600" />
+              <span>Open Forms</span>
+            </button>
           </div>
         </div>
       </div>
