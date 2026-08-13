@@ -58,6 +58,7 @@ model User {
   comments            Comment[]
   legacyPatents       Patent[]
   ownedProjects       PatentProject[]  @relation("ProjectOwner")
+  projectReviews      ProjectReview[]
 }
 
 model PatentProject {
@@ -84,13 +85,15 @@ model PatentProject {
   ownerId String
   owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
-  members      ProjectMember[]
-  documents    Document[]
-  tasks        Task[]
-  comments     Comment[]
-  activityLogs ActivityLog[]
-  invitations  Invitation[]
+  members          ProjectMember[]
+  documents        Document[]
+  tasks            Task[]
+  comments         Comment[]
+  activityLogs     ActivityLog[]
+  invitations      Invitation[]
   patentReferences PatentReference[]
+  patentForms      PatentForm[]
+  projectReviews   ProjectReview[]
 }
 
 model ProjectMember {
@@ -154,16 +157,20 @@ model ActivityLog {
 }
 
 model Document {
-  id        String        @id @default(uuid())
-  name      String
-  fileUrl   String
-  fileType  String?
-  fileSize  Int?
-  version   Int           @default(1)
-  category  String        @default("SUPPORTING") // RESEARCH_PAPER, LITERATURE_REVIEW, PATENT_DRAFT, PROTOTYPE, TESTING, SUPPORTING
-  projectId String
-  project   PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdAt DateTime      @default(now())
+  id           String        @id @default(uuid())
+  name         String
+  fileUrl      String
+  fileType     String?
+  fileSize     Int?
+  version      Int           @default(1)
+  category     String        @default("SUPPORTING") // RESEARCH_PAPER, LITERATURE_REVIEW, PATENT_DRAFT, PROTOTYPE, TESTING, SUPPORTING
+  projectId    String
+  project      PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentDocId  String?
+  parentDoc    Document?     @relation("DocumentVersions", fields: [parentDocId], references: [id], onDelete: SetNull)
+  childDocs    Document[]    @relation("DocumentVersions")
+  patentForm   PatentForm?
+  createdAt    DateTime      @default(now())
 }
 
 model Task {
@@ -230,4 +237,35 @@ model PatentReference {
   updatedAt      DateTime      @updatedAt
 
   @@unique([projectId, patentNumber])
+}
+
+model PatentForm {
+  id           String        @id @default(uuid())
+  projectId    String
+  project      PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  formType     String        // "Form 1", "Form 2", "Form 3", "Form 5", "Form 26"
+  formData     Json          // Structured key-value fields
+  status       String        @default("DRAFT") // DRAFT, SUBMITTED, APPROVED
+  version      Int           @default(1)
+  createdBy    String?
+  documentId   String?       @unique
+  document     Document?     @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([projectId, formType])
+}
+
+model ProjectReview {
+  id                String        @id @default(uuid())
+  projectId         String
+  project           PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reviewerId        String
+  reviewer          User          @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewType        String        // "GUIDE_REVIEW", "EXPERT_REVIEW"
+  decision          String        // "APPROVED", "REJECTED", "CHANGES_REQUESTED"
+  comments          String?       @db.Text
+  checklistSnapshot Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 }

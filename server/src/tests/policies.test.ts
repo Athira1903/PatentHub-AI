@@ -15,6 +15,9 @@ import { prisma } from '../config/db';
 import { AiService } from '../services/aiService';
 import { PatentSearchService } from '../services/patentSearchService';
 import { PatentReferenceService } from '../services/patentReferenceService';
+import { FormService } from '../services/formService';
+import { ReviewService } from '../services/reviewService';
+import { FilingReadinessService } from '../services/filingReadinessService';
 import {
   generateInnovationAi,
   getSimilarityAnalysis,
@@ -1007,6 +1010,243 @@ test('AI Service: analyzeSimilarity handles project with 0 references cleanly', 
   assert.strictEqual(res.similarityScore, 0);
   assert.strictEqual(res.matches.length, 0);
   assert.ok(res.explanation.includes('No verified prior-art references'));
+});
+
+// ----------------------------------------------------
+// 13. Task 5: Patent Forms, Reviews & Filing Readiness Tests
+// ----------------------------------------------------
+test('Task 5: FormService normalizes form types and pre-fills default data', () => {
+  assert.strictEqual(FormService.normalizeFormType('1'), 'Form 1');
+  assert.strictEqual(FormService.normalizeFormType('form 2'), 'Form 2');
+  assert.strictEqual(FormService.normalizeFormType('Form 3'), 'Form 3');
+  assert.strictEqual(FormService.normalizeFormType('5'), 'Form 5');
+  assert.strictEqual(FormService.normalizeFormType('form_26'), 'Form 26');
+
+  const dummyProj = {
+    title: 'Quantum Sensor Array',
+    category: 'Electronics',
+    innovationIdea: 'A quantum sensor',
+    problemStatement: 'High noise',
+    proposedSolution: 'Cold atom trap',
+    owner: { fullName: 'Dr. Alice', email: 'alice@institution.edu', institution: 'MIT' },
+    members: []
+  };
+
+  const form1Data = FormService.generateDefaultFormData(dummyProj, 'Form 1');
+  assert.strictEqual(form1Data.applicantName, 'Dr. Alice');
+  assert.strictEqual(form1Data.title, 'Quantum Sensor Array');
+
+  const form2Data = FormService.generateDefaultFormData(dummyProj, 'Form 2');
+  assert.strictEqual(form2Data.specificationType, 'COMPLETE');
+  assert.strictEqual(form2Data.abstract, 'A quantum sensor');
+});
+
+test('Task 5: FormService upserts forms and handles version increment on approved edit', async () => {
+  const origFindUnique = prisma.patentForm.findUnique;
+  const origUpdate = prisma.patentForm.update;
+  const origCreate = prisma.patentForm.create;
+
+  // 1. Test creation
+  (prisma.patentForm as any).findUnique = async () => null;
+  (prisma.patentForm as any).create = async (args: any) => ({ id: 'f1', ...args.data });
+
+  const saved = await FormService.saveForm('p1', 'Form 1', { applicantName: 'Dr. Alice' }, 'u1');
+  assert.strictEqual(saved.version, 1);
+  assert.strictEqual(saved.status, 'DRAFT');
+
+  // 2. Test version bump if status was APPROVED
+  (prisma.patentForm as any).findUnique = async () => ({
+    id: 'f1',
+    projectId: 'p1',
+    formType: 'Form 1',
+    formData: { applicantName: 'Dr. Alice' },
+    status: 'APPROVED',
+    version: 1
+  });
+  (prisma.patentForm as any).update = async (args: any) => ({
+    id: 'f1',
+    ...args.data
+  });
+
+  const updated = await FormService.saveForm('p1', 'Form 1', { applicantName: 'Dr. Alice Updated' }, 'u1');
+  assert.strictEqual(updated.version, 2);
+  assert.strictEqual(updated.status, 'DRAFT');
+
+  (prisma.patentForm as any).findUnique = origFindUnique;
+  (prisma.patentForm as any).update = origUpdate;
+  (prisma.patentForm as any).create = origCreate;
+});
+
+test('Task 5: ReviewService advances stage on APPROVED and returns to DOCUMENTATION on REJECTED', async () => {
+  const origFindProject = prisma.patentProject.findUnique;
+  const origUpdateProject = prisma.patentProject.update;
+  const origCreateReview = prisma.projectReview.create;
+  const origCreateLog = prisma.activityLog.create;
+
+  const mockProject = {
+    id: 'p1',
+    title: 'AI Router',
+    stage: 'GUIDE_REVIEW',
+    ownerId: 'inventor_1',
+    owner: { id: 'inventor_1', fullName: 'Inventor' },
+    members: [{ userId: 'guide_1', role: 'GUIDE' }],
+    documents: [
+      { id: 'd1', name: 'Form 1' },
+      { id: 'd2', name: 'Form 2' },
+      { id: 'd3', name: 'Form 3' },
+      { id: 'd4', name: 'Form 5' }
+    ]
+  };
+
+  (prisma.patentProject as any).findUnique = async () => mockProject;
+  let updatedStage = '';
+  (prisma.patentProject as any).update = async (args: any) => {
+    updatedStage = args.data.stage;
+    return { ...mockProject, stage: args.data.stage };
+  };
+  (prisma.projectReview as any).create = async (args: any) => ({ id: 'rev_1', ...args.data });
+  (prisma.activityLog as any).create = async () => ({ id: 'log_1' });
+
+  const guideUser = { userId: 'guide_1', role: 'Guide' };
+
+  // 1. Approval advances stage from GUIDE_REVIEW to PATENT_EXPERT_REVIEW
+  const reviewApproved = await ReviewService.submitReviewDecision('p1', guideUser, {
+    reviewType: 'GUIDE_REVIEW',
+    decision: 'APPROVED',
+    comments: 'Looks good!'
+  });
+
+  assert.strictEqual(reviewApproved.decision, 'APPROVED');
+  assert.strictEqual(updatedStage, 'PATENT_EXPERT_REVIEW');
+
+  // 2. Rejection sends stage back to DOCUMENTATION
+  mockProject.stage = 'GUIDE_REVIEW';
+  await ReviewService.submitReviewDecision('p1', guideUser, {
+    reviewType: 'GUIDE_REVIEW',
+    decision: 'REJECTED',
+    comments: 'Missing drawings.'
+  });
+
+  assert.strictEqual(updatedStage, 'DOCUMENTATION');
+
+  (prisma.patentProject as any).findUnique = origFindProject;
+  (prisma.patentProject as any).update = origUpdateProject;
+  (prisma.projectReview as any).create = origCreateReview;
+  (prisma.activityLog as any).create = origCreateLog;
+});
+
+test('Task 5: FilingReadinessService checklist returns NOT_READY vs READY correctly', async () => {
+  const origFindProject = prisma.patentProject.findUnique;
+
+  // 1. Test Incomplete project
+  const incompleteProj = {
+    id: 'p1',
+    title: 'Incomplete Idea',
+    stage: 'IDEA',
+    innovationIdea: '',
+    problemStatement: '',
+    proposedSolution: '',
+    technicalDomain: 'IT',
+    category: 'Software',
+    owner: { fullName: 'Bob', email: 'bob@test.com' },
+    members: [],
+    documents: [],
+    patentReferences: [],
+    patentForms: [],
+    projectReviews: []
+  };
+
+  (prisma.patentProject as any).findUnique = async () => incompleteProj;
+
+  const incompleteRes = await FilingReadinessService.getFilingReadiness('p1');
+  assert.strictEqual(incompleteRes.overallReadiness, 'NOT_READY');
+  assert.ok(incompleteRes.blockingIssues.length > 0);
+
+  // 2. Test Complete project
+  const completeProj = {
+    id: 'p2',
+    title: 'Complete Autonomous System',
+    stage: 'FILING_READY',
+    innovationIdea: 'A full autonomous system description',
+    problemStatement: 'Manual intervention inefficiency',
+    proposedSolution: 'Automated feedback loop',
+    novelFeatures: 'Self-correcting PID node',
+    keywords: 'autonomous, PID, robotics',
+    technicalDomain: 'Robotics',
+    category: 'Engineering',
+    owner: { fullName: 'Alice', email: 'alice@test.com' },
+    members: [{ userId: 'g1', role: 'GUIDE' }],
+    documents: [{ id: 'd1', name: 'Form 1' }],
+    patentReferences: [{ id: 'ref1', patentNumber: 'US1234567' }],
+    patentForms: [
+      { formType: 'Form 1', formData: {} },
+      { formType: 'Form 2', formData: { novelFeatures: 'PID', claimsText: 'Claim 1' } },
+      { formType: 'Form 3', formData: {} },
+      { formType: 'Form 5', formData: {} }
+    ],
+    projectReviews: [{ decision: 'APPROVED' }]
+  };
+
+  (prisma.patentProject as any).findUnique = async () => completeProj;
+
+  const completeRes = await FilingReadinessService.getFilingReadiness('p2');
+  assert.strictEqual(completeRes.overallReadiness, 'READY');
+  assert.strictEqual(completeRes.completedCount, 6);
+  assert.strictEqual(completeRes.blockingIssues.length, 0);
+
+  (prisma.patentProject as any).findUnique = origFindProject;
+});
+
+test('Task 5: Filing Package export throws when incomplete and compiles PDF when ready', async () => {
+  const origGetReadiness = FilingReadinessService.getFilingReadiness;
+  const origFindProject = prisma.patentProject.findUnique;
+  const origCreateDoc = prisma.document.create;
+  const origCreateLog = prisma.activityLog.create;
+
+  // 1. Incomplete throws error with blockingIssues
+  (FilingReadinessService as any).getFilingReadiness = async () => ({
+    overallReadiness: 'NOT_READY',
+    completedCount: 2,
+    totalRequiredCount: 6,
+    checklist: [],
+    blockingIssues: ['Forms 1, 2, 3, 5 missing']
+  });
+
+  await assert.rejects(async () => {
+    await FilingReadinessService.exportFilingPackage('p1', 'user1');
+  }, /audit failed/);
+
+  // 2. Complete generates PDF package and registers Document record
+  (FilingReadinessService as any).getFilingReadiness = async () => ({
+    overallReadiness: 'READY',
+    completedCount: 6,
+    totalRequiredCount: 6,
+    checklist: [],
+    blockingIssues: []
+  });
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Complete Autonomous System',
+    stage: 'FILING_READY',
+    owner: { fullName: 'Alice', email: 'alice@test.com' },
+    members: [],
+    patentForms: [],
+    patentReferences: [],
+    projectReviews: []
+  });
+
+  (prisma.document as any).create = async (args: any) => ({ id: 'doc_package_1', ...args.data });
+  (prisma.activityLog as any).create = async () => ({ id: 'log_1' });
+
+  const packageDoc = await FilingReadinessService.exportFilingPackage('p1', 'user1');
+  assert.ok(packageDoc.id);
+  assert.ok(packageDoc.fileUrl.includes('.pdf'));
+
+  (FilingReadinessService as any).getFilingReadiness = origGetReadiness;
+  (prisma.patentProject as any).findUnique = origFindProject;
+  (prisma.document as any).create = origCreateDoc;
+  (prisma.activityLog as any).create = origCreateLog;
 });
 
 // Summary reporting and sequential execution

@@ -24,12 +24,28 @@ import {
   saveReference,
   deleteReference
 } from '../controllers/patentController';
+import {
+  getProjectForms,
+  getFormById,
+  saveForm,
+  submitForm,
+  generateFormPdf
+} from '../controllers/formController';
+import {
+  submitReview,
+  getProjectReviews,
+  getFilingReadiness,
+  generateReadinessReportPdf,
+  exportFilingPackage
+} from '../controllers/reviewController';
 import { authenticateToken } from '../middleware/authMiddleware';
 import { authorize } from '../policies/middleware/authorize';
 import { projectGuard } from '../policies/middleware/policyGuard';
 import { ProjectPolicy } from '../policies/project/project.policy';
 import { ReviewPolicy } from '../policies/review/review.policy';
 import { PatentReferencePolicy } from '../policies/project/patent-reference.policy';
+import { PatentFormPolicy } from '../policies/forms/patent-form.policy';
+import { ReportPolicy } from '../policies/report/report.policy';
 
 const router = Router();
 
@@ -56,6 +72,20 @@ router.get('/:id/patents/search', projectGuard(PatentReferencePolicy.canSearch) 
 router.get('/:id/patents/references', projectGuard(PatentReferencePolicy.canViewReferences) as any, getSavedReferences as any);
 router.post('/:id/patents/references', projectGuard(PatentReferencePolicy.canSaveReference) as any, saveReference as any);
 router.delete('/:id/patents/references/:refId', projectGuard(PatentReferencePolicy.canDeleteReference) as any, deleteReference as any);
+
+// Patent Forms Endpoints (Task 5)
+router.get('/:id/forms', projectGuard((u, p) => PatentFormPolicy.canView(u, p, 'Form 1')) as any, getProjectForms as any);
+router.get('/:id/forms/:formId', projectGuard((u, p) => PatentFormPolicy.canView(u, p, 'Form 1')) as any, getFormById as any);
+router.post('/:id/forms', projectGuard((u, p, req) => PatentFormPolicy.canCreate(u, p, req.body.formType || 'Form 1')) as any, saveForm as any);
+router.post('/:id/forms/:formId/submit', projectGuard((u, p) => PatentFormPolicy.canSubmit(u, p, 'Form 1')) as any, submitForm as any);
+router.post('/:id/forms/pdf', projectGuard((u, p, req) => PatentFormPolicy.canCreate(u, p, req.body.formType || 'Form 1')) as any, generateFormPdf as any);
+
+// Formal Reviews & Filing Readiness Endpoints (Task 5)
+router.get('/:id/reviews', projectGuard(ReviewPolicy.canReview) as any, getProjectReviews as any);
+router.post('/:id/reviews', projectGuard(ReviewPolicy.canReview) as any, submitReview as any);
+router.get('/:id/filing-readiness', projectGuard(ReportPolicy.canGenerateSummary) as any, getFilingReadiness as any);
+router.post('/:id/readiness-report/pdf', projectGuard(ReportPolicy.canGenerateReadinessReport) as any, generateReadinessReportPdf as any);
+router.post('/:id/filing-package', projectGuard(ReportPolicy.canGenerateFinalReport) as any, exportFilingPackage as any);
 
 // Simulated AI Innovation & Diagnostics endpoints
 router.post('/:id/ai/innovation', projectGuard(ProjectPolicy.canViewProject) as any, generateInnovationAi as any);
