@@ -26,6 +26,9 @@ import {
   FolderOpen,
   Activity,
   Settings as SettingsIcon,
+  Search,
+  AlertCircle,
+  Plus,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -223,6 +226,74 @@ export const ProjectDetailsPage: React.FC = () => {
   const [loadingNovelty, setLoadingNovelty] = useState(false);
   const [noveltyError, setNoveltyError] = useState<string | null>(null);
 
+  // Patent Search & Reference States
+  const [patentSearchQuery, setPatentSearchQuery] = useState('');
+  const [patentSearchResults, setPatentSearchResults] = useState<any[]>([]);
+  const [loadingPatentSearch, setLoadingPatentSearch] = useState(false);
+  const [patentSearchError, setPatentSearchError] = useState<string | null>(null);
+
+  const [savedReferences, setSavedReferences] = useState<any[]>([]);
+  const [loadingReferences, setLoadingReferences] = useState(false);
+
+  // Determine if the current project member has rights to manage patent references
+  const canManageReferences =
+    user?.role === 'Admin' ||
+    project?.owner?.id === user?.id ||
+    project?.owner?.id === user?.userId ||
+    userProjectRole === 'INVENTOR' ||
+    userProjectRole === 'CO_INVENTOR';
+
+  // Search Patents
+  const handlePatentSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patentSearchQuery.trim()) return;
+    setLoadingPatentSearch(true);
+    setPatentSearchError(null);
+    try {
+      const res = await api.get(`/projects/${id}/patents/search?q=${encodeURIComponent(patentSearchQuery.trim())}`);
+      setPatentSearchResults(res.data.results || []);
+    } catch (err: any) {
+      setPatentSearchError(err.response?.data?.message || 'Failed to search patents.');
+    } finally {
+      setLoadingPatentSearch(false);
+    }
+  };
+
+  // Fetch Saved References
+  const fetchSavedReferences = async () => {
+    setLoadingReferences(true);
+    try {
+      const res = await api.get(`/projects/${id}/patents/references`);
+      setSavedReferences(res.data.references || []);
+    } catch (err) {
+      console.error('Failed to load saved references', err);
+    } finally {
+      setLoadingReferences(false);
+    }
+  };
+
+  // Save Reference
+  const handleSaveReference = async (pat: any) => {
+    try {
+      const res = await api.post(`/projects/${id}/patents/references`, pat);
+      toast.success('Patent saved to project as a reference!');
+      setSavedReferences(prev => [res.data.reference, ...prev]);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save reference.');
+    }
+  };
+
+  // Delete Reference
+  const handleDeleteReference = async (refId: string) => {
+    try {
+      await api.delete(`/projects/${id}/patents/references/${refId}`);
+      toast.success('Patent reference deleted from project.');
+      setSavedReferences(prev => prev.filter(r => r.id !== refId));
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete reference.');
+    }
+  };
+
   // Forms checklist wizard
   const [activeFormIndex, setActiveFormIndex] = useState<string | null>(null);
   const [formField1, setFormField1] = useState('');
@@ -265,7 +336,10 @@ export const ProjectDetailsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (id) fetchProject();
+    if (id) {
+      fetchProject();
+      fetchSavedReferences();
+    }
   }, [id]);
 
   // Username search debouncing
@@ -1637,8 +1711,188 @@ export const ProjectDetailsPage: React.FC = () => {
         {activeTab === 'Expert Audit' && (
           <div className="space-y-8">
             <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-              Run comprehensive diagnostics against USPTO/WIPO prior art registries to audit claims and evaluate overall novelty index before filing:
+              Search the public patent database to link relevant prior art documents to your project, then run AI diagnostics to audit similarity and novelty strength.
             </p>
+
+            {/* PATENT EXPLORER & REFERENCES MANAGER */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-3xs space-y-6">
+              <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                <div>
+                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    🔍 Verified Patent Explorer & References Manager
+                  </h4>
+                  <p className="text-[10px] text-slate-450 font-semibold mt-0.5">
+                    Search public patent registries and link relevant prior-art documents as context for AI diagnostics.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Search Panel */}
+                <div className="space-y-4">
+                  <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>Registry Search</span>
+                  </h5>
+                  <form onSubmit={handlePatentSearch} className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        placeholder="Search by keywords, patent number, or assignee..."
+                        value={patentSearchQuery}
+                        onChange={(e) => setPatentSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-650"
+                      />
+                      <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loadingPatentSearch}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {loadingPatentSearch ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" /> Searching...
+                        </>
+                      ) : (
+                        'Search'
+                      )}
+                    </button>
+                  </form>
+
+                  {patentSearchError && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-semibold leading-normal flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{patentSearchError}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    {patentSearchResults.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                        {loadingPatentSearch ? 'Fetching records...' : 'Enter keywords above to search patent registries.'}
+                      </div>
+                    ) : (
+                      patentSearchResults.map((pat) => {
+                        const isSaved = savedReferences.some(r => r.patentNumber === pat.patentNumber);
+                        const isMock = pat.source === 'MOCK';
+
+                        return (
+                          <div key={pat.patentNumber} className="p-3 bg-white border border-slate-200 rounded-2xl shadow-3xs space-y-2 hover:border-slate-350 transition-all">
+                            <div className="flex justify-between items-start gap-2">
+                              <div>
+                                <span className={`inline-block px-2 py-0.5 rounded text-[8px] font-bold border uppercase ${
+                                  isMock
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
+                                  {isMock ? 'Mock / Offline Data' : 'Verified USPTO Patent'}
+                                </span>
+                                <h6 className="font-extrabold text-[10px] text-slate-900 mt-1">{pat.patentNumber}</h6>
+                              </div>
+
+                              {canManageReferences && (
+                                <button
+                                  onClick={() => handleSaveReference(pat)}
+                                  disabled={isSaved}
+                                  className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold border cursor-pointer transition-all flex items-center gap-1 ${
+                                    isSaved
+                                      ? 'bg-slate-50 border-slate-200 text-slate-450'
+                                      : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                                  }`}
+                                >
+                                  {isSaved ? 'Linked ✓' : <><Plus className="w-2.5 h-2.5" /> Link Reference</>}
+                                </button>
+                              )}
+                            </div>
+                            <h6 className="font-bold text-[11px] text-slate-800 leading-snug">{pat.title}</h6>
+                            {pat.abstract && (
+                              <p className="text-[10px] text-slate-500 leading-normal line-clamp-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                {pat.abstract}
+                              </p>
+                            )}
+                            <div className="flex gap-4 text-[9px] text-slate-400 font-semibold">
+                              {pat.inventors && <span>👤 {pat.inventors}</span>}
+                              {pat.publishDate && <span>📅 {pat.publishDate}</span>}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Saved References Panel */}
+                <div className="space-y-4">
+                  <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>Saved Project References ({savedReferences.length})</span>
+                  </h5>
+
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                    {loadingReferences ? (
+                      <div className="py-12 text-center text-slate-400 text-xs font-medium">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600 mb-2" />
+                        Loading references...
+                      </div>
+                    ) : savedReferences.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                        No references linked to this project yet. Use the explorer search panel to link patents.
+                      </div>
+                    ) : (
+                      savedReferences.map((ref) => {
+                        const isMock = ref.source === 'MOCK';
+                        return (
+                          <div key={ref.id} className="p-3 bg-indigo-50/20 border border-indigo-200/60 rounded-2xl shadow-3xs space-y-1.5 relative">
+                            <div className="flex justify-between items-start gap-2">
+                              <div>
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold border uppercase ${
+                                  isMock
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
+                                  {isMock ? 'Offline Reference' : 'Verified Patent'}
+                                </span>
+                                <h6 className="font-extrabold text-[10px] text-indigo-800 mt-1">{ref.patentNumber}</h6>
+                              </div>
+
+                              {canManageReferences && (
+                                <button
+                                  onClick={() => handleDeleteReference(ref.id)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                  title="Delete Reference"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            <h6 className="font-bold text-[11px] text-slate-900 leading-snug">{ref.title}</h6>
+                            {ref.abstract && (
+                              <p className="text-[10px] text-slate-655 leading-normal italic line-clamp-2 bg-white p-2 rounded border border-slate-150">
+                                {ref.abstract}
+                              </p>
+                            )}
+                            <div className="flex items-center justify-between text-[9px] pt-1">
+                              <span className="text-slate-400 font-semibold">
+                                {ref.publishDate && `Published: ${new Date(ref.publishDate).toLocaleDateString()}`}
+                              </span>
+                              {ref.url && (
+                                <a
+                                  href={ref.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-indigo-650 hover:underline font-bold flex items-center gap-0.5"
+                                >
+                                  Registry link →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Prior Art / Similarity Panel */}

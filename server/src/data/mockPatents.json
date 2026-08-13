@@ -1,0 +1,112 @@
+[
+  {
+    "patentNumber": "US11048956B2",
+    "title": "Decentralized trust verification system using distributed consensus ledger",
+    "abstract": "A system and method for verifying digital assets using a distributed consensus ledger. The system generates secure consensus keys, registers transactions, and validates ownership metadata using cryptographic hashing across public nodes.",
+    "claims": "1. A computer-implemented consensus system comprising: a distributed cryptographic ledger; a plurality of network nodes; and a smart contract executing trust verification steps...\n2. The system of claim 1, wherein consensus is achieved using proof-of-stake verification keys.",
+    "url": "https://patents.google.com/patent/US11048956B2",
+    "inventors": "Alice Johnson, Robert Smith",
+    "assignee": "BlockTrust Technologies Inc.",
+    "publishDate": "2024-03-12",
+    "source": "MOCK"
+  },
+  {
+    "patentNumber": "US10842911B1",
+    "title": "Deep learning model training optimization using dynamic batch size adaptation",
+    "abstract": "An artificial intelligence training pipeline that monitors validation error curves and automatically adjusts gradient batch sizes. It scales resource allocation dynamically to prevent overfitting in multi-layer neural network architectures.",
+    "claims": "1. A method for deep neural network training optimization: monitoring a validation loss parameter; and adapting a batch size parameter dynamically during gradient descent iterations.",
+    "url": "https://patents.google.com/patent/US10842911B1",
+    "inventors": "Emily Chen, David Miller",
+    "assignee": "Cognitive Scale Labs LLC",
+    "publishDate": "2023-08-19",
+    "source": "MOCK"
+  },
+  {
+    "patentNumber": "US11205312B2",
+    "title": "Method for predictive energy load balancing in smart electrical grids",
+    "abstract": "A smart-grid optimization technique utilizing neural networks to forecast local energy demand spikes. The system reroutes storage battery output during peak periods to maintain frequency stability and balance transmission line loads.",
+    "claims": "1. A power management controller configured to: collect sensor measurements from power distribution nodes; and trigger local battery storage output balancing using predictive models.",
+    "url": "https://patents.google.com/patent/US11205312B2",
+    "inventors": "Michael Chang, Sarah Connor",
+    "assignee": "Apex SmartGrid Power",
+    "publishDate": "2024-01-05",
+    "source": "MOCK"
+  },
+  {
+    "patentNumber": "US10992345B2",
+    "title": "Secure data transmission protocol in low-power wireless sensor networks",
+    "abstract": "An encrypted routing scheme for Internet-of-Things (IoT) micro-controllers. The protocol employs rotating cryptographic salts and dynamic route hopping to secure communication across mesh topology networks against sniffing attacks.",
+    "claims": "1. An IoT communication protocol comprising: generating a dynamic session salt; encrypting data frames at sensor nodes; and scheduling randomized multi-hop transmission paths.",
+    "url": "https://patents.google.com/patent/US10992345B2",
+    "inventors": "John Doe, Richard Roe",
+    "assignee": "LinkSec Solutions Corp.",
+    "publishDate": "2023-11-22",
+    "source": "MOCK"
+  },
+  {
+    "patentNumber": "US11124800B2",
+    "title": "Machine learning system for anomaly detection in electronic health records",
+    "abstract": "A natural language processing framework that parses medical charts to highlight contradictory prescriptions, critical laboratory value discrepancies, and unrecognized patient history flags, outputting safety risk scores.",
+    "claims": "1. A medical diagnostics server comprising: an ingestion pipeline parsing EHR logs; a feature extraction classifier; and a decision tree yielding warning events.",
+    "url": "https://patents.google.com/patent/US11124800B2",
+    "inventors": "Patricia Jenkins, James Watson",
+    "assignee": "MedSafe Systems Corp.",
+    "publishDate": "2024-05-14",
+    "source": "MOCK"
+  },
+  {
+    "patentNumber": "US10756910B1",
+    "title": "Image classification assistant using edge computing nodes",
+    "abstract": "A distributed computer vision architecture where light feature extraction maps are generated on edge micro-cameras, and heavy tensor matrix classifications are delegated to centralized cloud servers.",
+    "claims": "1. A hardware-efficient computer vision system comprising: an edge sensor computing local kernel weights; and a network interface transmitting feature vectors to a remote host.",
+    "url": "https://patents.google.com/patent/US10756910B1",
+    "inventors": "Linda Carter, Clark Kent",
+    "assignee": "EdgeVision Systems",
+    "publishDate": "2023-02-28",
+    "source": "MOCK"
+  },
+  {
+    "patentNumber": "US11105432B2",
+    "title": "Smart automated hydroponic environmental control module",
+    "abstract": "An automated agricultural cabinet utilizing electrochemical pH sensors and digital valves to balance nutrient solutions in closed-loop vertical farm systems, adjusting spectral lights according to plant height growth metrics.",
+    "claims": "1. A hydroponic apparatus comprising: nutrient supply reservoirs; pH monitoring feedback loops; and adjustable LED panels responsive to optical height cameras.",
+    "url": "https://patents.google.com/patent/US11105432B2",
+    "inventors": "Arthur Dent, Ford Prefect",
+    "assignee": "BioHarvest AgriTech Ltd.",
+    "publishDate": "2024-04-18",
+    "source": "MOCK"
+  },
+  {
+    "patentNumber": "US10654877B2",
+    "title": "Cryogenic vaccine storage container with vacuum insulation monitoring",
+    "abstract": "A thermal storage cylinder having double-walled vacuum panels and temperature sensors linked to a cellular transmission antenna, designed to alert clinics when vacuum pressure leaks are detected.",
+    "claims": "1. A vacuum-insulated container comprising: an inner storage cell; a vacuum sensor between double walls; and a transmitter broadcasting failure warnings.",
+    "url": "https://patents.google.com/patent/US10654877B2",
+    "inventors": "Bruce Wayne, Diana Prince",
+    "assignee": "ColdChain Logistics",
+    "publishDate": "2022-09-30",
+    "source": "MOCK"
+  },
+  {
+    "patentNumber": "US11180291B2",
+    "title": "Autonomous vehicle collision avoidance system based on LIDAR cloud density",
+    "abstract": "A driverless guidance system that maps points from 3D LIDAR scans into dense point clouds, dynamically calculates occupancy maps, and triggers backup braking when dense clusters are resolved in the travel trajectory.",
+    "claims": "1. An vehicle safety controller comprising: a LIDAR transceiver mapping 3D arrays; and a processing unit identifying obstacles within braking zones.",
+    "url": "https://patents.google.com/patent/US11180291B2",
+    "inventors": "Barry Allen, Hal Jordan",
+    "assignee": "Velocity Motors Inc.",
+    "publishDate": "2024-06-25",
+    "source": "MOCK"
+  },
+  {
+    "patentNumber": "US10950311B2",
+    "title": "Augmented reality holographic display configuration using diffractive gratings",
+    "abstract": "A waveguide display for smart eyewear that projects light engines through micro-grating arrays, bending spectral coordinates to produce high-contrast, wide-field virtual imagery directly in front of the pupil.",
+    "claims": "1. A near-eye virtual display comprising: a grating substrate reflecting beam projections; and a sensor aligning field coordinates relative to eye position.",
+    "url": "https://patents.google.com/patent/US10950311B2",
+    "inventors": "Tony Stark, Peter Parker",
+    "assignee": "Arc Vision Labs",
+    "publishDate": "2023-05-09",
+    "source": "MOCK"
+  }
+]

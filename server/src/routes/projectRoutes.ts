@@ -18,11 +18,18 @@ import {
   getNoveltyAssessment,
   generatePatentDrawing,
 } from '../controllers/aiController';
+import {
+  searchPatents,
+  getSavedReferences,
+  saveReference,
+  deleteReference
+} from '../controllers/patentController';
 import { authenticateToken } from '../middleware/authMiddleware';
 import { authorize } from '../policies/middleware/authorize';
 import { projectGuard } from '../policies/middleware/policyGuard';
 import { ProjectPolicy } from '../policies/project/project.policy';
 import { ReviewPolicy } from '../policies/review/review.policy';
+import { PatentReferencePolicy } from '../policies/project/patent-reference.policy';
 
 const router = Router();
 
@@ -43,6 +50,12 @@ router.delete('/:id/tasks/:taskId', projectGuard(ProjectPolicy.canDeleteTask) as
 
 // Comments Endpoint
 router.post('/:id/comments', projectGuard(ReviewPolicy.canComment) as any, createComment as any);
+
+// Patent Search & Reference Management Endpoints
+router.get('/:id/patents/search', projectGuard(PatentReferencePolicy.canSearch) as any, searchPatents as any);
+router.get('/:id/patents/references', projectGuard(PatentReferencePolicy.canViewReferences) as any, getSavedReferences as any);
+router.post('/:id/patents/references', projectGuard(PatentReferencePolicy.canSaveReference) as any, saveReference as any);
+router.delete('/:id/patents/references/:refId', projectGuard(PatentReferencePolicy.canDeleteReference) as any, deleteReference as any);
 
 // Simulated AI Innovation & Diagnostics endpoints
 router.post('/:id/ai/innovation', projectGuard(ProjectPolicy.canViewProject) as any, generateInnovationAi as any);

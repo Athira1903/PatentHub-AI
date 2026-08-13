@@ -65,12 +65,17 @@ export const getSimilarityAnalysis = async (req: AuthenticatedRequest, res: Resp
       return;
     }
 
+    const references = await prisma.patentReference.findMany({
+      where: { projectId }
+    });
+
     const analysis = await AiService.analyzeSimilarity(
       project.title,
       project.category || '',
       project.technicalDomain || '',
       project.innovationIdea,
-      project.proposedSolution
+      project.proposedSolution,
+      references
     );
 
     res.status(200).json({
@@ -101,12 +106,17 @@ export const getNoveltyAssessment = async (req: AuthenticatedRequest, res: Respo
       return;
     }
 
+    const references = await prisma.patentReference.findMany({
+      where: { projectId }
+    });
+
     const assessment = await AiService.analyzeNovelty(
       project.title,
       project.category || '',
       project.technicalDomain || '',
       project.innovationIdea,
-      project.proposedSolution
+      project.proposedSolution,
+      references
     );
 
     res.status(200).json({

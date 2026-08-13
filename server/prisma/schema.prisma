@@ -90,6 +90,7 @@ model PatentProject {
   comments     Comment[]
   activityLogs ActivityLog[]
   invitations  Invitation[]
+  patentReferences PatentReference[]
 }
 
 model ProjectMember {
@@ -210,4 +211,23 @@ model Profile {
   profileCompleted Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+model PatentReference {
+  id             String        @id @default(uuid())
+  projectId      String
+  project        PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  patentNumber   String
+  title          String
+  abstract       String?       @db.Text
+  claims         String?       @db.Text
+  url            String?
+  inventors      String?
+  assignee       String?
+  publishDate    DateTime?
+  source         String        @default("USPTO") // "USPTO", "MOCK"
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([projectId, patentNumber])
 }

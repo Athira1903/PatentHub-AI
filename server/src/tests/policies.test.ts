@@ -10,14 +10,23 @@ import { ReviewPolicy } from '../policies/review/review.policy';
 import { PatentFormPolicy } from '../policies/forms/patent-form.policy';
 import { InvitationPolicy } from '../policies/invitation/invitation.policy';
 import { ReportPolicy } from '../policies/report/report.policy';
+import { PatentReferencePolicy } from '../policies/project/patent-reference.policy';
 import { prisma } from '../config/db';
 import { AiService } from '../services/aiService';
+import { PatentSearchService } from '../services/patentSearchService';
+import { PatentReferenceService } from '../services/patentReferenceService';
 import {
   generateInnovationAi,
   getSimilarityAnalysis,
   getNoveltyAssessment,
   generatePatentDrawing
 } from '../controllers/aiController';
+import {
+  searchPatents,
+  getSavedReferences,
+  saveReference,
+  deleteReference
+} from '../controllers/patentController';
 
 // Simple Test Runner framework
 let passedTests = 0;
@@ -864,6 +873,140 @@ test('Controller: AI endpoints handle Gemini service failure gracefully with 502
 
   (prisma.patentProject as any).findUnique = originalFindUnique;
   (AiService as any).analyzeNovelty = originalNovelty;
+});
+
+// ----------------------------------------------------
+// 12. Patent Reference Policy & Service Tests (Task 4)
+// ----------------------------------------------------
+test('Patent Policy: Role permissions for Search, View, Save, Delete, and AI Analysis', () => {
+  const ownerUser = { userId: 'user_owner', role: 'Inventor' };
+  const adminUser = { userId: 'user_admin', role: 'Admin' };
+  const editorUser = { userId: 'user_editor', role: 'Inventor' };
+  const viewerUser = { userId: 'user_viewer', role: 'Guide' };
+  const externalUser = { userId: 'user_external', role: 'Inventor' };
+
+  const testProject = {
+    id: 'p1',
+    ownerId: 'user_owner',
+    members: [
+      { userId: 'user_owner', role: 'INVENTOR' },
+      { userId: 'user_editor', role: 'INVENTOR' },
+      { userId: 'user_viewer', role: 'GUIDE' }
+    ]
+  };
+
+  assert.strictEqual(PatentReferencePolicy.canSearch(ownerUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canSearch(editorUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canSearch(viewerUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canSearch(externalUser, testProject), false);
+
+  assert.strictEqual(PatentReferencePolicy.canViewReferences(ownerUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canViewReferences(viewerUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canViewReferences(externalUser, testProject), false);
+
+  assert.strictEqual(PatentReferencePolicy.canSaveReference(ownerUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canSaveReference(adminUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canSaveReference(editorUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canSaveReference(viewerUser, testProject), false);
+  assert.strictEqual(PatentReferencePolicy.canSaveReference(externalUser, testProject), false);
+
+  assert.strictEqual(PatentReferencePolicy.canDeleteReference(ownerUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canDeleteReference(editorUser, testProject), true);
+  assert.strictEqual(PatentReferencePolicy.canDeleteReference(viewerUser, testProject), false);
+});
+
+test('Patent Search Service: Performs mock search fallback cleanly', async () => {
+  const results = await PatentSearchService.search('consensus');
+  assert.ok(Array.isArray(results));
+  assert.ok(results.length > 0);
+  assert.strictEqual(results[0].source, 'MOCK');
+  assert.ok(results[0].patentNumber);
+  assert.ok(results[0].title);
+});
+
+test('Patent Controller: Empty query returns 400 Bad Request', async () => {
+  let statusVal = 0;
+  let jsonVal: any = null;
+  const req = { query: { q: '' } } as any;
+  const res = {
+    status: (s: number) => { statusVal = s; return res; },
+    json: (j: any) => { jsonVal = j; }
+  } as any;
+
+  await searchPatents(req, res);
+  assert.strictEqual(statusVal, 400);
+  assert.ok(jsonVal.message.includes('required'));
+});
+
+test('Patent Reference Service: Saves reference and prevents duplicates', async () => {
+  const originalFindUnique = prisma.patentReference.findUnique;
+  const originalCreate = prisma.patentReference.create;
+
+  let createdData: any = null;
+  (prisma.patentReference as any).findUnique = async () => null;
+  (prisma.patentReference as any).create = async (args: any) => {
+    createdData = args.data;
+    return { id: 'ref_101', ...args.data };
+  };
+
+  const saved = await PatentReferenceService.saveReference('p1', {
+    patentNumber: 'US11048956B2',
+    title: 'Decentralized trust verification system',
+    abstract: 'A system for verifying digital assets',
+    source: 'MOCK'
+  });
+
+  assert.strictEqual(saved.id, 'ref_101');
+  assert.strictEqual(createdData.patentNumber, 'US11048956B2');
+  assert.strictEqual(createdData.source, 'MOCK');
+
+  // Test duplicate prevention
+  (prisma.patentReference as any).findUnique = async () => ({ id: 'ref_101', projectId: 'p1', patentNumber: 'US11048956B2' });
+  await assert.rejects(async () => {
+    await PatentReferenceService.saveReference('p1', {
+      patentNumber: 'US11048956B2',
+      title: 'Decentralized trust verification system',
+      source: 'MOCK'
+    });
+  }, /already saved/);
+
+  (prisma.patentReference as any).findUnique = originalFindUnique;
+  (prisma.patentReference as any).create = originalCreate;
+});
+
+test('Patent Reference Service: Enforces project isolation on deletion', async () => {
+  const originalFindUnique = prisma.patentReference.findUnique;
+  const originalDelete = prisma.patentReference.delete;
+
+  (prisma.patentReference as any).findUnique = async () => ({
+    id: 'ref_101',
+    projectId: 'p1',
+    patentNumber: 'US11048956B2'
+  });
+
+  // Attempting to delete for wrong project 'p2' should throw isolation error
+  await assert.rejects(async () => {
+    await PatentReferenceService.deleteReference('p2', 'ref_101');
+  }, /Project isolation violation/);
+
+  (prisma.patentReference as any).findUnique = originalFindUnique;
+  (prisma.patentReference as any).delete = originalDelete;
+});
+
+test('AI Service: analyzeSimilarity handles project with 0 references cleanly', async () => {
+  const res = await AiService.analyzeSimilarity(
+    'Smart Ingestor',
+    'Software',
+    'Computing',
+    'An automated ingestor',
+    'Distributed queues',
+    []
+  );
+
+  assert.strictEqual(res.score, 0);
+  assert.strictEqual(res.similarityScore, 0);
+  assert.strictEqual(res.matches.length, 0);
+  assert.ok(res.explanation.includes('No verified prior-art references'));
 });
 
 // Summary reporting and sequential execution

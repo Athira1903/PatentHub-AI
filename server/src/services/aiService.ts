@@ -47,48 +47,87 @@ Return ONLY the generated content appropriate for this section in clean, profess
   }
 
   /**
+   /**
    * Performs an AI-assisted similarity analysis, identifying matching concepts and overlapping features.
-   * Returns empty priorArtReferences list per repository safety rules since no database search is active.
    */
   static async analyzeSimilarity(
     title: string,
     category: string,
     domain: string,
     innovationIdea: string,
-    proposedSolution: string
+    proposedSolution: string,
+    verifiedReferences: any[]
   ): Promise<{
     score: number;
+    similarityScore: number;
     riskLevel: 'Low Risk' | 'Medium Risk' | 'High Risk';
     matchingConcepts: string[];
     overlappingFeatures: string[];
+    matches: any[];
     priorArtReferences: any[];
     explanation: string;
     disclaimer: string;
   }> {
+    if (!verifiedReferences || verifiedReferences.length === 0) {
+      return {
+        score: 0,
+        similarityScore: 0,
+        riskLevel: 'Low Risk',
+        matchingConcepts: [],
+        overlappingFeatures: [],
+        matches: [],
+        priorArtReferences: [],
+        explanation: 'No verified prior-art references have been saved to this project yet. Please search and save prior-art references under the Expert Audit tab before running this diagnostic check.',
+        disclaimer: 'AI-assisted conceptual comparison based on user-saved references.'
+      };
+    }
+
     const genAIClient = getGenAI();
     const model = genAIClient.getGenerativeModel({
       model: 'gemini-1.5-flash',
       generationConfig: { responseMimeType: 'application/json' }
     });
 
-    const prompt = `Analyze the similarity of the following invention to prior art:
-Title: ${title}
-Category: ${category}
-Domain: ${domain}
+    const formattedRefs = verifiedReferences.map(ref => `
+- Patent Number: ${ref.patentNumber}
+  Title: ${ref.title}
+  Abstract: ${ref.abstract || 'N/A'}
+  URL: ${ref.url || 'N/A'}
+`).join('\n');
+
+    const prompt = `Analyze the similarity of the following project to the list of verified prior art references provided.
+Project Title: ${title}
+Project Category: ${category}
+Project Domain: ${domain}
 Innovation Idea: ${innovationIdea}
 Proposed Solution: ${proposedSolution}
 
+Verified Prior-Art References list:
+${formattedRefs}
+
+Analyze the project relative only to these verified prior art references. Do NOT invent, hallucinate, or reference any other patent numbers or titles.
+
 Return a JSON object matching this schema:
 {
-  "score": number (0 to 100 representing similarity percentage),
+  "score": number (0 to 100 representing overall similarity percentage matching these references),
   "riskLevel": "Low Risk" | "Medium Risk" | "High Risk",
-  "matchingConcepts": string[] (concepts in common with standard systems),
-  "overlappingFeatures": string[] (features overlapping with existing methods),
-  "explanation": string (analysis of technical and conceptual similarities),
-  "disclaimer": "AI-assisted conceptual comparison rather than a verified prior-art search."
+  "matchingConcepts": string[] (concepts in common with these references),
+  "overlappingFeatures": string[] (features overlapping with these references),
+  "matches": Array of objects:
+    [
+      {
+        "patentId": string (MUST EXACTLY match the "Patent Number" of one of the provided references, e.g. "US11048956B2"),
+        "title": string (MUST EXACTLY match the title of that reference),
+        "similarityPercent": number (0 to 100 percentage similarity to this specific patent),
+        "drawbackOverlap": string (description of how this project overlaps or differs from the patent's drawbacks/specifications),
+        "url": string (MUST EXACTLY match the URL of that reference)
+      }
+    ],
+  "explanation": string (analysis of technical and conceptual similarities to the references),
+  "disclaimer": "AI-assisted conceptual comparison based on user-saved references."
 }
 
-NOTE: Since verified patent database integration is not active, the field "priorArtReferences" must be returned as an empty array []. Do not invent any patents.`;
+Ensure the "matches" array contains analysis only for the provided references.`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
@@ -107,14 +146,24 @@ NOTE: Since verified patent database integration is not active, the field "prior
       throw new Error('Invalid riskLevel returned from Gemini.');
     }
 
+    const matches = Array.isArray(parsed.matches) ? parsed.matches.map((m: any) => ({
+      patentId: typeof m.patentId === 'string' ? m.patentId : '',
+      title: typeof m.title === 'string' ? m.title : '',
+      similarityPercent: typeof m.similarityPercent === 'number' ? m.similarityPercent : 0,
+      drawbackOverlap: typeof m.drawbackOverlap === 'string' ? m.drawbackOverlap : '',
+      url: typeof m.url === 'string' ? m.url : ''
+    })) : [];
+
     return {
       score,
+      similarityScore: score,
       riskLevel: riskLevel as any,
       matchingConcepts: Array.isArray(parsed.matchingConcepts) ? parsed.matchingConcepts : [],
       overlappingFeatures: Array.isArray(parsed.overlappingFeatures) ? parsed.overlappingFeatures : [],
-      priorArtReferences: [],
+      matches,
+      priorArtReferences: matches,
       explanation: typeof parsed.explanation === 'string' ? parsed.explanation : '',
-      disclaimer: 'AI-assisted conceptual comparison rather than a verified prior-art search.'
+      disclaimer: 'AI-assisted conceptual comparison based on user-saved references.'
     };
   }
 
@@ -126,37 +175,65 @@ NOTE: Since verified patent database integration is not active, the field "prior
     category: string,
     domain: string,
     innovationIdea: string,
-    proposedSolution: string
+    proposedSolution: string,
+    verifiedReferences: any[]
   ): Promise<{
     score: number;
+    noveltyScore: number;
     assessment: 'High' | 'Medium' | 'Low';
+    strength: 'High' | 'Medium' | 'Low';
     strongAreas: string[];
     weakAreas: string[];
     recommendations: string[];
     explanation: string;
     disclaimer: string;
   }> {
+    if (!verifiedReferences || verifiedReferences.length === 0) {
+      return {
+        score: 0,
+        noveltyScore: 0,
+        assessment: 'High',
+        strength: 'High',
+        strongAreas: [],
+        weakAreas: [],
+        recommendations: [],
+        explanation: 'No verified prior-art references have been saved to this project yet. Please search and save prior-art references under the Expert Audit tab before running this diagnostic check.',
+        disclaimer: 'AI-assisted preliminary assessment based on user-saved references.'
+      };
+    }
+
     const genAIClient = getGenAI();
     const model = genAIClient.getGenerativeModel({
       model: 'gemini-1.5-flash',
       generationConfig: { responseMimeType: 'application/json' }
     });
 
-    const prompt = `Evaluate the novelty of the following invention:
-Title: ${title}
-Category: ${category}
-Domain: ${domain}
+    const formattedRefs = verifiedReferences.map(ref => `
+- Patent Number: ${ref.patentNumber}
+  Title: ${ref.title}
+  Abstract: ${ref.abstract || 'N/A'}
+`).join('\n');
+
+    const prompt = `Evaluate the novelty of the following project relative only to the provided verified prior art references.
+Project Title: ${title}
+Project Category: ${category}
+Project Domain: ${domain}
 Innovation Idea: ${innovationIdea}
 Proposed Solution: ${proposedSolution}
 
+Verified Prior-Art References list:
+${formattedRefs}
+
+Analyze the novelty relative ONLY to these verified references. Do NOT invent or reference other patents.
+
 Return a JSON object matching this schema:
 {
-  "score": number (0 to 100 representing novelty score),
-  "assessment": "High" | "Medium" | "Low",
-  "strongAreas": string[] (potentially novel, distinguishing features),
-  "weakAreas": string[] (common or known concepts),
-  "recommendations": string[] (next steps to verify prior-art or adjust scope),
-  "explanation": string (brief summary explaining the novelty strength and potential patentability paths),
+  "score": number (0 to 100 representing novelty score relative to these references),
+  "assessment": "High" | "Medium" | "Low" (novelty level rating),
+  "strongAreas": string[] (potentially novel, distinguishing features compared to these references),
+  "weakAreas": string[] (common or known concepts found in these references),
+  "recommendations": string[] (steps to verify further or adjust claim scopes),
+  "explanation": string (brief summary explaining the novelty evaluation),
   "disclaimer": "AI-assisted preliminary assessment. This is not a legal opinion or a definitive patentability determination."
 }
 
@@ -181,7 +258,9 @@ Do not present this as a legal determination.`;
 
     return {
       score,
+      noveltyScore: score,
       assessment: assessment as any,
+      strength: assessment as any,
       strongAreas: Array.isArray(parsed.strongAreas) ? parsed.strongAreas : [],
       weakAreas: Array.isArray(parsed.weakAreas) ? parsed.weakAreas : [],
       recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
