@@ -38,6 +38,20 @@ import {
   generateReadinessReportPdf,
   exportFilingPackage
 } from '../controllers/reviewController';
+import {
+  getPrototypes,
+  createPrototype,
+  getPrototypeById,
+  updatePrototype,
+  deletePrototype,
+  getFigures,
+  createFigure,
+  updateFigure,
+  deleteFigure,
+  updateFigureComponents,
+  analyzeFigureImageVision,
+  generateFigureSheetPdf
+} from '../controllers/prototypeController';
 import { authenticateToken } from '../middleware/authMiddleware';
 import { authorize } from '../policies/middleware/authorize';
 import { projectGuard } from '../policies/middleware/policyGuard';
@@ -46,6 +60,7 @@ import { ReviewPolicy } from '../policies/review/review.policy';
 import { PatentReferencePolicy } from '../policies/project/patent-reference.policy';
 import { PatentFormPolicy } from '../policies/forms/patent-form.policy';
 import { ReportPolicy } from '../policies/report/report.policy';
+import { DocumentPolicy } from '../policies/document/document.policy';
 
 const router = Router();
 
@@ -86,6 +101,22 @@ router.post('/:id/reviews', projectGuard(ReviewPolicy.canReview) as any, submitR
 router.get('/:id/filing-readiness', projectGuard(ReportPolicy.canGenerateSummary) as any, getFilingReadiness as any);
 router.post('/:id/readiness-report/pdf', projectGuard(ReportPolicy.canGenerateReadinessReport) as any, generateReadinessReportPdf as any);
 router.post('/:id/filing-package', projectGuard(ReportPolicy.canGenerateFinalReport) as any, exportFilingPackage as any);
+
+// Prototype & Technical Drawing Endpoints (Task 6)
+router.get('/:id/prototypes', projectGuard(ProjectPolicy.canViewProject) as any, getPrototypes as any);
+router.post('/:id/prototypes', projectGuard(DocumentPolicy.canUpload) as any, createPrototype as any);
+router.get('/:id/prototypes/:prototypeId', projectGuard(ProjectPolicy.canViewProject) as any, getPrototypeById as any);
+router.put('/:id/prototypes/:prototypeId', projectGuard(DocumentPolicy.canEdit) as any, updatePrototype as any);
+router.delete('/:id/prototypes/:prototypeId', projectGuard(DocumentPolicy.canDelete) as any, deletePrototype as any);
+
+router.get('/:id/figures', projectGuard(ProjectPolicy.canViewProject) as any, getFigures as any);
+router.post('/:id/figures', projectGuard(DocumentPolicy.canUpload) as any, createFigure as any);
+router.put('/:id/figures/:figureId', projectGuard(DocumentPolicy.canEdit) as any, updateFigure as any);
+router.delete('/:id/figures/:figureId', projectGuard(DocumentPolicy.canDelete) as any, deleteFigure as any);
+
+router.put('/:id/figures/:figureId/components', projectGuard(DocumentPolicy.canEdit) as any, updateFigureComponents as any);
+router.post('/:id/figures/:figureId/ai-vision', projectGuard(DocumentPolicy.canEdit) as any, analyzeFigureImageVision as any);
+router.post('/:id/figures/:figureId/render-sheet', projectGuard(DocumentPolicy.canUpload) as any, generateFigureSheetPdf as any);
 
 // Simulated AI Innovation & Diagnostics endpoints
 router.post('/:id/ai/innovation', projectGuard(ProjectPolicy.canViewProject) as any, generateInnovationAi as any);

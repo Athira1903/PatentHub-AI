@@ -316,4 +316,83 @@ Return a JSON object matching this schema:
         : []
     };
   }
+
+  /**
+   * Performs multimodal Gemini Vision analysis on an uploaded prototype photo or sketch image.
+   */
+  static async analyzePrototypeImageVision(
+    imageBuffer: Buffer,
+    mimeType: string,
+    projectContext: { title: string; innovationIdea: string; proposedSolution: string }
+  ): Promise<{
+    components: Array<{ referenceNumber: string; name: string; description: string }>;
+    figureDescription: string;
+    confidence: number;
+    disclaimer: string;
+  }> {
+    if (!imageBuffer || imageBuffer.length === 0) {
+      throw new Error('Image buffer is empty or unreadable.');
+    }
+
+    const validMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf'];
+    const cleanMime = mimeType?.toLowerCase() || 'image/png';
+    if (!validMimeTypes.includes(cleanMime)) {
+      throw new Error(`Unsupported image format "${mimeType}". Supported formats: PNG, JPG, JPEG, WEBP, PDF.`);
+    }
+
+    const genAIClient = getGenAI();
+    const model = genAIClient.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      generationConfig: { responseMimeType: 'application/json' }
+    });
+
+    const imagePart = {
+      inlineData: {
+        data: imageBuffer.toString('base64'),
+        mimeType: cleanMime.includes('pdf') ? 'application/pdf' : cleanMime
+      }
+    };
+
+    const prompt = `Analyze this technical prototype sketch or blueprint photo for a patent application:
+Invention Title: ${projectContext.title}
+Innovation Idea: ${projectContext.innovationIdea}
+Proposed Solution: ${projectContext.proposedSolution}
+
+Identify visual components, assembly elements, structural blocks, or reference tags.
+Assign standard patent drawing reference numbers (e.g. 100, 102, 104, 106).
+
+Return JSON matching this schema:
+{
+  "components": [
+    { "referenceNumber": "100", "name": "Component Name", "description": "Visual structural or functional description" }
+  ],
+  "figureDescription": "General technical summary of the figure view",
+  "confidence": number (between 0 and 100)
+}`;
+
+    const result = await model.generateContent([prompt, imagePart]);
+    const text = result.response.text();
+    if (!text) {
+      throw new Error('Received empty response from Gemini Vision model.');
+    }
+
+    const parsed = JSON.parse(text.trim());
+    const rawConf = typeof parsed.confidence === 'number' ? parsed.confidence : 80;
+    const confidence = Math.max(0, Math.min(100, rawConf));
+
+    const components = Array.isArray(parsed.components)
+      ? parsed.components.map((c: any, idx: number) => ({
+          referenceNumber: typeof c.referenceNumber === 'string' ? c.referenceNumber : String(100 + idx * 2),
+          name: typeof c.name === 'string' ? c.name : `Component ${idx + 1}`,
+          description: typeof c.description === 'string' ? c.description : ''
+        }))
+      : [];
+
+    return {
+      components,
+      figureDescription: typeof parsed.figureDescription === 'string' ? parsed.figureDescription : `Technical schematic layout for ${projectContext.title}`,
+      confidence,
+      disclaimer: 'AI-generated component analysis is an assistive technical interpretation and is not a legal, engineering, or filing certification.'
+    };
+  }
 }

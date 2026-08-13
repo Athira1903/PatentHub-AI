@@ -18,6 +18,8 @@ import { PatentReferenceService } from '../services/patentReferenceService';
 import { FormService } from '../services/formService';
 import { ReviewService } from '../services/reviewService';
 import { FilingReadinessService } from '../services/filingReadinessService';
+import { PrototypeService } from '../services/prototypeService';
+import { PdfService } from '../services/pdfService';
 import {
   generateInnovationAi,
   getSimilarityAnalysis,
@@ -1247,6 +1249,132 @@ test('Task 5: Filing Package export throws when incomplete and compiles PDF when
   (prisma.patentProject as any).findUnique = origFindProject;
   (prisma.document as any).create = origCreateDoc;
   (prisma.activityLog as any).create = origCreateLog;
+});
+
+// ----------------------------------------------------
+// 14. Task 6: Prototype & Technical Drawing Intelligence Tests
+// ----------------------------------------------------
+test('Task 6: PrototypeService creation, retrieval, and project isolation', async () => {
+  const origFindProj = prisma.patentProject.findUnique;
+  const origCreateProto = prisma.prototype.create;
+  const origFindMany = prisma.prototype.findMany;
+  const origFindUnique = prisma.prototype.findUnique;
+
+  (prisma.patentProject as any).findUnique = async () => ({ id: 'p1', title: 'Solar Array' });
+  (prisma.prototype as any).create = async (args: any) => ({ id: 'proto_1', ...args.data });
+  (prisma.prototype as any).findMany = async (args: any) => [{ id: 'proto_1', projectId: args.where.projectId, title: 'Alpha Model' }];
+
+  const proto = await PrototypeService.createPrototype('p1', { title: 'Alpha Model', description: 'Initial CAD draft' }, 'u1');
+  assert.strictEqual(proto.title, 'Alpha Model');
+  assert.strictEqual(proto.projectId, 'p1');
+
+  const list = await PrototypeService.getProjectPrototypes('p1');
+  assert.strictEqual(list.length, 1);
+
+  // Project isolation violation check
+  (prisma.prototype as any).findUnique = async () => ({ id: 'proto_1', projectId: 'p1', title: 'Alpha Model' });
+  await assert.rejects(async () => {
+    await PrototypeService.getPrototypeById('p2_wrong', 'proto_1');
+  }, /isolation violation/);
+
+  (prisma.patentProject as any).findUnique = origFindProj;
+  (prisma.prototype as any).create = origCreateProto;
+  (prisma.prototype as any).findMany = origFindMany;
+  (prisma.prototype as any).findUnique = origFindUnique;
+});
+
+test('Task 6: DrawingFigure and DrawingComponent tag persistence', async () => {
+  const origCount = prisma.drawingFigure.count;
+  const origFindDup = prisma.drawingFigure.findUnique;
+  const origCreateFig = prisma.drawingFigure.create;
+  const origDeleteComp = prisma.drawingComponent.deleteMany;
+  const origCreateComp = prisma.drawingComponent.create;
+
+  (prisma.drawingFigure as any).count = async () => 0;
+  (prisma.drawingFigure as any).findUnique = async () => null;
+  (prisma.drawingFigure as any).create = async (args: any) => ({ id: 'fig_1', ...args.data });
+  (prisma.drawingComponent as any).deleteMany = async () => ({ count: 0 });
+  (prisma.drawingComponent as any).create = async (args: any) => ({ id: 'comp_1', ...args.data });
+
+  const fig = await PrototypeService.createDrawingFigure('p1', { title: 'Assembly Perspective', description: 'FIG. 1 View' });
+  assert.strictEqual(fig.figureNumber, 'FIG. 1');
+  assert.strictEqual(fig.title, 'Assembly Perspective');
+
+  // Update component tags
+  (prisma.drawingFigure as any).findUnique = async () => ({ id: 'fig_1', projectId: 'p1', figureNumber: 'FIG. 1' });
+  const components = await PrototypeService.updateFigureComponents('p1', 'fig_1', [
+    { referenceNumber: '100', componentName: 'Base Housing', description: 'Enclosure chassis' },
+    { referenceNumber: '102', componentName: 'Optical Sensor', description: 'Photodiode array' }
+  ]);
+
+  assert.strictEqual(components.length, 2);
+  assert.strictEqual(components[0].referenceNumber, '100');
+  assert.strictEqual(components[1].componentName, 'Optical Sensor');
+
+  (prisma.drawingFigure as any).count = origCount;
+  (prisma.drawingFigure as any).findUnique = origFindDup;
+  (prisma.drawingFigure as any).create = origCreateFig;
+  (prisma.drawingComponent as any).deleteMany = origDeleteComp;
+  (prisma.drawingComponent as any).create = origCreateComp;
+});
+
+test('Task 6: Gemini Vision analysis handles invalid buffers and clamps confidence scores', async () => {
+  // 1. Invalid empty buffer throws clean error
+  await assert.rejects(async () => {
+    await AiService.analyzePrototypeImageVision(Buffer.from(''), 'image/png', {
+      title: 'Sensor',
+      innovationIdea: 'Idea',
+      proposedSolution: 'Solution'
+    });
+  }, /empty or unreadable/);
+
+  // 2. Unsupported format throws clean error
+  await assert.rejects(async () => {
+    await AiService.analyzePrototypeImageVision(Buffer.from('test data'), 'image/bmp', {
+      title: 'Sensor',
+      innovationIdea: 'Idea',
+      proposedSolution: 'Solution'
+    });
+  }, /Unsupported image format/);
+});
+
+test('Task 6: Server-side Patent Figure Sheet PDF generation attaches Document record', async () => {
+  const origFindProj = prisma.patentProject.findUnique;
+  const origFindFig = prisma.drawingFigure.findUnique;
+  const origCreateDoc = prisma.document.create;
+  const origUpdateFig = prisma.drawingFigure.update;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Autonomous Rover',
+    category: 'Robotics',
+    owner: { fullName: 'Dr. Carol', email: 'carol@test.com' }
+  });
+
+  (prisma.drawingFigure as any).findUnique = async () => ({
+    id: 'fig_101',
+    projectId: 'p1',
+    figureNumber: 'FIG. 1',
+    title: 'Exploded View',
+    description: 'Exploded component assembly',
+    components: [
+      { referenceNumber: '100', componentName: 'Chassis Frame', description: 'Aluminium frame' },
+      { referenceNumber: '102', componentName: 'Drive Motor', description: 'Brushless motor' }
+    ]
+  });
+
+  (prisma.document as any).create = async (args: any) => ({ id: 'doc_fig_101', ...args.data });
+  (prisma.drawingFigure as any).update = async (args: any) => ({ id: 'fig_101', ...args.data });
+
+  const figDoc = await PdfService.generatePatentFigureSheetPdf('p1', 'fig_101', 'u1');
+  assert.ok(figDoc.id);
+  assert.strictEqual(figDoc.category, 'PATENT_DRAFT');
+  assert.ok(figDoc.fileUrl.includes('.pdf'));
+
+  (prisma.patentProject as any).findUnique = origFindProj;
+  (prisma.drawingFigure as any).findUnique = origFindFig;
+  (prisma.document as any).create = origCreateDoc;
+  (prisma.drawingFigure as any).update = origUpdateFig;
 });
 
 // Summary reporting and sequential execution

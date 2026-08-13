@@ -303,4 +303,189 @@ export class PdfService {
 
     return document;
   }
+
+  /**
+   * Generates a server-side Technical Patent Figure Preparation Sheet PDF.
+   */
+  static async generatePatentFigureSheetPdf(projectId: string, figureId: string, userId?: string): Promise<any> {
+    const project = await prisma.patentProject.findUnique({
+      where: { id: projectId },
+      include: { owner: { select: { fullName: true, email: true, institution: true } } }
+    });
+
+    if (!project) {
+      throw new Error('Project not found for figure sheet generation.');
+    }
+
+    const figure = await prisma.drawingFigure.findUnique({
+      where: { id: figureId },
+      include: {
+        components: { orderBy: { referenceNumber: 'asc' } },
+        sourceDocument: true
+      }
+    });
+
+    if (!figure || figure.projectId !== projectId) {
+      throw new Error('Drawing figure not found or project mismatch.');
+    }
+
+    const doc = new jsPDF();
+
+    // Border Frame for Official Layout
+    doc.setDrawColor(15, 23, 42);
+    doc.setLineWidth(0.5);
+    doc.rect(10, 10, 190, 277);
+
+    // Sheet Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(`PATENT FIGURE PREPARATION SHEET`, 15, 22);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Project: ${project.title} (${project.category})`, 15, 28);
+    doc.text(`Applicant: ${project.owner.fullName}`, 15, 33);
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(15, 36, 195, 36);
+
+    // Figure Title Banner
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text(`${figure.figureNumber} - ${figure.title}`, 15, 47);
+
+    if (figure.description) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 116, 139);
+      const splitDesc = doc.splitTextToSize(figure.description, 180);
+      doc.text(splitDesc, 15, 53);
+    }
+
+    // Schematic Drawing Bounding Box
+    let yPos = figure.description ? 65 : 55;
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(15, yPos, 180, 110, 'FD');
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`[2D SCHEMATIC LAYOUT REPRESENTATION]`, 45, yPos + 20);
+
+    // Draw reference tags in bounding box
+    let tagY = yPos + 35;
+    let tagX = 25;
+    figure.components.slice(0, 8).forEach((comp, idx) => {
+      doc.setFillColor(79, 70, 229);
+      doc.circle(tagX, tagY, 4, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text(comp.referenceNumber, tagX - 2.5, tagY + 1.5);
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`─── ${comp.componentName}`, tagX + 6, tagY + 1.5);
+
+      tagY += 16;
+      if (tagY > yPos + 95) {
+        tagY = yPos + 35;
+        tagX += 85;
+      }
+    });
+
+    // Reference Components Table Legend
+    yPos += 120;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('COMPONENT REFERENCE LEGEND TABLE:', 15, yPos);
+
+    yPos += 5;
+    doc.setDrawColor(203, 213, 225);
+    doc.line(15, yPos, 195, yPos);
+
+    yPos += 6;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Ref #', 15, yPos);
+    doc.text('Component Name', 40, yPos);
+    doc.text('Description', 100, yPos);
+
+    yPos += 4;
+    doc.line(15, yPos, 195, yPos);
+    yPos += 5;
+
+    if (figure.components.length === 0) {
+      doc.setFont('helvetica', 'italic');
+      doc.text('No component reference tags cataloged for this figure.', 15, yPos);
+      yPos += 10;
+    } else {
+      figure.components.forEach((comp) => {
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+        }
+        doc.setFont('helvetica', 'bold');
+        doc.text(comp.referenceNumber, 15, yPos);
+        doc.setFont('helvetica', 'normal');
+        doc.text(comp.componentName, 40, yPos);
+        const splitCompDesc = doc.splitTextToSize(comp.description || 'N/A', 90);
+        doc.text(splitCompDesc, 100, yPos);
+        yPos += (splitCompDesc.length * 4) + 3;
+      });
+    }
+
+    // Disclaimer footer
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Note: Patent figure preparation sheet. AI-assisted technical drawing draft. Not an official IPO/USPTO filing document.', 15, 283);
+
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    const uploadDir = this.ensureUploadDirectory();
+    const sanitizedFileName = `Figure_${figure.figureNumber.replace(/[^a-zA-Z0-9]/g, '_')}_${projectId.substring(0, 8)}_${Date.now()}.pdf`;
+    const filePath = path.join(uploadDir, sanitizedFileName);
+
+    fs.writeFileSync(filePath, pdfBuffer);
+
+    const fileUrl = `/uploads/documents/${sanitizedFileName}`;
+
+    const document = await prisma.document.create({
+      data: {
+        name: `${figure.figureNumber} Sheet - ${figure.title}.pdf`,
+        fileUrl,
+        fileType: 'application/pdf',
+        fileSize: pdfBuffer.length,
+        version: 1,
+        category: 'PATENT_DRAFT',
+        projectId
+      }
+    });
+
+    // Update DrawingFigure generatedDocumentId
+    await prisma.drawingFigure.update({
+      where: { id: figure.id },
+      data: { generatedDocumentId: document.id }
+    });
+
+    if (userId) {
+      try {
+        await prisma.activityLog.create({
+          data: {
+            userId,
+            projectId,
+            action: `Generated Technical Figure Sheet PDF for ${figure.figureNumber}.`
+          }
+        });
+      } catch (e) {
+        // Ignore activity log creation in mock/test environments
+      }
+    }
+
+    return document;
+  }
 }
