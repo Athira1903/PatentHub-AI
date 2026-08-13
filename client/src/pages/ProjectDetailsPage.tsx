@@ -141,6 +141,40 @@ export const ProjectDetailsPage: React.FC = () => {
 
   const [isAutosaving, setIsAutosaving] = useState(false);
 
+  const [analyticsSummary, setAnalyticsSummary] = useState<any>(null);
+  const [showCalculationExplanations, setShowCalculationExplanations] = useState(false);
+  const [generatingMasterReport, setGeneratingMasterReport] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      fetchAnalytics();
+    }
+  }, [id]);
+
+  const fetchAnalytics = async () => {
+    try {
+      const res = await api.get(`/projects/${id}/analytics`);
+      setAnalyticsSummary(res.data);
+    } catch (e) {
+      console.error('Failed to fetch analytics', e);
+    }
+  };
+
+  const handleGenerateMasterReport = async () => {
+    try {
+      setGeneratingMasterReport(true);
+      const res = await api.post(`/projects/${id}/reports/comprehensive-pdf`);
+      toast.success('Master Patent Intelligence Report PDF compiled!');
+      if (res.data && res.data.fileUrl) {
+        window.open(`http://localhost:5000${res.data.fileUrl}`, '_blank');
+      }
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to generate Master Patent Report.');
+    } finally {
+      setGeneratingMasterReport(false);
+    }
+  };
+
   useEffect(() => {
     if (!project || !editMode) return;
 
@@ -965,15 +999,100 @@ export const ProjectDetailsPage: React.FC = () => {
               <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">{activeTab}</h3>
               <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
                 ✦ {tabs.find((t) => t.name === activeTab)?.subtitle}
-              </p>
+            </p>
             </div>
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono">
               SEC_ID: {activeTab.replace(/\s+/g, '_').toUpperCase()}
             </span>
           </div>
+          {/* T1: OVERVIEW & INTELLIGENCE DASHBOARD */}
         {activeTab === 'Overview' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-2xs">
+          <div className="space-y-8">
+            {/* Task 8: Project Intelligence Metrics Grid */}
+            {analyticsSummary && (
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-indigo-600 animate-pulse" /> Project Intelligence & Health Dashboard
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">Real-time patentability, compliance, and velocity analytics</p>
+                  </div>
+                  <button
+                    onClick={() => setShowCalculationExplanations(!showCalculationExplanations)}
+                    className="text-[10px] font-extrabold px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    {showCalculationExplanations ? 'Hide Score Calculation Rules' : 'How Scores are Calculated'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="p-3.5 bg-indigo-50/60 border border-indigo-150 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[9px] font-bold text-indigo-900 uppercase tracking-wider">Patent Eligibility</span>
+                    <div className="my-1.5 flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-indigo-700">{analyticsSummary.scores.patentEligibilityScore}%</span>
+                    </div>
+                    <span className="text-[9px] font-semibold text-indigo-600">High Strength</span>
+                  </div>
+
+                  <div className="p-3.5 bg-amber-50/60 border border-amber-150 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[9px] font-bold text-amber-900 uppercase tracking-wider">Prior Art Risk</span>
+                    <div className="my-1.5 flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-amber-700">{analyticsSummary.scores.priorArtRiskIndex}%</span>
+                    </div>
+                    <span className="text-[9px] font-semibold text-amber-600">{analyticsSummary.metrics.totalReferences} References</span>
+                  </div>
+
+                  <div className="p-3.5 bg-cyan-50/60 border border-cyan-150 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[9px] font-bold text-cyan-900 uppercase tracking-wider">Drawing Health</span>
+                    <div className="my-1.5 flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-cyan-700">{analyticsSummary.scores.technicalDrawingScore}%</span>
+                    </div>
+                    <span className="text-[9px] font-semibold text-cyan-600">{analyticsSummary.metrics.totalFigures} Figures ({analyticsSummary.metrics.annotatedComponentsCount} Tags)</span>
+                  </div>
+
+                  <div className="p-3.5 bg-emerald-50/60 border border-emerald-150 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[9px] font-bold text-emerald-900 uppercase tracking-wider">Form Compliance</span>
+                    <div className="my-1.5 flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-emerald-700">{analyticsSummary.scores.legalComplianceHealth}%</span>
+                    </div>
+                    <span className="text-[9px] font-semibold text-emerald-600">{analyticsSummary.metrics.approvedFormsCount} Forms Approved</span>
+                  </div>
+
+                  <div className="p-3.5 bg-purple-50/60 border border-purple-150 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[9px] font-bold text-purple-900 uppercase tracking-wider">Team Velocity</span>
+                    <div className="my-1.5 flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-purple-700">{analyticsSummary.scores.teamExecutionVelocity}%</span>
+                    </div>
+                    <span className="text-[9px] font-semibold text-purple-600">{analyticsSummary.metrics.completedTasks}/{analyticsSummary.metrics.totalTasks} Tasks Done</span>
+                  </div>
+
+                  <div className="p-3.5 bg-blue-50/60 border border-blue-150 rounded-2xl flex flex-col justify-between">
+                    <span className="text-[9px] font-bold text-blue-900 uppercase tracking-wider">Filing Readiness</span>
+                    <div className="my-1.5 flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-blue-700">{analyticsSummary.scores.filingReadinessScore}%</span>
+                    </div>
+                    <span className="text-[9px] font-semibold text-blue-600">{analyticsSummary.stage}</span>
+                  </div>
+                </div>
+
+                {showCalculationExplanations && analyticsSummary.explanations && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-[11px] text-slate-700 font-medium">
+                    <h4 className="font-extrabold text-xs text-slate-900 uppercase mb-2">💡 How Scores are Calculated:</h4>
+                    <p>• <strong>Patent Eligibility:</strong> {analyticsSummary.explanations.patentEligibilityScore}</p>
+                    <p>• <strong>Prior Art Risk:</strong> {analyticsSummary.explanations.priorArtRiskIndex}</p>
+                    <p>• <strong>Drawing Health:</strong> {analyticsSummary.explanations.technicalDrawingScore}</p>
+                    <p>• <strong>Form Compliance:</strong> {analyticsSummary.explanations.legalComplianceHealth}</p>
+                    <p>• <strong>Team Velocity:</strong> {analyticsSummary.explanations.teamExecutionVelocity}</p>
+                    <p>• <strong>Filing Readiness:</strong> {analyticsSummary.explanations.filingReadinessScore}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-2xs">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
                   <Layers className="w-5 h-5" />
@@ -1043,6 +1162,52 @@ export const ProjectDetailsPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* AI Assistant recommendations column */}
+            <div className="lg:col-span-1 space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs">
+                <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Sparkles className="w-4.5 h-4.5 text-indigo-600 animate-pulse" /> AI Innovation Optimizers
+                </h4>
+                <p className="text-[11px] text-slate-500 leading-normal font-semibold">
+                  Select a module to automatically review and enhance your patent specifications copy:
+                </p>
+
+                <div className="space-y-2 pt-2">
+                  <button
+                    type="button"
+                    disabled={!!aiLoading}
+                    onClick={() => triggerAiInnovation('title')}
+                    className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {aiLoading === 'title' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Optimize Title
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!!aiLoading}
+                    onClick={() => triggerAiInnovation('abstract')}
+                    className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {aiLoading === 'abstract' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Generate Better Abstract
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         )}
 
         {/* T2: INNOVATION */}
@@ -2641,6 +2806,34 @@ export const ProjectDetailsPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-semibold leading-normal">
               Download automated claims evaluations, AI suggestions digests, and compiled readiness checklists:
             </p>
+
+            {/* Task 8: Master Patent Intelligence Report PDF Banner Card */}
+            <div className="p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-1.5 max-w-xl">
+                <span className="px-2.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 tracking-wider">
+                  ✦ Comprehensive Audit Dossier
+                </span>
+                <h4 className="text-lg font-black tracking-tight text-white">Master Patent Intelligence Report PDF</h4>
+                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                  Generates an executive 6-page filing dossier combining Invention Specifications, Prior Art Citations, AI Novelty Evaluation, 2D Figure Legends, IPO Form Approvals, Supervisor Review Audit Logs, and Filing Readiness Certification.
+                </p>
+              </div>
+              <button
+                onClick={handleGenerateMasterReport}
+                disabled={generatingMasterReport}
+                className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-indigo-500/25 shrink-0 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
+              >
+                {generatingMasterReport ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Compiling Master Report...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-indigo-200" /> Compile Master Report PDF
+                  </>
+                )}
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {[

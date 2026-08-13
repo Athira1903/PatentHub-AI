@@ -54,6 +54,11 @@ import {
   analyzeFigureImageVision,
   generateFigureSheetPdf
 } from '../controllers/prototypeController';
+import {
+  getProjectAnalytics,
+  getDashboardAnalytics,
+  generateComprehensiveReportPdf
+} from '../controllers/analyticsController';
 import { authenticateToken } from '../middleware/authMiddleware';
 import { authorize } from '../policies/middleware/authorize';
 import { projectGuard } from '../policies/middleware/policyGuard';
@@ -70,6 +75,7 @@ router.use(authenticateToken);
 
 router.post('/', authorize((user) => ProjectPolicy.canCreateProject(user)) as any, createProject);
 router.get('/', getProjects);
+router.get('/analytics/dashboard', getDashboardAnalytics as any);
 router.get('/:id', projectGuard(ProjectPolicy.canViewProject) as any, getProjectById);
 router.put('/:id', projectGuard(ProjectPolicy.canEditProject) as any, updateProject);
 router.put('/:id/archive', projectGuard(ProjectPolicy.canArchiveProject) as any, archiveProject);
@@ -78,6 +84,10 @@ router.post('/:id/members', projectGuard(ProjectPolicy.canAssignGuide) as any, i
 
 // Activity Audit Timeline Endpoint
 router.get('/:id/activity', projectGuard(ProjectPolicy.canViewProject) as any, getProjectActivity as any);
+
+// Analytics & Master Report Endpoints (Task 8)
+router.get('/:id/analytics', projectGuard(ProjectPolicy.canViewProject) as any, getProjectAnalytics as any);
+router.post('/:id/reports/comprehensive-pdf', projectGuard(ReportPolicy.canGenerateFinalReport) as any, generateComprehensiveReportPdf as any);
 
 // Task Management Endpoints
 router.get('/:id/tasks', projectGuard(ProjectPolicy.canViewProject) as any, getProjectTasks as any);

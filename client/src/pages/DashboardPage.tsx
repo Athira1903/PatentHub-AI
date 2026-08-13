@@ -135,9 +135,21 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const [portfolioAnalytics, setPortfolioAnalytics] = useState<any>(null);
+
+  const fetchPortfolioAnalytics = async () => {
+    try {
+      const res = await api.get('/projects/analytics/dashboard');
+      setPortfolioAnalytics(res.data);
+    } catch (e) {
+      console.error('Failed to fetch portfolio analytics', e);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
     fetchNotificationsCount();
+    fetchPortfolioAnalytics();
     if (role === 'Admin') {
       fetchUsers();
     }
@@ -637,7 +649,7 @@ export const DashboardPage: React.FC = () => {
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
             <div className="flex justify-between items-center mb-2">
               <span className="text-3xl font-extrabold text-slate-900">
-                {filterReviews(['GUIDE_REVIEW']).length || '05'}
+                {filterReviews(['GUIDE_REVIEW']).length}
               </span>
               <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
             </div>
@@ -647,7 +659,7 @@ export const DashboardPage: React.FC = () => {
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
             <div className="flex justify-between items-center mb-2">
               <span className="text-3xl font-extrabold text-slate-900">
-                {filterReviews(['PATENT_EXPERT_REVIEW', 'FILING_READY', 'FILED']).length || '09'}
+                {filterReviews(['PATENT_EXPERT_REVIEW', 'FILING_READY', 'FILED']).length}
               </span>
               <div className="w-2.5 h-2.5 bg-cyan-500 rounded-full" />
             </div>
@@ -908,7 +920,7 @@ export const DashboardPage: React.FC = () => {
               Good morning, Patent Expert
             </h1>
             <p className="text-sm text-cyan-200 font-medium">
-              Review claim bounds and forms configuration. {filterReviews(['PATENT_EXPERT_REVIEW']).length || '12'} projects require expert attention.
+              Review claim bounds and forms configuration. {filterReviews(['PATENT_EXPERT_REVIEW']).length} projects require expert attention.
             </p>
           </div>
           <button
@@ -925,22 +937,22 @@ export const DashboardPage: React.FC = () => {
         {/* Statistics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['PATENT_EXPERT_REVIEW']).length || '12'}</span>
+            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['PATENT_EXPERT_REVIEW']).length}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Pending Reviews</p>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <span className="text-3xl font-extrabold text-slate-900">{projects.filter(p => p.stage === 'PATENT_EXPERT_REVIEW').length || '07'}</span>
+            <span className="text-3xl font-extrabold text-slate-900">{projects.filter(p => p.stage === 'PATENT_EXPERT_REVIEW').length}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Under Review</p>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['FILED']).length || '32'}</span>
+            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['FILED']).length}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Approved/Filed</p>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['FILING_READY']).length || '08'}</span>
+            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['FILING_READY']).length}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Filing Ready ({unreadNotificationsCount} notifications)</p>
           </div>
         </div>
@@ -1166,11 +1178,41 @@ export const DashboardPage: React.FC = () => {
         </Link>
       </div>
 
+      {/* Task 8: Portfolio Analytics Summary Cards */}
+      {portfolioAnalytics && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+            <span className="text-xl font-black text-slate-900">{portfolioAnalytics.totalProjects}</span>
+            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Total Projects</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+            <span className="text-xl font-black text-indigo-600">{portfolioAnalytics.inProgressProjects}</span>
+            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">In Progress</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+            <span className="text-xl font-black text-emerald-600">{portfolioAnalytics.filingReadyProjects}</span>
+            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Filing Ready</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+            <span className="text-xl font-black text-purple-600">{portfolioAnalytics.averageFilingReadiness}%</span>
+            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Avg Readiness</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+            <span className="text-xl font-black text-cyan-600">{portfolioAnalytics.averageTaskCompletion}%</span>
+            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Avg Task Velocity</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+            <span className="text-xl font-black text-amber-600">{portfolioAnalytics.totalReferences}</span>
+            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Total References</p>
+          </div>
+        </div>
+      )}
+
       {/* Quick Statistics (Four cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
           <div>
-            <span className="text-3xl font-extrabold text-slate-900">{activeProjectsCount || '03'}</span>
+            <span className="text-3xl font-extrabold text-slate-900">{activeProjectsCount}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Projects</p>
           </div>
           <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
@@ -1180,7 +1222,7 @@ export const DashboardPage: React.FC = () => {
 
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
           <div>
-            <span className="text-3xl font-extrabold text-slate-900">{pendingTasksCount || '07'}</span>
+            <span className="text-3xl font-extrabold text-slate-900">{pendingTasksCount}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Pending Tasks</p>
           </div>
           <div className="p-3 bg-amber-50 rounded-2xl text-amber-600">
@@ -1191,7 +1233,7 @@ export const DashboardPage: React.FC = () => {
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
           <div>
             <span className="text-3xl font-extrabold text-slate-900">
-              {projects.filter(p => ['GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length || '02'}
+              {projects.filter(p => ['GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length}
             </span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Under Review</p>
           </div>
@@ -1202,7 +1244,9 @@ export const DashboardPage: React.FC = () => {
 
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
           <div>
-            <span className="text-3xl font-extrabold text-slate-900">78%</span>
+            <span className="text-3xl font-extrabold text-slate-900">
+              {portfolioAnalytics ? `${portfolioAnalytics.averageFilingReadiness}%` : (projects.length > 0 ? `${Math.round(projects.reduce((sum, p) => sum + getStageProgress(p.stage), 0) / projects.length)}%` : '0%')}
+            </span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Filing Readiness</p>
           </div>
           <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">

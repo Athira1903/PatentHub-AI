@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { prisma } from '../config/db';
 import { FormService } from './formService';
+import { FilingReadinessService } from './filingReadinessService';
 
 export class PdfService {
   /**
@@ -479,6 +480,268 @@ export class PdfService {
             userId,
             projectId,
             action: `Generated Technical Figure Sheet PDF for ${figure.figureNumber}.`
+          }
+        });
+      } catch (e) {
+        // Ignore activity log creation in mock/test environments
+      }
+    }
+
+    return document;
+  }
+
+  /**
+   * Generates a comprehensive multi-page Master Patent Intelligence Report PDF.
+   */
+  static async generateComprehensivePatentReportPdf(projectId: string, userId: string): Promise<any> {
+    const project = await prisma.patentProject.findUnique({
+      where: { id: projectId },
+      include: {
+        owner: { select: { fullName: true, email: true, institution: true, username: true } },
+        members: { include: { user: { select: { fullName: true, username: true } } } },
+        tasks: { include: { assignedTo: { select: { username: true } } } },
+        patentReferences: true,
+        patentForms: true,
+        projectReviews: { include: { reviewer: { select: { fullName: true, username: true } } } },
+        prototypes: { include: { figures: { include: { components: true } } } },
+        drawingFigures: { include: { components: true } },
+        activityLogs: true,
+        documents: true
+      }
+    });
+
+    if (!project) {
+      throw new Error('Project not found for Master Patent Intelligence Report PDF generation.');
+    }
+
+    const readiness = await FilingReadinessService.getFilingReadiness(projectId);
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // --- PAGE 1: EXECUTIVE COVER & SUMMARY ---
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, pageWidth, 40, 'F');
+
+    doc.setFontSize(20);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PATENTHUB-AI INTELLIGENCE REPORT', 15, 22);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(148, 163, 184);
+    doc.text('CONFIDENTIAL PRE-FILING AUDIT DOSSIER', 15, 30);
+
+    let y = 50;
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.text(project.title, 15, y);
+
+    y += 8;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Category: ${project.category}  |  Technical Domain: ${project.technicalDomain || 'General'}  |  Workflow Stage: ${project.stage}`, 15, y);
+
+    y += 6;
+    doc.text(`Lead Inventor / Owner: ${project.owner.fullName} (@${project.owner.username})  |  Generated: ${new Date().toLocaleDateString()}`, 15, y);
+
+    y += 12;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(15, y, pageWidth - 15, y);
+
+    y += 10;
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.text('1. EXECUTIVE INVENTION ABSTRACT', 15, y);
+
+    y += 7;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    const splitIdea = doc.splitTextToSize(project.innovationIdea || 'No abstract text registered.', pageWidth - 30);
+    doc.text(splitIdea, 15, y);
+    y += splitIdea.length * 5 + 6;
+
+    // 6-Point Filing Readiness Status Box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(15, y, pageWidth - 30, 28, 'F');
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(15, y, pageWidth - 30, 28, 'S');
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`FILING READINESS STATUS: ${readiness.overallReadiness}`, 20, y + 8);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Completed Compliance Checks: ${readiness.completedCount} of ${readiness.totalRequiredCount}`, 20, y + 15);
+    doc.text(`Active Blocking Issues: ${readiness.blockingIssues.length}`, 20, y + 21);
+
+    y += 38;
+
+    // --- SECTION 2: PRIOR ART & PATENT REFERENCES ---
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.text('2. PRIOR ART & PATENT REGISTRY REFERENCES', 15, y);
+
+    y += 8;
+    if (project.patentReferences.length === 0) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(148, 163, 184);
+      doc.text('No prior art patent references cataloged in workspace.', 15, y);
+      y += 8;
+    } else {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setFillColor(241, 245, 249);
+      doc.rect(15, y, pageWidth - 30, 6, 'F');
+      doc.text('Patent Number', 18, y + 4.5);
+      doc.text('Title / Abstract', 60, y + 4.5);
+      doc.text('Source', 160, y + 4.5);
+
+      y += 7;
+      doc.setFont('helvetica', 'normal');
+      for (const ref of project.patentReferences.slice(0, 5)) {
+        doc.text(ref.patentNumber, 18, y + 4);
+        const titleTrunc = ref.title.length > 55 ? ref.title.substring(0, 55) + '...' : ref.title;
+        doc.text(titleTrunc, 60, y + 4);
+        doc.text(ref.source, 160, y + 4);
+        y += 6;
+      }
+    }
+
+    // PAGE 2: DRAWINGS, FORMS & REVIEWS
+    doc.addPage();
+    y = 20;
+
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.text('3. TECHNICAL BLUEPRINT FIGURES & COMPONENT LEGEND', 15, y);
+
+    y += 8;
+    if (project.drawingFigures.length === 0) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(148, 163, 184);
+      doc.text('No technical 2D drawing figures registered.', 15, y);
+      y += 8;
+    } else {
+      for (const fig of project.drawingFigures.slice(0, 3)) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59);
+        doc.text(`${fig.figureNumber}: ${fig.title}`, 15, y);
+        y += 5;
+
+        if (fig.components.length > 0) {
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          const tagsStr = fig.components.map((c) => `[${c.referenceNumber}] ${c.componentName}`).join(', ');
+          const splitTags = doc.splitTextToSize(`Annotated Callout Tags: ${tagsStr}`, pageWidth - 30);
+          doc.text(splitTags, 18, y);
+          y += splitTags.length * 4 + 4;
+        } else {
+          y += 4;
+        }
+      }
+    }
+
+    y += 6;
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.text('4. INDIAN PATENT OFFICE (IPO) FORMS DOCKET', 15, y);
+
+    y += 8;
+    const mandatoryForms = ['Form 1', 'Form 2', 'Form 3', 'Form 5', 'Form 26'];
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setFillColor(241, 245, 249);
+    doc.rect(15, y, pageWidth - 30, 6, 'F');
+    doc.text('Form Identifier', 18, y + 4.5);
+    doc.text('Mandatory Purpose', 60, y + 4.5);
+    doc.text('Status', 160, y + 4.5);
+
+    y += 7;
+    doc.setFont('helvetica', 'normal');
+    for (const ft of mandatoryForms) {
+      const match = project.patentForms.find((f) => f.formType === ft);
+      doc.text(ft, 18, y + 4);
+      doc.text(ft === 'Form 1' ? 'Application for Grant of Patent' : ft === 'Form 2' ? 'Provisional / Complete Specification' : 'Statutory Registration Form', 60, y + 4);
+      doc.text(match ? match.status : 'NOT_STARTED', 160, y + 4);
+      y += 6;
+    }
+
+    y += 8;
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.text('5. SUPERVISOR & EXPERT REVIEW LOG', 15, y);
+
+    y += 8;
+    if (project.projectReviews.length === 0) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(148, 163, 184);
+      doc.text('No formal guide or patent expert review decisions recorded.', 15, y);
+      y += 10;
+    } else {
+      for (const rev of project.projectReviews.slice(0, 4)) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${rev.reviewType}: ${rev.decision} by @${rev.reviewer.username}`, 15, y);
+        if (rev.comments) {
+          doc.setFont('helvetica', 'normal');
+          doc.text(`Comments: ${rev.comments}`, 18, y + 4);
+          y += 4;
+        }
+        y += 5;
+      }
+    }
+
+    // Disclaimer footer
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Note: Master Patent Intelligence & Pre-Filing Report. AI-assisted technical dossier. Not an official IPO/USPTO legal certificate.', 15, 283);
+
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    const uploadDir = this.ensureUploadDirectory();
+    const sanitizedFileName = `Master_Intelligence_Report_${projectId.substring(0, 8)}_${Date.now()}.pdf`;
+    const filePath = path.join(uploadDir, sanitizedFileName);
+
+    fs.writeFileSync(filePath, pdfBuffer);
+
+    const fileUrl = `/uploads/documents/${sanitizedFileName}`;
+
+    const document = await prisma.document.create({
+      data: {
+        name: `Master Patent Intelligence Report - ${project.title}.pdf`,
+        fileUrl,
+        fileType: 'application/pdf',
+        fileSize: pdfBuffer.length,
+        version: 1,
+        category: 'PATENT_DRAFT',
+        projectId
+      }
+    });
+
+    if (userId) {
+      try {
+        await prisma.activityLog.create({
+          data: {
+            userId,
+            projectId,
+            action: `Generated Master Patent Intelligence Report PDF.`
           }
         });
       } catch (e) {

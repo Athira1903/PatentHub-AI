@@ -23,6 +23,7 @@ import { PdfService } from '../services/pdfService';
 import { ActivityService } from '../services/activityService';
 import { NotificationService } from '../services/notificationService';
 import { TaskService } from '../services/taskService';
+import { AnalyticsService } from '../services/analyticsService';
 import {
   generateInnovationAi,
   getSimilarityAnalysis,
@@ -1495,6 +1496,137 @@ test('Task 7: TaskService task creation, assignment validation, and status trans
   (prisma.task as any).create = origCreateTask;
   (prisma.task as any).findUnique = origFindTask;
   (prisma.task as any).update = origUpdateTask;
+});
+
+// ----------------------------------------------------
+// 16. Task 8: Advanced Analytics & Master Intelligence Report Tests
+// ----------------------------------------------------
+test('Task 8: AnalyticsService computes project intelligence scores and supporting metrics', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Autonomous Solar Rover',
+    category: 'Robotics',
+    stage: 'FILING_READY',
+    technicalDomain: 'CleanTech',
+    innovationIdea: 'An autonomous rover using AI solar tracking for lunar exploration.',
+    problemStatement: 'Limited power on space rovers.',
+    proposedSolution: 'AI solar array tracking mechanism.',
+    novelFeatures: 'Multi-axis solar tracking.',
+    owner: { fullName: 'Dr. Jane Smith', email: 'jane@univ.edu', institution: 'Engineering University' },
+    members: [{ user: { fullName: 'Alex Inventor', username: 'alex_inv' } }],
+    tasks: [
+      { id: 't1', status: 'COMPLETED', dueDate: new Date() },
+      { id: 't2', status: 'TODO', dueDate: new Date(Date.now() - 86400000) } // Overdue
+    ],
+    patentReferences: [
+      { id: 'r1', source: 'USPTO', patentNumber: 'US10928371B2', title: 'Solar Array Controller' }
+    ],
+    patentForms: [
+      { formType: 'Form 1', status: 'APPROVED' },
+      { formType: 'Form 2', status: 'APPROVED' },
+      { formType: 'Form 3', status: 'APPROVED' },
+      { formType: 'Form 5', status: 'APPROVED' },
+      { formType: 'Form 26', status: 'APPROVED' }
+    ],
+    projectReviews: [
+      { id: 'rev1', decision: 'APPROVED', reviewType: 'GUIDE_REVIEW' }
+    ],
+    prototypes: [{ id: 'proto1' }],
+    drawingFigures: [{ id: 'fig1', components: [{ id: 'c1' }] }],
+    activityLogs: [{ id: 'act1' }],
+    documents: [
+      { name: 'Form 1 Draft.pdf', category: 'PATENT_DRAFT' },
+      { name: 'Form 2 Specification.pdf', category: 'PATENT_DRAFT' },
+      { name: 'Form 3 Statement.pdf', category: 'PATENT_DRAFT' },
+      { name: 'Form 5 Inventorship.pdf', category: 'PATENT_DRAFT' },
+      { name: 'Form 26 PowerOfAttorney.pdf', category: 'PATENT_DRAFT' }
+    ]
+  });
+
+  const analytics = await AnalyticsService.getProjectAnalytics('p1', 'u1');
+  assert.ok(analytics);
+  assert.strictEqual(analytics.projectId, 'p1');
+  assert.strictEqual(analytics.metrics.totalTasks, 2);
+  assert.strictEqual(analytics.metrics.completedTasks, 1);
+  assert.strictEqual(analytics.metrics.overdueTasks, 1);
+  assert.strictEqual(analytics.metrics.taskCompletionPercentage, 50);
+  assert.ok(analytics.scores.legalComplianceHealth >= 80);
+  assert.ok(analytics.scores.filingReadinessScore >= 80);
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+});
+
+test('Task 8: AnalyticsService aggregates portfolio analytics for user projects', async () => {
+  const origFindMany = prisma.patentProject.findMany;
+
+  (prisma.patentProject as any).findMany = async () => [
+    {
+      id: 'p1',
+      stage: 'FILING_READY',
+      patentReferences: [{ id: 'r1' }],
+      prototypes: [{ id: 'pr1' }],
+      projectReviews: [{ decision: 'APPROVED' }],
+      tasks: [{ status: 'COMPLETED' }],
+      patentForms: [{ status: 'APPROVED' }],
+      documents: []
+    },
+    {
+      id: 'p2',
+      stage: 'IDEA',
+      patentReferences: [],
+      prototypes: [],
+      projectReviews: [],
+      tasks: [{ status: 'TODO', dueDate: new Date(Date.now() - 86400000) }],
+      patentForms: [],
+      documents: []
+    }
+  ];
+
+  const portfolio = await AnalyticsService.getDashboardAnalytics('u1');
+  assert.ok(portfolio);
+  assert.strictEqual(portfolio.totalProjects, 2);
+  assert.strictEqual(portfolio.filingReadyProjects, 1);
+  assert.strictEqual(portfolio.inProgressProjects, 1);
+  assert.strictEqual(portfolio.overdueTasksCount, 1);
+  assert.strictEqual(portfolio.totalReferences, 1);
+
+  (prisma.patentProject as any).findMany = origFindMany;
+});
+
+test('Task 8: PdfService compiles multi-page Master Patent Intelligence Report PDF', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+  const origCreateDoc = prisma.document.create;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Autonomous Solar Rover',
+    category: 'Robotics',
+    stage: 'FILING_READY',
+    technicalDomain: 'CleanTech',
+    innovationIdea: 'An autonomous rover using AI solar tracking for lunar exploration.',
+    owner: { fullName: 'Dr. Jane Smith', email: 'jane@univ.edu', institution: 'Engineering Univ', username: 'jane_smith' },
+    members: [],
+    tasks: [],
+    patentReferences: [{ patentNumber: 'US10928371B2', title: 'Solar Tracking', source: 'USPTO' }],
+    patentForms: [{ formType: 'Form 1', status: 'APPROVED' }],
+    projectReviews: [{ reviewType: 'GUIDE_REVIEW', decision: 'APPROVED', reviewer: { username: 'guide_user' } }],
+    prototypes: [],
+    drawingFigures: [{ figureNumber: 'FIG. 1', title: 'Assembly View', components: [{ referenceNumber: '10', componentName: 'Solar Panel' }] }],
+    activityLogs: [],
+    documents: []
+  });
+
+  (prisma.document as any).create = async (args: any) => ({ id: 'doc_master_1', ...args.data });
+
+  const masterDoc = await PdfService.generateComprehensivePatentReportPdf('p1', 'u1');
+  assert.ok(masterDoc.id);
+  assert.strictEqual(masterDoc.category, 'PATENT_DRAFT');
+  assert.ok(masterDoc.fileUrl.includes('.pdf'));
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+  (prisma.document as any).create = origCreateDoc;
 });
 
 // Summary reporting and sequential execution
