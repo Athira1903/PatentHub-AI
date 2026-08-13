@@ -270,6 +270,8 @@ export const listMyInvitations = async (req: AuthenticatedRequest, res: Response
   }
 };
 
+import { NotificationService } from '../services/notificationService';
+
 export const listMyNotifications = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
@@ -278,14 +280,25 @@ export const listMyNotifications = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    const notifications = await prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-
+    const notifications = await NotificationService.listUserNotifications(userId);
     res.status(200).json(notifications);
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to fetch notifications.' });
+  }
+};
+
+export const getUnreadNotificationsCount = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized.' });
+      return;
+    }
+
+    const count = await NotificationService.getUnreadCount(userId);
+    res.status(200).json({ success: true, count });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch unread notification count.' });
   }
 };
 
@@ -298,23 +311,24 @@ export const markNotificationAsRead = async (req: AuthenticatedRequest, res: Res
     }
 
     const id = req.params.id as string;
+    await NotificationService.markNotificationRead(userId, id);
+    res.status(200).json({ message: 'Notification marked as read.' });
+  } catch (error: any) {
+    res.status(404).json({ message: error.message || 'Notification not found or access denied.' });
+  }
+};
 
-    const notification = await prisma.notification.findUnique({
-      where: { id },
-    });
-
-    if (!notification) {
-      res.status(404).json({ message: 'Notification not found.' });
+export const markAllNotificationsAsRead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized.' });
       return;
     }
 
-    await prisma.notification.update({
-      where: { id },
-      data: { isRead: true },
-    });
-
-    res.status(200).json({ message: 'Notification marked as read.' });
+    const result = await NotificationService.markAllNotificationsRead(userId);
+    res.status(200).json({ message: 'All notifications marked as read.', count: result.count });
   } catch (error: any) {
-    res.status(500).json({ message: error.message || 'Failed to update notification.' });
+    res.status(500).json({ message: error.message || 'Failed to mark all notifications as read.' });
   }
 };

@@ -132,16 +132,32 @@ export const NotificationsPage: React.FC = () => {
     return true;
   });
 
+  const handleMarkAllAsRead = async () => {
+    try {
+      await api.put('/collaboration/notifications/read-all');
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      toast.success('All notifications marked as read');
+    } catch (error) {
+      toast.error('Failed to mark notifications as read.');
+    }
+  };
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto py-4 font-sans animate-fade-in relative z-10">
+    <div className="space-y-6 max-w-5xl mx-auto py-2 animate-fade-in font-sans">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Notifications</h2>
           <p className="text-xs text-slate-500 font-semibold mt-0.5">
             Accept project workspace invitations and audit active system alerts.
           </p>
         </div>
+        <button
+          onClick={handleMarkAllAsRead}
+          className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+        >
+          <Bell className="w-3.5 h-3.5 text-indigo-600" /> Mark All as Read
+        </button>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">

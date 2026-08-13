@@ -7,6 +7,8 @@ import {
   deleteProject,
   inviteMember,
   archiveProject,
+  getProjectActivity,
+  getProjectTasks,
   createTask,
   updateTask,
   deleteTask,
@@ -22,7 +24,7 @@ import {
   searchPatents,
   getSavedReferences,
   saveReference,
-  deleteReference
+  deleteReference,
 } from '../controllers/patentController';
 import {
   getProjectForms,
@@ -74,7 +76,11 @@ router.put('/:id/archive', projectGuard(ProjectPolicy.canArchiveProject) as any,
 router.delete('/:id', projectGuard(ProjectPolicy.canDeleteProject) as any, deleteProject);
 router.post('/:id/members', projectGuard(ProjectPolicy.canAssignGuide) as any, inviteMember);
 
+// Activity Audit Timeline Endpoint
+router.get('/:id/activity', projectGuard(ProjectPolicy.canViewProject) as any, getProjectActivity as any);
+
 // Task Management Endpoints
+router.get('/:id/tasks', projectGuard(ProjectPolicy.canViewProject) as any, getProjectTasks as any);
 router.post('/:id/tasks', projectGuard(ProjectPolicy.canCreateTask) as any, createTask as any);
 router.put('/:id/tasks/:taskId', projectGuard(ProjectPolicy.canUpdateTask) as any, updateTask as any);
 router.delete('/:id/tasks/:taskId', projectGuard(ProjectPolicy.canDeleteTask) as any, deleteTask as any);

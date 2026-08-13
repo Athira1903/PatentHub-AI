@@ -20,6 +20,9 @@ import { ReviewService } from '../services/reviewService';
 import { FilingReadinessService } from '../services/filingReadinessService';
 import { PrototypeService } from '../services/prototypeService';
 import { PdfService } from '../services/pdfService';
+import { ActivityService } from '../services/activityService';
+import { NotificationService } from '../services/notificationService';
+import { TaskService } from '../services/taskService';
 import {
   generateInnovationAi,
   getSimilarityAnalysis,
@@ -1375,6 +1378,123 @@ test('Task 6: Server-side Patent Figure Sheet PDF generation attaches Document r
   (prisma.drawingFigure as any).findUnique = origFindFig;
   (prisma.document as any).create = origCreateDoc;
   (prisma.drawingFigure as any).update = origUpdateFig;
+});
+
+// ----------------------------------------------------
+// 15. Task 7: Activity Timeline, Notifications & Task Assignment Tests
+// ----------------------------------------------------
+test('Task 7: ActivityService creates structured audit logs and sanitizes metadata', async () => {
+  const origCreate = prisma.activityLog.create;
+  const origFindMany = prisma.activityLog.findMany;
+
+  (prisma.activityLog as any).create = async (args: any) => ({ id: 'act_1', ...args.data });
+  (prisma.activityLog as any).findMany = async (args: any) => [
+    { id: 'act_1', projectId: 'p1', action: 'Uploaded document draft.pdf', type: 'DOCUMENT' }
+  ];
+
+  const log = await ActivityService.createActivity('p1', 'u1', 'Uploaded document draft.pdf', 'DOCUMENT', {
+    docId: 'doc_1',
+    password: 'secret_token_value' // Sensitive field should be stripped
+  });
+
+  assert.ok(log);
+  assert.strictEqual(log?.action, 'Uploaded document draft.pdf');
+  assert.strictEqual(log?.type, 'DOCUMENT');
+  assert.strictEqual((log?.metadata as any)?.docId, 'doc_1');
+  assert.strictEqual((log?.metadata as any)?.password, undefined);
+
+  const activities = await ActivityService.listProjectActivities('p1', 'DOCUMENT');
+  assert.strictEqual(activities.length, 1);
+  assert.strictEqual(activities[0].type, 'DOCUMENT');
+
+  (prisma.activityLog as any).create = origCreate;
+  (prisma.activityLog as any).findMany = origFindMany;
+});
+
+test('Task 7: NotificationService dispatch, unread count, and recipient isolation', async () => {
+  const origCreate = prisma.notification.create;
+  const origCount = prisma.notification.count;
+  const origFindUnique = prisma.notification.findUnique;
+  const origUpdate = prisma.notification.update;
+  const origUpdateMany = prisma.notification.updateMany;
+
+  (prisma.notification as any).create = async (args: any) => ({ id: 'notif_1', isRead: false, ...args.data });
+  (prisma.notification as any).count = async () => 3;
+  (prisma.notification as any).findUnique = async () => ({ id: 'notif_1', userId: 'u1', isRead: false });
+  (prisma.notification as any).update = async (args: any) => ({ id: 'notif_1', userId: 'u1', isRead: true, readAt: new Date() });
+  (prisma.notification as any).updateMany = async () => ({ count: 3 });
+
+  const notif = await NotificationService.createNotification('u1', 'Review Decision', 'Your review was approved.', 'REVIEW', 'rev_1', 'p1');
+  assert.ok(notif);
+  assert.strictEqual(notif?.title, 'Review Decision');
+
+  const count = await NotificationService.getUnreadCount('u1');
+  assert.strictEqual(count, 3);
+
+  const updated = await NotificationService.markNotificationRead('u1', 'notif_1');
+  assert.strictEqual(updated.isRead, true);
+
+  const batchRead = await NotificationService.markAllNotificationsRead('u1');
+  assert.strictEqual(batchRead.count, 3);
+
+  // Recipient privacy violation check
+  (prisma.notification as any).findUnique = async () => ({ id: 'notif_1', userId: 'u1_owner', isRead: false });
+  await assert.rejects(async () => {
+    await NotificationService.markNotificationRead('u2_attacker', 'notif_1');
+  }, /access denied/);
+
+  (prisma.notification as any).create = origCreate;
+  (prisma.notification as any).count = origCount;
+  (prisma.notification as any).findUnique = origFindUnique;
+  (prisma.notification as any).update = origUpdate;
+  (prisma.notification as any).updateMany = origUpdateMany;
+});
+
+test('Task 7: TaskService task creation, assignment validation, and status transitions', async () => {
+  const origFindProj = prisma.patentProject.findUnique;
+  const origCreateTask = prisma.task.create;
+  const origFindTask = prisma.task.findUnique;
+  const origUpdateTask = prisma.task.update;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    ownerId: 'u1_owner',
+    members: [{ userId: 'u2_member' }]
+  });
+
+  (prisma.task as any).create = async (args: any) => ({ id: 'task_1', ...args.data });
+  (prisma.task as any).findUnique = async () => ({ id: 'task_1', projectId: 'p1', status: 'TODO', assignedToId: 'u2_member' });
+  (prisma.task as any).update = async (args: any) => ({ id: 'task_1', projectId: 'p1', ...args.data });
+
+  // 1. Valid task creation with priority
+  const task = await TaskService.createTask('p1', 'u1_owner', {
+    title: 'Draft Claims Section',
+    assignedToId: 'u2_member',
+    priority: 'HIGH'
+  });
+  assert.strictEqual(task.title, 'Draft Claims Section');
+  assert.strictEqual(task.priority, 'HIGH');
+  assert.strictEqual(task.status, 'TODO');
+
+  // 2. Invalid assigned user throws error
+  await assert.rejects(async () => {
+    await TaskService.createTask('p1', 'u1_owner', {
+      title: 'Invalid Task Assignment',
+      assignedToId: 'u9_nonmember'
+    });
+  }, /not a valid member/);
+
+  // 3. Update task status to COMPLETED sets completedAt
+  const completedTask = await TaskService.updateTask('p1', 'task_1', 'u1_owner', {
+    status: 'COMPLETED'
+  });
+  assert.strictEqual(completedTask.status, 'COMPLETED');
+  assert.ok(completedTask.completedAt);
+
+  (prisma.patentProject as any).findUnique = origFindProj;
+  (prisma.task as any).create = origCreateTask;
+  (prisma.task as any).findUnique = origFindTask;
+  (prisma.task as any).update = origUpdateTask;
 });
 
 // Summary reporting and sequential execution

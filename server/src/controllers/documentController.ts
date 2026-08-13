@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import path from 'path';
 import fs from 'fs';
 import { NotificationPolicy } from '../policies/notification/notification.policy';
+import { ActivityService } from '../services/activityService';
 
 export const uploadDocument = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -101,21 +102,18 @@ export const uploadDocument = async (req: AuthenticatedRequest, res: Response): 
       }
     }
 
-    // Log Activity
-    await prisma.activityLog.create({
-      data: {
-        userId,
-        projectId,
-        action: `Uploaded document: "${originalName}" (Version 1).`,
-      },
-    });
-
     await Promise.all(notificationPromises);
 
-    res.status(201).json({
-      message: 'Document uploaded successfully.',
-      document,
-    });
+    // Record Activity Log
+    await ActivityService.createActivity(
+      projectId,
+      userId,
+      `Uploaded document "${originalName}" (v${document.version}).`,
+      'DOCUMENT',
+      { documentId: document.id, category: document.category }
+    );
+
+    res.status(201).json({ message: 'Document uploaded successfully', document });
   } catch (error: any) {
     console.error('[Document Upload Error]', error);
     res.status(500).json({ message: error.message || 'Failed to upload document.' });

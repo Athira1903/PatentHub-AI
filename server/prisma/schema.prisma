@@ -90,6 +90,7 @@ model PatentProject {
   tasks            Task[]
   comments         Comment[]
   activityLogs     ActivityLog[]
+  notifications    Notification[]
   invitations      Invitation[]
   patentReferences PatentReference[]
   patentForms      PatentForm[]
@@ -126,15 +127,22 @@ model Invitation {
 }
 
 model Notification {
-  id          String   @id @default(uuid())
+  id          String         @id @default(uuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     PatentProject? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   title       String
-  message     String   @db.Text
-  type        String   @default("GENERAL") // INVITATION, TASK, COMMENT, STATUS_CHANGE, GENERAL
+  message     String         @db.Text
+  type        String         @default("GENERAL") // INVITATION, TASK, REVIEW, DOCUMENT, PATENT, PROTOTYPE, WORKFLOW, FORM, FILING, GENERAL
   referenceId String?
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  metadata    Json?
+  isRead      Boolean        @default(false)
+  readAt      DateTime?
+  createdAt   DateTime       @default(now())
+
+  @@index([userId, isRead, createdAt])
+  @@index([projectId])
 }
 
 model Comment {
@@ -155,7 +163,11 @@ model ActivityLog {
   projectId String?
   project   PatentProject? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   action    String
+  type      String         @default("GENERAL") // DOCUMENT, AI, PATENT, PROTOTYPE, REVIEW, WORKFLOW, FORM, TASK, FILING, GENERAL
+  metadata  Json?
   createdAt DateTime       @default(now())
+
+  @@index([projectId, createdAt])
 }
 
 model Document {
@@ -181,14 +193,20 @@ model Task {
   id          String        @id @default(uuid())
   title       String
   description String?       @db.Text
-  status      String        @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  status      String        @default("TODO") // TODO, IN_PROGRESS, COMPLETED, CANCELLED
+  priority    String        @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate     DateTime?
+  completedAt DateTime?
   projectId   String
   project     PatentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   String?
+  assignedToId String?
+  assignedTo   User?        @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  assignedToId String?
-  assignedTo   User?        @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  @@index([projectId, status])
+  @@index([assignedToId])
 }
 
 model Patent {

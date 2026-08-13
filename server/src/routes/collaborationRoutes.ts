@@ -5,7 +5,9 @@ import {
   respondToInvitation,
   listMyInvitations,
   listMyNotifications,
+  getUnreadNotificationsCount,
   markNotificationAsRead,
+  markAllNotificationsAsRead,
 } from '../controllers/collaborationController';
 import { authorize } from '../policies/middleware/authorize';
 import { InvitationPolicy } from '../policies/invitation/invitation.policy';
@@ -47,7 +49,9 @@ router.post(
 
 router.get('/invitations', listMyInvitations as any);
 router.get('/notifications', listMyNotifications as any);
+router.get('/notifications/unread-count', getUnreadNotificationsCount as any);
 
+router.put('/notifications/read-all', markAllNotificationsAsRead as any);
 router.put(
   '/notifications/:id/read',
   authorize(async (user, req) => {

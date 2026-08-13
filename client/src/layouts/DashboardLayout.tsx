@@ -47,6 +47,25 @@ export const DashboardLayout: React.FC = () => {
   const [calcClaims, setCalcClaims] = useState<number>(10);
   const [calcResult, setCalcResult] = useState<number>(1600);
 
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await api.get('/collaboration/notifications/unread-count');
+      if (res.data && typeof res.data.count === 'number') {
+        setUnreadCount(res.data.count);
+      }
+    } catch (e) {
+      // Ignore count fetch error
+    }
+  };
+
   useEffect(() => {
     let base = applicantType === 'individual' ? 1600 : 8000;
     let extraPageFee = applicantType === 'individual' ? 160 : 800;
@@ -143,7 +162,12 @@ export const DashboardLayout: React.FC = () => {
                   }`}
                 >
                   <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-450'}`} />
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate flex-1">{item.label}</span>
+                  {item.label === 'Notifications' && unreadCount > 0 && (
+                    <span className="ml-auto px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-rose-500 text-white animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

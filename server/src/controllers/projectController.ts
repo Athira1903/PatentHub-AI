@@ -175,55 +175,81 @@ const updateTaskSchema = z.object({
   assignedToId: z.string().trim().optional().nullable(),
 });
 
+import { ActivityService } from '../services/activityService';
+import { TaskService } from '../services/taskService';
+
+export const getProjectActivity = async (req: any, res: Response): Promise<void> => {
+  try {
+    const projectId = req.params.id as string;
+    const filterType = req.query.type as string | undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+    const skip = req.query.skip ? parseInt(req.query.skip as string, 10) : 0;
+
+    const activities = await ActivityService.listProjectActivities(projectId, filterType, limit, skip);
+    res.status(200).json({ success: true, activities });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch project activity timeline.' });
+  }
+};
+
+export const getProjectTasks = async (req: any, res: Response): Promise<void> => {
+  try {
+    const projectId = req.params.id as string;
+    const statusFilter = req.query.status as string | undefined;
+
+    const tasks = await TaskService.getProjectTasks(projectId, statusFilter);
+    res.status(200).json({ success: true, tasks });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch project tasks.' });
+  }
+};
+
 export const createTask = async (req: any, res: Response): Promise<void> => {
   try {
-    const validatedData = createTaskSchema.parse(req.body);
+    const projectId = req.params.id as string;
+    const { title, description, assignedToId, priority, dueDate } = req.body;
 
-    const task = await ProjectService.createTask(
-      req.project.id,
-      req.user.userId,
-      validatedData.title,
-      validatedData.description,
-      validatedData.assignedToUsername
-    );
+    const task = await TaskService.createTask(projectId, req.user.userId, {
+      title,
+      description,
+      assignedToId,
+      priority,
+      dueDate
+    });
 
     res.status(201).json({ message: 'Task created successfully', task });
   } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
-      return;
-    }
     res.status(400).json({ message: error.message || 'Failed to create task' });
   }
 };
 
 export const updateTask = async (req: any, res: Response): Promise<void> => {
   try {
+    const projectId = req.params.id as string;
     const taskId = req.params.taskId as string;
-    const validatedData = updateTaskSchema.parse(req.body);
+    const { title, description, status, priority, assignedToId, dueDate } = req.body;
 
-    const task = await ProjectService.updateTask(
-      req.project.id,
-      taskId,
-      req.user.userId,
-      validatedData as any
-    );
+    const task = await TaskService.updateTask(projectId, taskId, req.user.userId, {
+      title,
+      description,
+      status,
+      priority,
+      assignedToId,
+      dueDate
+    });
 
     res.status(200).json({ message: 'Task updated successfully', task });
   } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
-      return;
-    }
     res.status(400).json({ message: error.message || 'Failed to update task' });
   }
 };
 
 export const deleteTask = async (req: any, res: Response): Promise<void> => {
   try {
+    const projectId = req.params.id as string;
     const taskId = req.params.taskId as string;
 
-    await ProjectService.deleteTask(req.project.id, taskId, req.user.userId);
+    await TaskService.deleteTask(projectId, taskId, req.user.userId);
     res.status(200).json({ message: 'Task deleted successfully' });
   } catch (error: any) {
     res.status(400).json({ message: error.message || 'Failed to delete task' });
