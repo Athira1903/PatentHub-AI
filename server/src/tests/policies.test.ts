@@ -1560,10 +1560,13 @@ test('Task 8: AnalyticsService computes project intelligence scores and supporti
 
 test('Task 8: AnalyticsService aggregates portfolio analytics for user projects', async () => {
   const origFindMany = prisma.patentProject.findMany;
+  const origGetReadiness = FilingReadinessService.getFilingReadiness;
 
   (prisma.patentProject as any).findMany = async () => [
     {
       id: 'p1',
+      title: 'Project 1',
+      category: 'Robotics',
       stage: 'FILING_READY',
       patentReferences: [{ id: 'r1' }],
       prototypes: [{ id: 'pr1' }],
@@ -1574,6 +1577,8 @@ test('Task 8: AnalyticsService aggregates portfolio analytics for user projects'
     },
     {
       id: 'p2',
+      title: 'Project 2',
+      category: 'Software',
       stage: 'IDEA',
       patentReferences: [],
       prototypes: [],
@@ -1584,6 +1589,14 @@ test('Task 8: AnalyticsService aggregates portfolio analytics for user projects'
     }
   ];
 
+  (FilingReadinessService as any).getFilingReadiness = async (id: string) => ({
+    overallReadiness: id === 'p1' ? 'READY' : 'NOT_READY',
+    completedCount: id === 'p1' ? 6 : 1,
+    totalRequiredCount: 6,
+    checklist: [],
+    blockingIssues: []
+  });
+
   const portfolio = await AnalyticsService.getDashboardAnalytics('u1');
   assert.ok(portfolio);
   assert.strictEqual(portfolio.totalProjects, 2);
@@ -1591,8 +1604,10 @@ test('Task 8: AnalyticsService aggregates portfolio analytics for user projects'
   assert.strictEqual(portfolio.inProgressProjects, 1);
   assert.strictEqual(portfolio.overdueTasksCount, 1);
   assert.strictEqual(portfolio.totalReferences, 1);
+  assert.ok(portfolio.averageFilingReadiness > 0);
 
   (prisma.patentProject as any).findMany = origFindMany;
+  (FilingReadinessService as any).getFilingReadiness = origGetReadiness;
 });
 
 test('Task 8: PdfService compiles multi-page Master Patent Intelligence Report PDF', async () => {
@@ -1627,6 +1642,572 @@ test('Task 8: PdfService compiles multi-page Master Patent Intelligence Report P
 
   (prisma.patentProject as any).findUnique = origFindUnique;
   (prisma.document as any).create = origCreateDoc;
+});
+
+test('Task 8: Prior Art Risk Index produces higher risk for 0 references than for projects with verified references', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+
+  const projectZeroRefs = {
+    id: 'p_zero',
+    title: 'Zero Refs Project',
+    stage: 'IDEA',
+    category: 'Software',
+    owner: { fullName: 'User 1' },
+    members: [],
+    tasks: [],
+    patentReferences: [],
+    patentForms: [],
+    projectReviews: [],
+    prototypes: [],
+    drawingFigures: [],
+    activityLogs: [],
+    documents: []
+  };
+
+  const projectWithRefs = {
+    ...projectZeroRefs,
+    id: 'p_with_refs',
+    patentReferences: [
+      { id: 'r1', source: 'USPTO', patentNumber: 'US1234567A', title: 'Prior Ref 1' },
+      { id: 'r2', source: 'USPTO', patentNumber: 'US7654321B', title: 'Prior Ref 2' }
+    ]
+  };
+
+  (prisma.patentProject as any).findUnique = async (args: any) => {
+    if (args.where.id === 'p_zero') return projectZeroRefs;
+    if (args.where.id === 'p_with_refs') return projectWithRefs;
+    return null;
+  };
+
+  const analyticsZero = await AnalyticsService.getProjectAnalytics('p_zero', 'u1');
+  const analyticsWithRefs = await AnalyticsService.getProjectAnalytics('p_with_refs', 'u1');
+
+  assert.ok(
+    analyticsZero.scores.priorArtRiskIndex > analyticsWithRefs.scores.priorArtRiskIndex,
+    `Expected 0 references (${analyticsZero.scores.priorArtRiskIndex}%) to have higher risk than project with references (${analyticsWithRefs.scores.priorArtRiskIndex}%)`
+  );
+  assert.strictEqual(analyticsZero.scores.priorArtRiskIndex, 85);
+  assert.strictEqual(analyticsWithRefs.scores.priorArtRiskIndex, 55);
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+});
+
+test('Task 8: Prior Art Risk Index decreases monotonically as verified references are added (never increases risk)', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+
+  const baseProject = {
+    id: 'p_step',
+    title: 'Stepwise Test',
+    stage: 'IDEA',
+    category: 'Software',
+    owner: { fullName: 'User 1' },
+    members: [],
+    tasks: [],
+    patentReferences: [] as any[],
+    patentForms: [],
+    projectReviews: [],
+    prototypes: [],
+    drawingFigures: [],
+    activityLogs: [],
+    documents: []
+  };
+
+  let currentRefs: any[] = [];
+  (prisma.patentProject as any).findUnique = async () => ({
+    ...baseProject,
+    patentReferences: currentRefs
+  });
+
+  let previousRisk = 101;
+  for (let count = 0; count <= 4; count++) {
+    currentRefs = Array.from({ length: count }, (_, i) => ({
+      id: `r_${i}`,
+      source: 'USPTO',
+      patentNumber: `US${1000000 + i}`,
+      title: `Reference ${i}`
+    }));
+
+    const result = await AnalyticsService.getProjectAnalytics('p_step', 'u1');
+    const risk = result.scores.priorArtRiskIndex;
+
+    assert.ok(risk <= previousRisk, `Adding references must not increase risk: previous=${previousRisk}, current=${risk}`);
+    assert.ok(risk >= 0 && risk <= 100, `Risk must be between 0 and 100, got ${risk}`);
+    previousRisk = risk;
+  }
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+});
+
+test('Task 8: Prior Art Risk Index score remains strictly bounded between 0 and 100 for extreme edge cases', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+
+  const extremeProject = {
+    id: 'p_extreme',
+    title: 'Extreme Project',
+    stage: 'FILED',
+    category: 'Robotics',
+    owner: { fullName: 'User 1' },
+    members: [],
+    tasks: [],
+    patentReferences: Array.from({ length: 50 }, (_, i) => ({
+      id: `r_${i}`,
+      source: 'USPTO',
+      patentNumber: `US${2000000 + i}`,
+      title: `Reference ${i}`
+    })),
+    patentForms: [{ formType: 'Form 1', status: 'APPROVED' }],
+    projectReviews: [{ reviewType: 'GUIDE_REVIEW', decision: 'APPROVED' }],
+    prototypes: [],
+    drawingFigures: [],
+    activityLogs: [],
+    documents: []
+  };
+
+  (prisma.patentProject as any).findUnique = async () => extremeProject;
+
+  const result = await AnalyticsService.getProjectAnalytics('p_extreme', 'u1');
+  assert.ok(result.scores.priorArtRiskIndex >= 0 && result.scores.priorArtRiskIndex <= 100);
+  assert.strictEqual(result.scores.priorArtRiskIndex, 5);
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+});
+
+test('Task 8: Patent Eligibility & Novelty Score is low for an empty project', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+
+  const emptyProject = {
+    id: 'p_empty',
+    title: 'New Idea',
+    stage: 'IDEA',
+    category: '',
+    technicalDomain: '',
+    innovationIdea: '',
+    problemStatement: '',
+    proposedSolution: '',
+    novelFeatures: '',
+    owner: { fullName: 'User 1' },
+    members: [],
+    tasks: [],
+    patentReferences: [],
+    patentForms: [],
+    projectReviews: [],
+    prototypes: [],
+    drawingFigures: [],
+    activityLogs: [],
+    documents: []
+  };
+
+  (prisma.patentProject as any).findUnique = async () => emptyProject;
+
+  const analytics = await AnalyticsService.getProjectAnalytics('p_empty', 'u1');
+  assert.ok(
+    analytics.scores.patentEligibilityScore <= 10,
+    `Expected empty project score <= 10%, got ${analytics.scores.patentEligibilityScore}%`
+  );
+  assert.ok(analytics.scores.patentEligibilityScore >= 0);
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+});
+
+test('Task 8: Patent Eligibility Score increases monotonically as patent evidence is added (never decreases)', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+
+  // Step 0: Blank project
+  const p0 = {
+    id: 'p_evo',
+    title: '',
+    stage: 'IDEA',
+    category: '',
+    technicalDomain: '',
+    innovationIdea: '',
+    problemStatement: '',
+    proposedSolution: '',
+    novelFeatures: '',
+    keywords: '',
+    owner: { fullName: 'User 1' },
+    members: [],
+    tasks: [],
+    patentReferences: [],
+    patentForms: [],
+    projectReviews: [],
+    prototypes: [],
+    drawingFigures: [],
+    activityLogs: [],
+    documents: []
+  };
+
+  // Step 1: Adding specification disclosure
+  const p1 = {
+    ...p0,
+    title: 'Autonomous Smart Sensor',
+    category: 'Hardware',
+    technicalDomain: 'IoT',
+    innovationIdea: 'A self-calibrating smart sensor with autonomous energy harvesting.',
+    problemStatement: 'Manual calibration in remote deployments is cost-prohibitive.',
+    proposedSolution: 'Automated dynamic calibration using background ambient vibrations.'
+  };
+
+  // Step 2: Adding novel features & draft document
+  const p2 = {
+    ...p1,
+    novelFeatures: 'Self-adjusting piezoelectric transducer feedback circuit.',
+    keywords: 'piezoelectric, autonomous calibration, IoT energy harvester',
+    documents: [{ id: 'doc1', category: 'PATENT_DRAFT', name: 'Specification_Draft.pdf' }]
+  };
+
+  // Step 3: Adding prior-art references
+  const p3 = {
+    ...p2,
+    patentReferences: [
+      { id: 'r1', source: 'USPTO', patentNumber: 'US10928371B2', title: 'Energy Harvester' },
+      { id: 'r2', source: 'USPTO', patentNumber: 'US10928372B2', title: 'Autonomous Sensor' }
+    ]
+  };
+
+  // Step 4: Adding Forms
+  const p4 = {
+    ...p3,
+    patentForms: [
+      { formType: 'Form 1', status: 'SUBMITTED', formData: {} },
+      { formType: 'Form 2', status: 'SUBMITTED', formData: { novelFeatures: 'Self-adjusting transducer', claimsText: 'Claim 1: An autonomous smart sensor...' } }
+    ]
+  };
+
+  // Step 5: Adding Approved Review & Filing Ready Stage
+  const p5 = {
+    ...p4,
+    stage: 'FILING_READY',
+    patentForms: [
+      { formType: 'Form 1', status: 'APPROVED', formData: {} },
+      { formType: 'Form 2', status: 'APPROVED', formData: { novelFeatures: 'Transducer', claimsText: 'Claim 1' } },
+      { formType: 'Form 3', status: 'APPROVED', formData: {} },
+      { formType: 'Form 5', status: 'APPROVED', formData: {} }
+    ],
+    projectReviews: [{ reviewType: 'GUIDE_REVIEW', decision: 'APPROVED' }]
+  };
+
+  const steps = [p0, p1, p2, p3, p4, p5];
+  let prevScore = -1;
+
+  for (let i = 0; i < steps.length; i++) {
+    (prisma.patentProject as any).findUnique = async () => steps[i];
+    const res = await AnalyticsService.getProjectAnalytics('p_evo', 'u1');
+    const score = res.scores.patentEligibilityScore;
+
+    assert.ok(
+      score >= prevScore,
+      `Step ${i} score (${score}%) must be >= previous step (${prevScore}%)`
+    );
+    assert.ok(score >= 0 && score <= 100, `Score must be in [0, 100], got ${score}%`);
+    prevScore = score;
+  }
+
+  assert.strictEqual(prevScore, 100);
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+});
+
+test('Task 8: Patent Eligibility Score is strictly bounded between 0 and 100 for edge cases', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+
+  // 1. Minimum edge case (completely null/empty)
+  const minProject = {
+    id: 'p_min',
+    title: '',
+    stage: 'IDEA',
+    category: '',
+    technicalDomain: '',
+    innovationIdea: '',
+    problemStatement: '',
+    proposedSolution: '',
+    owner: { fullName: 'User' },
+    members: [],
+    tasks: [],
+    patentReferences: [],
+    patentForms: [],
+    projectReviews: [],
+    prototypes: [],
+    drawingFigures: [],
+    activityLogs: [],
+    documents: []
+  };
+
+  (prisma.patentProject as any).findUnique = async () => minProject;
+  const resMin = await AnalyticsService.getProjectAnalytics('p_min', 'u1');
+  assert.strictEqual(resMin.scores.patentEligibilityScore, 0);
+
+  // 2. Maximum edge case (redundant excess evidence)
+  const maxProject = {
+    id: 'p_max',
+    title: 'Super Novel Patent Architecture',
+    stage: 'FILED',
+    category: 'DeepTech',
+    technicalDomain: 'Quantum',
+    innovationIdea: 'A detailed quantum error correction system.',
+    problemStatement: 'Qubit decoherence in superconducting loops.',
+    proposedSolution: 'Topological braiding with fault-tolerant stabilizer codes.',
+    novelFeatures: 'Adaptive syndrome measurement lattice.',
+    keywords: 'quantum computing, error correction, topological braiding',
+    owner: { fullName: 'Dr. Expert' },
+    members: [],
+    tasks: [],
+    patentReferences: Array.from({ length: 20 }, (_, i) => ({ id: `r_${i}`, source: 'USPTO', patentNumber: `US${3000000 + i}` })),
+    patentForms: [
+      { formType: 'Form 1', status: 'APPROVED', formData: {} },
+      { formType: 'Form 2', status: 'APPROVED', formData: { novelFeatures: 'Lattice', claimsText: 'Claim 1-50' } },
+      { formType: 'Form 3', status: 'APPROVED', formData: {} },
+      { formType: 'Form 5', status: 'APPROVED', formData: {} },
+      { formType: 'Form 26', status: 'APPROVED', formData: {} }
+    ],
+    projectReviews: [
+      { reviewType: 'GUIDE_REVIEW', decision: 'APPROVED' },
+      { reviewType: 'EXPERT_REVIEW', decision: 'APPROVED' }
+    ],
+    prototypes: [],
+    drawingFigures: [],
+    activityLogs: [],
+    documents: [
+      { id: 'd1', category: 'PATENT_DRAFT', name: 'Master_Spec.pdf' },
+      { id: 'd2', category: 'RESEARCH_PAPER', name: 'Paper.pdf' }
+    ]
+  };
+
+  (prisma.patentProject as any).findUnique = async () => maxProject;
+  const resMax = await AnalyticsService.getProjectAnalytics('p_max', 'u1');
+  assert.strictEqual(resMax.scores.patentEligibilityScore, 100);
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+});
+
+test('Task 8: Portfolio Dashboard readiness equals arithmetic mean of FilingReadinessService results', async () => {
+  const origFindMany = prisma.patentProject.findMany;
+  const origGetReadiness = FilingReadinessService.getFilingReadiness;
+
+  (prisma.patentProject as any).findMany = async () => [
+    {
+      id: 'p1',
+      title: 'Ready Project',
+      stage: 'FILING_READY',
+      category: 'Robotics',
+      patentReferences: [{ id: 'r1' }],
+      prototypes: [],
+      projectReviews: [{ id: 'rev1', decision: 'APPROVED' }],
+      tasks: [{ id: 't1', status: 'COMPLETED' }],
+      patentForms: [{ id: 'f1', status: 'APPROVED' }],
+      documents: []
+    },
+    {
+      id: 'p2',
+      title: 'Halfway Project',
+      stage: 'DOCUMENTATION',
+      category: 'Software',
+      patentReferences: [],
+      prototypes: [],
+      projectReviews: [],
+      tasks: [{ id: 't2', status: 'TODO' }],
+      patentForms: [],
+      documents: []
+    },
+    {
+      id: 'p3',
+      title: 'Empty Project',
+      stage: 'IDEA',
+      category: '',
+      patentReferences: [],
+      prototypes: [],
+      projectReviews: [],
+      tasks: [],
+      patentForms: [],
+      documents: []
+    }
+  ];
+
+  (FilingReadinessService as any).getFilingReadiness = async (projectId: string) => {
+    if (projectId === 'p1') {
+      return { overallReadiness: 'READY', completedCount: 6, totalRequiredCount: 6, checklist: [], blockingIssues: [] };
+    }
+    if (projectId === 'p2') {
+      return { overallReadiness: 'NOT_READY', completedCount: 3, totalRequiredCount: 6, checklist: [], blockingIssues: ['Forms missing'] };
+    }
+    if (projectId === 'p3') {
+      return { overallReadiness: 'NOT_READY', completedCount: 0, totalRequiredCount: 6, checklist: [], blockingIssues: ['Everything missing'] };
+    }
+    return { overallReadiness: 'NOT_READY', completedCount: 0, totalRequiredCount: 6, checklist: [], blockingIssues: [] };
+  };
+
+  const dashboard = await AnalyticsService.getDashboardAnalytics('u1');
+
+  const p1Summary = dashboard.projectHealthSummaries.find(p => p.id === 'p1');
+  const p2Summary = dashboard.projectHealthSummaries.find(p => p.id === 'p2');
+  const p3Summary = dashboard.projectHealthSummaries.find(p => p.id === 'p3');
+
+  assert.strictEqual(p1Summary?.readinessScore, 100, 'p1 readiness should be 100%');
+  assert.strictEqual(p2Summary?.readinessScore, 50, 'p2 readiness should be 50%');
+  assert.strictEqual(p3Summary?.readinessScore, 0, 'p3 empty project readiness should be 0% (unfabricated)');
+
+  // Arithmetic mean = Math.round((100 + 50 + 0) / 3) = Math.round(150 / 3) = 50%
+  assert.strictEqual(dashboard.averageFilingReadiness, 50, 'Portfolio average must equal arithmetic mean (50%)');
+  assert.ok(dashboard.averageFilingReadiness >= 0 && dashboard.averageFilingReadiness <= 100);
+  assert.ok(dashboard.needsAttentionProjects >= 1);
+
+  (prisma.patentProject as any).findMany = origFindMany;
+  (FilingReadinessService as any).getFilingReadiness = origGetReadiness;
+});
+
+test('Task 8: Single-project portfolio average equals exact single project readiness score', async () => {
+  const origFindMany = prisma.patentProject.findMany;
+  const origGetReadiness = FilingReadinessService.getFilingReadiness;
+
+  (prisma.patentProject as any).findMany = async () => [
+    {
+      id: 'p_single',
+      title: 'Solo Project',
+      stage: 'GUIDE_REVIEW',
+      category: 'Health',
+      patentReferences: [],
+      prototypes: [],
+      projectReviews: [],
+      tasks: [],
+      patentForms: [],
+      documents: []
+    }
+  ];
+
+  (FilingReadinessService as any).getFilingReadiness = async () => ({
+    overallReadiness: 'NOT_READY',
+    completedCount: 4,
+    totalRequiredCount: 6,
+    checklist: [],
+    blockingIssues: []
+  });
+
+  const dashboard = await AnalyticsService.getDashboardAnalytics('u1');
+  const expectedScore = Math.round((4 / 6) * 100); // 67%
+
+  assert.strictEqual(dashboard.totalProjects, 1);
+  assert.strictEqual(dashboard.averageFilingReadiness, expectedScore);
+  assert.strictEqual(dashboard.projectHealthSummaries[0].readinessScore, expectedScore);
+
+  (prisma.patentProject as any).findMany = origFindMany;
+  (FilingReadinessService as any).getFilingReadiness = origGetReadiness;
+});
+
+test('Task 8: Empty portfolio returns 0 and empty distributions without fabricated data', async () => {
+  const origFindMany = prisma.patentProject.findMany;
+
+  (prisma.patentProject as any).findMany = async () => [];
+
+  const dashboard = await AnalyticsService.getDashboardAnalytics('u_empty');
+  assert.strictEqual(dashboard.totalProjects, 0);
+  assert.strictEqual(dashboard.inProgressProjects, 0);
+  assert.strictEqual(dashboard.filingReadyProjects, 0);
+  assert.strictEqual(dashboard.needsAttentionProjects, 0);
+  assert.strictEqual(dashboard.averageFilingReadiness, 0);
+  assert.strictEqual(dashboard.averageTaskCompletion, 0);
+  assert.strictEqual(dashboard.totalReferences, 0);
+  assert.strictEqual(dashboard.totalPrototypes, 0);
+  assert.strictEqual(dashboard.totalReviews, 0);
+  assert.strictEqual(dashboard.totalForms, 0);
+  assert.strictEqual(dashboard.overdueTasksCount, 0);
+  assert.deepStrictEqual(dashboard.stageDistribution, {});
+  assert.deepStrictEqual(dashboard.projectHealthSummaries, []);
+
+  (prisma.patentProject as any).findMany = origFindMany;
+});
+
+test('Task 8: Dashboard analytics accurately scopes queries for non-admins vs Admin role', async () => {
+  const origFindMany = prisma.patentProject.findMany;
+  let lastWhereClause: any = null;
+
+  (prisma.patentProject as any).findMany = async (args: any) => {
+    lastWhereClause = args.where;
+    return [];
+  };
+
+  // 1. Non-admin user (e.g. Inventor / Guide)
+  await AnalyticsService.getDashboardAnalytics('user_123', 'Inventor');
+  assert.deepStrictEqual(lastWhereClause, {
+    OR: [
+      { ownerId: 'user_123' },
+      { members: { some: { userId: 'user_123' } } }
+    ]
+  });
+
+  // 2. Global Admin user
+  await AnalyticsService.getDashboardAnalytics('admin_123', 'Admin');
+  assert.deepStrictEqual(lastWhereClause, {});
+
+  (prisma.patentProject as any).findMany = origFindMany;
+});
+
+test('Task 8: Overdue task counts and stage distributions strictly match database records', async () => {
+  const origFindMany = prisma.patentProject.findMany;
+  const origGetReadiness = FilingReadinessService.getFilingReadiness;
+
+  const pastDate = new Date(Date.now() - 86400000); // 1 day ago (overdue)
+  const futureDate = new Date(Date.now() + 86400000); // 1 day in future
+
+  (prisma.patentProject as any).findMany = async () => [
+    {
+      id: 'p1',
+      stage: 'IDEA',
+      tasks: [
+        { id: 't1', status: 'TODO', dueDate: pastDate }, // Overdue
+        { id: 't2', status: 'COMPLETED', dueDate: pastDate }, // Not overdue because completed
+        { id: 't3', status: 'IN_PROGRESS', dueDate: futureDate } // Not overdue
+      ],
+      patentReferences: [{ id: 'r1' }, { id: 'r2' }],
+      prototypes: [{ id: 'proto1' }],
+      projectReviews: [{ id: 'rev1', decision: 'APPROVED' }],
+      patentForms: [{ id: 'f1', status: 'APPROVED' }],
+      documents: []
+    },
+    {
+      id: 'p2',
+      stage: 'PROTOTYPE',
+      tasks: [
+        { id: 't4', status: 'TODO', dueDate: pastDate } // Overdue
+      ],
+      patentReferences: [],
+      prototypes: [],
+      projectReviews: [],
+      patentForms: [],
+      documents: []
+    },
+    {
+      id: 'p3',
+      stage: 'FILING_READY',
+      tasks: [],
+      patentReferences: [],
+      prototypes: [],
+      projectReviews: [],
+      patentForms: [],
+      documents: []
+    }
+  ];
+
+  (FilingReadinessService as any).getFilingReadiness = async (id: string) => ({
+    overallReadiness: id === 'p3' ? 'READY' : 'NOT_READY',
+    completedCount: id === 'p3' ? 6 : 2,
+    totalRequiredCount: 6,
+    checklist: [],
+    blockingIssues: []
+  });
+
+  const dashboard = await AnalyticsService.getDashboardAnalytics('u1');
+
+  assert.strictEqual(dashboard.totalProjects, 3);
+  assert.strictEqual(dashboard.overdueTasksCount, 2); // t1 and t4 are overdue
+  assert.strictEqual(dashboard.stageDistribution['IDEA'], 1);
+  assert.strictEqual(dashboard.stageDistribution['PROTOTYPE'], 1);
+  assert.strictEqual(dashboard.stageDistribution['FILING_READY'], 1);
+  assert.strictEqual(dashboard.totalReferences, 2);
+  assert.strictEqual(dashboard.totalPrototypes, 1);
+  assert.strictEqual(dashboard.totalReviews, 1);
+  assert.strictEqual(dashboard.totalForms, 1);
+
+  (prisma.patentProject as any).findMany = origFindMany;
+  (FilingReadinessService as any).getFilingReadiness = origGetReadiness;
 });
 
 // Summary reporting and sequential execution

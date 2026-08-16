@@ -28,12 +28,13 @@ export const getProjectAnalytics = async (req: AuthenticatedRequest, res: Respon
 export const getDashboardAnalytics = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
+    const userRole = req.user?.role;
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized access.' });
       return;
     }
 
-    const summary = await AnalyticsService.getDashboardAnalytics(userId);
+    const summary = await AnalyticsService.getDashboardAnalytics(userId, userRole);
     res.status(200).json(summary);
   } catch (error: any) {
     console.error('[Get Dashboard Analytics Error]', error);

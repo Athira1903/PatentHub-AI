@@ -316,27 +316,27 @@ export const DashboardPage: React.FC = () => {
         {/* Platform Statistics (Five cards) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">1,248</span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{totalUsers}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Total Users</p>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">382</span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{portfolioAnalytics?.totalProjects ?? activeProjectsCount}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Projects</p>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">76</span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{portfolioAnalytics?.stageDistribution?.FILED ?? projects.filter(p => p.stage === 'FILED').length}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Filed Projects</p>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">64</span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{guidesCount}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Guides</p>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">18</span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{expertsCount}</span>
             <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Patent Experts</p>
           </div>
         </div>
@@ -355,7 +355,7 @@ export const DashboardPage: React.FC = () => {
                   <circle cx="56" cy="56" r="46" stroke="#06b6d4" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * (studentPct + guidePct + expertPct)) / 100} fill="transparent" />
                 </svg>
                 <div className="absolute text-center">
-                  <span className="text-lg font-extrabold text-slate-900">{totalUsers || '1248'}</span>
+                  <span className="text-lg font-extrabold text-slate-900">{totalUsers}</span>
                   <span className="text-[8px] text-slate-400 font-bold block uppercase">Users</span>
                 </div>
               </div>
@@ -363,19 +363,19 @@ export const DashboardPage: React.FC = () => {
               <div className="space-y-2 text-[10px] font-bold text-slate-500">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full" />
-                  <span>Inventors: 850 ({studentsCount})</span>
+                  <span>Inventors: {studentsCount} ({studentPct}%)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
-                  <span>Guides: 120 ({guidesCount})</span>
+                  <span>Guides: {guidesCount} ({guidePct}%)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-cyan-500 rounded-full" />
-                  <span>Experts: 18 ({expertsCount})</span>
+                  <span>Experts: {expertsCount} ({expertPct}%)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-slate-350 rounded-full" />
-                  <span>Admins: 5 ({adminsCount})</span>
+                  <span>Admins: {adminsCount} ({adminPct}%)</span>
                 </div>
               </div>
             </div>
@@ -386,31 +386,31 @@ export const DashboardPage: React.FC = () => {
             <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Project Statistics</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center font-sans">
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">120</span>
+                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.IDEA ?? projects.filter(p => p.stage === 'IDEA').length}</span>
                 <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Ideas</p>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">84</span>
+                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.LITERATURE_REVIEW ?? projects.filter(p => p.stage === 'LITERATURE_REVIEW').length}</span>
                 <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Research</p>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">72</span>
+                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.PROTOTYPE ?? projects.filter(p => p.stage === 'PROTOTYPE').length}</span>
                 <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Prototype</p>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">48</span>
+                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.GUIDE_REVIEW ?? projects.filter(p => p.stage === 'GUIDE_REVIEW').length}</span>
                 <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Guide Review</p>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">32</span>
+                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.PATENT_EXPERT_REVIEW ?? projects.filter(p => p.stage === 'PATENT_EXPERT_REVIEW').length}</span>
                 <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Expert Review</p>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">26</span>
+                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.FILING_READY ?? projects.filter(p => p.stage === 'FILING_READY').length}</span>
                 <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Filing Ready</p>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150 col-span-2">
-                <span className="text-xl font-extrabold text-emerald-650 font-mono">76</span>
+                <span className="text-xl font-extrabold text-emerald-650 font-mono">{portfolioAnalytics?.stageDistribution?.FILED ?? projects.filter(p => p.stage === 'FILED').length}</span>
                 <p className="text-[9px] text-emerald-700 uppercase font-extrabold mt-1">Filed</p>
               </div>
             </div>
@@ -456,24 +456,24 @@ export const DashboardPage: React.FC = () => {
 
           {/* Audit logs timeline */}
           <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Audit Logs</h3>
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Platform Projects Feed</h3>
             <div className="space-y-3.5 max-h-48 overflow-y-auto pr-1">
-              {[
-                { user: 'STU20260001', action: 'Uploaded document', resource: 'Patent Project #102', time: '08 Aug 2026, 10:42 AM', status: 'Success' },
-                { user: 'GDE20260001', action: 'Approved guide review', resource: 'Patent Project #102', time: '08 Aug 2026, 11:15 AM', status: 'Success' },
-                { user: 'PEX20260001', action: 'Modified claims checklist', resource: 'Patent Project #102', time: '08 Aug 2026, 02:30 PM', status: 'Success' }
-              ].map((log, index) => (
-                <div key={index} className="flex justify-between items-start text-xs p-3 bg-slate-50 border border-slate-150 rounded-xl">
-                  <div className="space-y-0.5">
-                    <p className="font-extrabold text-slate-950">{log.user}</p>
-                    <p className="text-[10px] text-slate-500 font-semibold">{log.action} — {log.resource}</p>
+              {projects.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs font-semibold">No platform projects created yet.</div>
+              ) : (
+                projects.slice(0, 5).map((proj) => (
+                  <div key={proj.id} className="flex justify-between items-start text-xs p-3 bg-slate-50 border border-slate-150 rounded-xl">
+                    <div className="space-y-0.5">
+                      <p className="font-extrabold text-slate-950">{proj.owner.fullName} ({proj.owner.username})</p>
+                      <p className="text-[10px] text-slate-500 font-semibold">{proj.title} • {proj.category}</p>
+                    </div>
+                    <div className="text-right space-y-0.5">
+                      <span className="px-2 py-0.5 rounded text-[8px] font-extrabold bg-blue-50 text-blue-700 uppercase tracking-wider">{proj.stage}</span>
+                      <p className="text-[9px] text-slate-400 font-bold block">{new Date(proj.createdAt).toLocaleDateString()}</p>
+                    </div>
                   </div>
-                  <div className="text-right space-y-0.5">
-                    <span className="px-2 py-0.5 rounded text-[8px] font-extrabold bg-emerald-50 text-emerald-700 uppercase tracking-wider">{log.status}</span>
-                    <p className="text-[9px] text-slate-400 font-bold block">{log.time}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -611,10 +611,10 @@ export const DashboardPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-amber-800 to-slate-900 p-8 rounded-3xl text-white shadow-lg border border-slate-800">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Good morning, Dr. {user?.fullName.split(' ')[0] || 'Meera'}
+              Good morning, {user?.fullName || 'Guide'}
             </h1>
             <p className="text-sm text-amber-200 font-medium">
-              You have 8 active students and {filterReviews(['GUIDE_REVIEW']).length || '5'} pending reviews.
+              You have {new Set(projects.map(p => p.owner.username)).size} supervised students and {filterReviews(['GUIDE_REVIEW']).length} pending reviews.
             </p>
           </div>
           <button
@@ -632,7 +632,9 @@ export const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-3xl font-extrabold text-slate-900">08</span>
+              <span className="text-3xl font-extrabold text-slate-900">
+                {new Set(projects.map(p => p.owner.username)).size}
+              </span>
               <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
             </div>
             <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Students</p>
@@ -640,7 +642,7 @@ export const DashboardPage: React.FC = () => {
 
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-3xl font-extrabold text-slate-900">{projects.length || '14'}</span>
+              <span className="text-3xl font-extrabold text-slate-900">{projects.length}</span>
               <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
             </div>
             <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Active Projects</p>
@@ -826,65 +828,87 @@ export const DashboardPage: React.FC = () => {
           {/* My Students */}
           <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
             <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">My Students</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-sans">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[9px] tracking-wider">
-                    <th className="pb-3">Student</th>
-                    <th className="pb-3">Projects</th>
-                    <th className="pb-3">Average Progress</th>
-                    <th className="pb-3 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {[
-                    { name: 'Athira Biju', projects: 2, progress: 82, status: 'On Track' },
-                    { name: 'Rahul', projects: 3, progress: 64, status: 'Needs Attention' },
-                    { name: 'Anjali', projects: 1, progress: 91, status: 'On Track' }
-                  ].map((stu, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3.5 pr-2 font-extrabold text-slate-900">{stu.name}</td>
-                      <td className="py-3.5 pr-2 font-bold text-slate-500">{stu.projects} projects</td>
-                      <td className="py-3.5 pr-2 font-medium">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-700">{stu.progress}%</span>
-                          <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-amber-500" style={{ width: `${stu.progress}%` }} />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3.5 text-right">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                          stu.status === 'On Track' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'
-                        }`}>
-                          {stu.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const studentsMap = new Map<string, { name: string; username: string; projectsCount: number; stages: string[] }>();
+              projects.forEach((p) => {
+                const key = p.owner.username || p.owner.fullName;
+                if (!studentsMap.has(key)) {
+                  studentsMap.set(key, { name: p.owner.fullName, username: p.owner.username, projectsCount: 0, stages: [] });
+                }
+                const s = studentsMap.get(key)!;
+                s.projectsCount++;
+                s.stages.push(p.stage);
+              });
+              const students = Array.from(studentsMap.values());
+
+              if (students.length === 0) {
+                return <div className="text-center py-8 text-slate-400 text-xs font-semibold">No supervised students assigned yet.</div>;
+              }
+
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-sans">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[9px] tracking-wider">
+                        <th className="pb-3">Student</th>
+                        <th className="pb-3">Projects</th>
+                        <th className="pb-3">Average Progress</th>
+                        <th className="pb-3 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {students.map((stu, idx) => {
+                        const avgProgress = Math.round(stu.stages.reduce((acc, st) => acc + getStageProgress(st), 0) / stu.stages.length);
+                        const status = avgProgress >= 50 ? 'On Track' : 'Needs Attention';
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3.5 pr-2 font-extrabold text-slate-900">{stu.name}</td>
+                            <td className="py-3.5 pr-2 font-bold text-slate-500">{stu.projectsCount} {stu.projectsCount === 1 ? 'project' : 'projects'}</td>
+                            <td className="py-3.5 pr-2 font-medium">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-700">{avgProgress}%</span>
+                                <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-amber-500" style={{ width: `${avgProgress}%` }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 text-right">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                                status === 'On Track' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'
+                              }`}>
+                                {status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Recent Student Activity */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
             <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Student Activity</h3>
-            <div className="space-y-4">
-              {[
-                { action: 'Athira uploaded Prototype v2', time: '1 hour ago' },
-                { action: 'Rahul submitted Form 2', time: '4 hours ago' },
-                { action: 'Anjali requested review', time: 'Yesterday' }
-              ].map((act, idx) => (
-                <div key={idx} className="flex gap-3 text-xs items-start">
-                  <div className="w-1.5 h-1.5 bg-amber-500 rounded-full mt-1.5 shrink-0" />
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-slate-700 leading-snug">{act.action}</p>
-                    <p className="text-[10px] text-slate-450 font-bold">{act.time}</p>
+            {projects.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-xs font-semibold">No recent activity recorded.</div>
+            ) : (
+              <div className="space-y-4">
+                {projects.slice(0, 4).map((p, idx) => (
+                  <div key={idx} className="flex gap-3 text-xs items-start">
+                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full mt-1.5 shrink-0" />
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-slate-700 leading-snug">
+                        <span className="font-extrabold text-slate-900">{p.owner.fullName}</span>: {p.title} ({p.stage.replace(/_/g, ' ')})
+                      </p>
+                      <p className="text-[10px] text-slate-450 font-bold">{new Date(p.createdAt).toLocaleDateString()}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -990,7 +1014,7 @@ export const DashboardPage: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {expertQueueProjects.map((p) => {
-                  const guideName = p.members.find(m => m.role === 'GUIDE')?.user.fullName || 'Dr. Meera';
+                  const guideName = p.members.find(m => m.role === 'GUIDE')?.user.fullName || 'Unassigned';
                   return (
                     <div key={p.id} className="p-5 border border-slate-150 bg-slate-50/50 hover:bg-white rounded-2xl shadow-3xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="space-y-1">
@@ -1084,48 +1108,55 @@ export const DashboardPage: React.FC = () => {
           {/* Filing Readiness */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
             <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Filing Readiness</h3>
-            <div className="space-y-4">
-              {[
-                { title: 'Smart Irrigation System', pct: 94 },
-                { title: 'AI Healthcare Diagnostics', pct: 87 },
-                { title: 'Solar Monitoring Grid', pct: 81 }
-              ].map((p, idx) => (
-                <div key={idx} className="space-y-1">
-                  <div className="flex justify-between text-xs font-bold text-slate-700">
-                    <span>{p.title}</span>
-                    <span className="font-mono text-cyan-650">{p.pct}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-cyan-500" style={{ width: `${p.pct}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+            {projects.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-xs font-semibold">No projects in review queue.</div>
+            ) : (
+              <div className="space-y-4">
+                {(portfolioAnalytics?.projectHealthSummaries || projects.map(p => ({
+                  id: p.id,
+                  title: p.title,
+                  readinessScore: getStageProgress(p.stage)
+                }))).slice(0, 4).map((p: any, idx: number) => {
+                  const pct = p.readinessScore ?? getStageProgress(p.stage);
+                  return (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex justify-between text-xs font-bold text-slate-700">
+                        <span className="truncate max-w-[180px]">{p.title}</span>
+                        <span className="font-mono text-cyan-650">{pct}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-cyan-500" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Patent Form Status */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Form Compliance</h3>
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Portfolio Metrics</h3>
             <div className="grid grid-cols-2 gap-3 text-xs font-bold text-slate-650">
               <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-                <span>Form 1</span>
-                <span className="text-emerald-600">✓ Ok</span>
+                <span>Forms Submitted</span>
+                <span className="font-mono text-cyan-700">{portfolioAnalytics?.totalForms ?? 0}</span>
               </div>
               <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-                <span>Form 2</span>
-                <span className="text-emerald-600">✓ Ok</span>
+                <span>Prior References</span>
+                <span className="font-mono text-cyan-700">{portfolioAnalytics?.totalReferences ?? 0}</span>
               </div>
               <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-                <span>Form 3</span>
-                <span className="text-emerald-600">✓ Ok</span>
+                <span>Prototypes</span>
+                <span className="font-mono text-cyan-700">{portfolioAnalytics?.totalPrototypes ?? 0}</span>
               </div>
               <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-                <span>Form 5</span>
-                <span className="text-emerald-600">✓ Ok</span>
+                <span>Completed Reviews</span>
+                <span className="font-mono text-emerald-600">{portfolioAnalytics?.totalReviews ?? filterReviews(['FILING_READY', 'FILED']).length}</span>
               </div>
               <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl col-span-2">
-                <span>Form 26</span>
-                <span className="text-amber-600">Pending</span>
+                <span>Avg Portfolio Readiness</span>
+                <span className="font-mono text-cyan-700 font-extrabold">{portfolioAnalytics?.averageFilingReadiness ?? 0}%</span>
               </div>
             </div>
           </div>
@@ -1133,21 +1164,23 @@ export const DashboardPage: React.FC = () => {
           {/* Recent Activity */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
             <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Recent Expert Activity</h3>
-            <div className="space-y-3.5">
-              {[
-                { action: 'Approved Form 2', time: 'Yesterday' },
-                { action: 'Requested changes to claims', time: '2 days ago' },
-                { action: 'Completed project review', time: '3 days ago' }
-              ].map((act, idx) => (
-                <div key={idx} className="flex gap-2.5 text-xs items-start">
-                  <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-1.5 shrink-0" />
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-slate-700 leading-snug">{act.action}</p>
-                    <p className="text-[10px] text-slate-450 font-bold">{act.time}</p>
+            {projects.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-xs font-semibold">No recent expert activity.</div>
+            ) : (
+              <div className="space-y-3.5">
+                {projects.slice(0, 3).map((p, idx) => (
+                  <div key={idx} className="flex gap-2.5 text-xs items-start">
+                    <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-1.5 shrink-0" />
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-slate-700 leading-snug">
+                        Reviewed <span className="font-bold text-slate-900">{p.title}</span> ({p.stage.replace(/_/g, ' ')})
+                      </p>
+                      <p className="text-[10px] text-slate-450 font-bold">{new Date(p.createdAt).toLocaleDateString()}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1163,7 +1196,7 @@ export const DashboardPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-indigo-900 to-slate-900 p-8 rounded-3xl text-white shadow-lg border border-slate-800">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Good morning, {user?.fullName.split(' ')[0] || 'Athira'}
+            Good morning, {user?.fullName || 'Inventor'}
           </h1>
           <p className="text-sm text-indigo-200 font-medium">
             Continue developing your patent projects. Make your claims boundaries clear.
@@ -1289,7 +1322,7 @@ export const DashboardPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {projects.map((p) => {
                     const progress = getStageProgress(p.stage);
-                    const guide = p.members.find(m => m.role === 'GUIDE')?.user.fullName || 'Dr. X';
+                    const guide = p.members.find(m => m.role === 'GUIDE')?.user.fullName || 'Unassigned';
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-3.5 pr-2">
@@ -1332,49 +1365,58 @@ export const DashboardPage: React.FC = () => {
           <div>
             <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Filing Readiness</h3>
 
-            <div className="flex flex-col items-center justify-center py-6">
-              <div className="relative inline-flex items-center justify-center">
-                <svg className="w-28 h-28 transform -rotate-90">
-                  <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
-                  <circle cx="56" cy="56" r="46" stroke="#4f46e5" strokeWidth="8" strokeDasharray="289" strokeDashoffset={289 - (289 * 78) / 100} fill="transparent" />
-                </svg>
-                <div className="absolute text-center">
-                  <span className="text-2xl font-extrabold text-indigo-950 font-mono">78%</span>
-                  <span className="text-[8px] text-slate-400 font-bold block uppercase">Readiness</span>
+            {(() => {
+              const avgReadiness = portfolioAnalytics?.averageFilingReadiness ?? (projects.length > 0 ? Math.round(projects.reduce((sum, p) => sum + getStageProgress(p.stage), 0) / projects.length) : 0);
+              return (
+                <div className="flex flex-col items-center justify-center py-6">
+                  <div className="relative inline-flex items-center justify-center">
+                    <svg className="w-28 h-28 transform -rotate-90">
+                      <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
+                      <circle cx="56" cy="56" r="46" stroke="#4f46e5" strokeWidth="8" strokeDasharray="289" strokeDashoffset={289 - (289 * avgReadiness) / 100} fill="transparent" />
+                    </svg>
+                    <div className="absolute text-center">
+                      <span className="text-2xl font-extrabold text-indigo-950 font-mono">{avgReadiness}%</span>
+                      <span className="text-[8px] text-slate-400 font-bold block uppercase">Readiness</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
 
             <div className="space-y-2.5 text-[11px] font-bold text-slate-600">
               <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Documentation</span>
-                <span className="text-emerald-600 font-extrabold">✓ Completed</span>
+                <span>Active Projects</span>
+                <span className="text-indigo-600 font-extrabold">{activeProjectsCount}</span>
               </div>
               <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Prototype</span>
-                <span className="text-emerald-600 font-extrabold">✓ Completed</span>
+                <span>Filing Ready</span>
+                <span className={portfolioAnalytics?.filingReadyProjects ? "text-emerald-600 font-extrabold" : "text-slate-400 font-extrabold"}>
+                  {portfolioAnalytics?.filingReadyProjects ?? projects.filter(p => p.stage === 'FILING_READY' || p.stage === 'FILED').length}
+                </span>
               </div>
               <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Patent Forms</span>
-                <span className="text-amber-600">60% Complete</span>
+                <span>Prior-Art References</span>
+                <span className="text-purple-600 font-extrabold">{portfolioAnalytics?.totalReferences ?? 0}</span>
               </div>
               <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Guide Review</span>
-                <span className="text-emerald-600 font-extrabold">✓ Approved</span>
+                <span>Under Review</span>
+                <span className="text-amber-600 font-extrabold">
+                  {projects.filter(p => ['GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length}
+                </span>
               </div>
               <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Expert Review</span>
-                <span className="text-slate-400 font-extrabold">Pending</span>
+                <span>Pending Tasks</span>
+                <span className="text-slate-600 font-extrabold">{pendingTasksCount}</span>
               </div>
             </div>
           </div>
 
-          <button
-            onClick={() => toast.success('Filing readiness diagnostics checklist verified.')}
-            className="w-full mt-4 h-10 bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all cursor-pointer"
+          <Link
+            to="/dashboard/projects"
+            className="w-full mt-4 h-10 bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center cursor-pointer"
           >
-            View Readiness
-          </button>
+            View Projects
+          </Link>
         </div>
       </div>
 
@@ -1391,7 +1433,7 @@ export const DashboardPage: React.FC = () => {
             {pendingTasks.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs font-semibold">No upcoming tasks assigned.</div>
             ) : (
-              pendingTasks.slice(0, 3).map((task, idx) => (
+              pendingTasks.slice(0, 3).map((task) => (
                 <div
                   key={task.id}
                   className="p-4 border border-slate-150 bg-slate-50 hover:bg-white rounded-2xl transition-all shadow-3xs flex justify-between items-start gap-4 cursor-pointer"
@@ -1401,7 +1443,9 @@ export const DashboardPage: React.FC = () => {
                     <h5 className="font-extrabold text-xs text-slate-900">{task.title}</h5>
                     <p className="text-[10px] text-slate-450 font-bold">Project: {task.projectTitle}</p>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-rose-50 border border-rose-100 text-rose-700 font-extrabold whitespace-nowrap">Due in {3 + idx} days</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 border border-blue-100 text-blue-700 font-extrabold whitespace-nowrap">
+                    {task.status}
+                  </span>
                 </div>
               ))
             )}
@@ -1416,7 +1460,16 @@ export const DashboardPage: React.FC = () => {
             <div className="relative inline-flex items-center justify-center">
               <svg className="w-28 h-28 transform -rotate-90">
                 <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
-                <circle cx="56" cy="56" r="46" stroke="#4f46e5" strokeWidth="8" strokeDasharray="289" strokeDashoffset="72" fill="transparent" />
+                <circle
+                  cx="56"
+                  cy="56"
+                  r="46"
+                  stroke="#4f46e5"
+                  strokeWidth="8"
+                  strokeDasharray="289"
+                  strokeDashoffset={activeProjectsCount > 0 ? 289 - (289 * Math.min(100, Math.round((draftingCount / activeProjectsCount) * 100))) / 100 : 289}
+                  fill="transparent"
+                />
               </svg>
               <div className="absolute text-center">
                 <span className="text-lg font-extrabold text-slate-900">{activeProjectsCount}</span>

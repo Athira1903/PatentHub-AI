@@ -51,6 +51,7 @@ export interface DashboardAnalyticsSummary {
   totalReferences: number;
   totalPrototypes: number;
   totalReviews: number;
+  totalForms: number;
   pendingReviewsCount: number;
   overdueTasksCount: number;
   stageDistribution: Record<string, number>;
@@ -148,20 +149,85 @@ export class AnalyticsService {
       technicalDrawingScore = 50;
     }
 
-    // 5. Prior Art Risk Index (%) (Lower score = lower overlap risk = safer patentability)
-    let priorArtRiskIndex = 15; // Base low risk
+    // 5. Prior Art Risk Index (%) (0 = Very Low Risk, 100 = Very High Risk)
+    // Scoring logic:
+    // - Unexamined prior art presents high risk (85%) when 0 references are cataloged.
+    // - Each verified USPTO reference reduces risk by 15% (strong registry search evidence).
+    // - Each cataloged/mock reference reduces risk by 10%.
+    // - Review sign-offs (approved reviews) and advanced stage maturity (FILING_READY/FILED) further mitigate prior-art risk.
+    // - Adding verified references strictly reduces or maintains risk (never increases risk).
+    // - The final score is strictly clamped between 0% and 100%.
+    let priorArtRiskIndex = 85; // Base high unexamined risk when 0 references exist
     if (totalReferences > 0) {
-      priorArtRiskIndex = Math.min(85, 20 + totalReferences * 12);
+      const referenceReduction = (usptoReferencesCount * 15) + (mockReferencesCount * 10);
+      const reviewReduction = approvedReviewsCount >= 1 ? 10 : 0;
+      const stageReduction = (project.stage === 'FILING_READY' || project.stage === 'FILED') ? 10 : 0;
+      priorArtRiskIndex = Math.max(5, priorArtRiskIndex - referenceReduction - reviewReduction - stageReduction);
+    }
+    priorArtRiskIndex = Math.max(0, Math.min(100, Math.round(priorArtRiskIndex)));
+
+    // 6. Patent Eligibility & Novelty Score (%) (0 = No Evidence, 100 = Fully Documented & Validated)
+    // Scoring logic built strictly from persisted database evidence:
+    // - Specification Evidence (max 30 pts): technical disclosure (idea, problem, solution, domain) & uploaded draft documents.
+    // - Claims & Novelty Evidence (max 25 pts): novel features definition & Form 2 claims scope.
+    // - Prior-Art Grounding (max 20 pts): cataloged prior-art references proving prior-art search diligence.
+    // - Statutory Forms Evidence (max 15 pts): submitted/approved statutory IPO forms (Forms 1, 2, 3, 5).
+    // - Review & Verification Evidence (max 10 pts): formal supervisor/expert approval sign-offs.
+    // Sub-score 1: Specification Evidence (0 - 30 pts)
+    let specificationEvidence = 0;
+    const hasCoreDisclosure = Boolean(
+      project.title && project.title.trim().length > 3 &&
+      project.innovationIdea && project.innovationIdea.trim().length > 10 &&
+      project.problemStatement && project.problemStatement.trim().length > 10 &&
+      project.proposedSolution && project.proposedSolution.trim().length > 10
+    );
+    if (hasCoreDisclosure) specificationEvidence += 15;
+    if (project.technicalDomain && project.category) specificationEvidence += 5;
+    const hasDraftDoc = project.documents.some((d) =>
+      d.category === 'PATENT_DRAFT' || d.category === 'RESEARCH_PAPER' || d.category === 'LITERATURE_REVIEW'
+    );
+    if (hasDraftDoc) specificationEvidence += 10;
+
+    // Sub-score 2: Claims & Novelty Evidence (0 - 25 pts)
+    let claimsEvidence = 0;
+    const form2 = project.patentForms.find((f) => f.formType === 'Form 2');
+    const form2Data = form2?.formData as Record<string, any> | undefined;
+    const hasNovelFeatures = Boolean(
+      (project.novelFeatures && project.novelFeatures.trim().length > 10) ||
+      (form2Data?.novelFeatures && String(form2Data.novelFeatures).trim().length > 10)
+    );
+    if (hasNovelFeatures) claimsEvidence += 10;
+    const hasClaims = Boolean(
+      (form2Data?.claimsText && String(form2Data.claimsText).trim().length > 10) ||
+      (project.keywords && project.keywords.trim().length > 5) ||
+      (form2 && (form2.status === 'SUBMITTED' || form2.status === 'APPROVED'))
+    );
+    if (hasClaims) claimsEvidence += 15;
+
+    // Sub-score 3: Prior-Art Evidence (0 - 20 pts)
+    let priorArtEvidence = 0;
+    if (totalReferences >= 1) priorArtEvidence += 10;
+    if (totalReferences >= 2) priorArtEvidence += 10;
+
+    // Sub-score 4: Statutory Forms Evidence (0 - 15 pts)
+    let formsEvidence = 0;
+    if (submittedFormsCount >= 1) formsEvidence += 5;
+    if (submittedFormsCount >= 2) formsEvidence += 5;
+    if (approvedFormsCount >= 3 || legalComplianceHealth >= 80) formsEvidence += 5;
+
+    // Sub-score 5: Review & Validation Evidence (0 - 10 pts)
+    let reviewEvidence = 0;
+    if (approvedReviewsCount >= 1 || project.stage === 'FILING_READY' || project.stage === 'FILED') {
+      reviewEvidence += 10;
     }
 
-    // 6. Patent Eligibility & Novelty Score (%)
-    let patentEligibilityScore = 50; // Base score
-    const hasDraftDoc = project.documents.some((d) => d.category === 'PATENT_DRAFT' || d.category === 'RESEARCH_PAPER');
-    if (hasDraftDoc) patentEligibilityScore += 15;
-    if (totalReferences >= 2) patentEligibilityScore += 15;
-    if (approvedFormsCount >= 2) patentEligibilityScore += 10;
-    if (approvedReviewsCount >= 1) patentEligibilityScore += 10;
-    patentEligibilityScore = Math.min(100, patentEligibilityScore);
+    const patentEligibilityScore = Math.max(
+      0,
+      Math.min(
+        100,
+        specificationEvidence + claimsEvidence + priorArtEvidence + formsEvidence + reviewEvidence
+      )
+    );
 
     return {
       projectId: project.id,
@@ -201,8 +267,8 @@ export class AnalyticsService {
       readinessChecklist: readiness.checklist,
       blockingIssues: readiness.blockingIssues,
       explanations: {
-        patentEligibilityScore: 'Calculated from documented specifications, prior art references cataloged, and supervisor endorsement status.',
-        priorArtRiskIndex: 'Derived from number of verified registry references (USPTO/Mock) linked to this invention workspace.',
+        patentEligibilityScore: 'Calculated from documented specifications, novelty definitions, claims drafting, prior art grounding, and formal review sign-offs.',
+        priorArtRiskIndex: 'Evaluated based on cataloged prior art references, source verification (USPTO vs Mock), and stage maturity; fewer references indicate higher unmitigated prior-art risk.',
         technicalDrawingScore: 'Evaluated based on 2D figure sheets uploaded, Gemini Vision component tags annotated, and schematic legend completeness.',
         legalComplianceHealth: 'Percentage of mandatory Indian Patent Office forms (Forms 1, 2, 3, 5, 26) prepared and submitted.',
         teamExecutionVelocity: 'Percentage of assigned project workspace tasks marked as COMPLETED.',
@@ -213,15 +279,19 @@ export class AnalyticsService {
 
   /**
    * Aggregates portfolio analytics across all projects accessible to the user.
+   * If the user is an Admin, aggregates across all platform projects.
    */
-  static async getDashboardAnalytics(userId: string): Promise<DashboardAnalyticsSummary> {
+  static async getDashboardAnalytics(userId: string, userRole?: string): Promise<DashboardAnalyticsSummary> {
+    const isGlobalAdmin = userRole === 'Admin';
     const projects = await prisma.patentProject.findMany({
-      where: {
-        OR: [
-          { ownerId: userId },
-          { members: { some: { userId } } }
-        ]
-      },
+      where: isGlobalAdmin
+        ? {}
+        : {
+            OR: [
+              { ownerId: userId },
+              { members: { some: { userId } } }
+            ]
+          },
       include: {
         patentReferences: { select: { id: true } },
         prototypes: { select: { id: true } },
@@ -241,6 +311,7 @@ export class AnalyticsService {
     let totalRefSum = 0;
     let totalProtoSum = 0;
     let totalReviewSum = 0;
+    let totalFormsSum = 0;
     let pendingReviewsCount = 0;
     let overdueTasksCount = 0;
 
@@ -275,15 +346,9 @@ export class AnalyticsService {
       const taskVelocity = totalT > 0 ? Math.round((compT / totalT) * 100) : 0;
       totalTaskVelSum += taskVelocity;
 
-      // Estimate basic readiness
-      const hasForms = proj.patentForms.filter((f) => f.status === 'APPROVED').length >= 3;
-      const hasReview = proj.projectReviews.some((r) => r.decision === 'APPROVED');
-      let readinessScore = Math.round((compT / Math.max(1, totalT)) * 40);
-      if (hasForms) readinessScore += 30;
-      if (hasReview) readinessScore += 30;
-      readinessScore = Math.min(100, readinessScore);
-
-      if (proj.stage === 'FILING_READY') readinessScore = 100;
+      // Authoritative 6-point filing readiness calculation via FilingReadinessService
+      const readiness = await FilingReadinessService.getFilingReadiness(proj.id);
+      const readinessScore = Math.round((readiness.completedCount / readiness.totalRequiredCount) * 100);
       totalReadinessSum += readinessScore;
 
       if (readinessScore < 50 || overT > 0) {
@@ -293,6 +358,7 @@ export class AnalyticsService {
       totalRefSum += proj.patentReferences.length;
       totalProtoSum += proj.prototypes.length;
       totalReviewSum += proj.projectReviews.length;
+      totalFormsSum += proj.patentForms.length;
 
       healthSummaries.push({
         id: proj.id,
@@ -314,6 +380,7 @@ export class AnalyticsService {
       totalReferences: totalRefSum,
       totalPrototypes: totalProtoSum,
       totalReviews: totalReviewSum,
+      totalForms: totalFormsSum,
       pendingReviewsCount,
       overdueTasksCount,
       stageDistribution,

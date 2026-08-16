@@ -1032,7 +1032,9 @@ export const ProjectDetailsPage: React.FC = () => {
                     <div className="my-1.5 flex items-baseline gap-1">
                       <span className="text-2xl font-black text-indigo-700">{analyticsSummary.scores.patentEligibilityScore}%</span>
                     </div>
-                    <span className="text-[9px] font-semibold text-indigo-600">High Strength</span>
+                    <span className="text-[9px] font-semibold text-indigo-600">
+                      {analyticsSummary.scores.patentEligibilityScore >= 70 ? 'Strong Evidence' : analyticsSummary.scores.patentEligibilityScore >= 40 ? 'Moderate Evidence' : 'Initial Evidence'}
+                    </span>
                   </div>
 
                   <div className="p-3.5 bg-amber-50/60 border border-amber-150 rounded-2xl flex flex-col justify-between">
@@ -1040,7 +1042,9 @@ export const ProjectDetailsPage: React.FC = () => {
                     <div className="my-1.5 flex items-baseline gap-1">
                       <span className="text-2xl font-black text-amber-700">{analyticsSummary.scores.priorArtRiskIndex}%</span>
                     </div>
-                    <span className="text-[9px] font-semibold text-amber-600">{analyticsSummary.metrics.totalReferences} References</span>
+                    <span className="text-[9px] font-semibold text-amber-600">
+                      {analyticsSummary.scores.priorArtRiskIndex >= 70 ? 'High Unexamined Risk' : analyticsSummary.scores.priorArtRiskIndex >= 40 ? 'Moderate Risk' : 'Low Examined Risk'} ({analyticsSummary.metrics.totalReferences} refs)
+                    </span>
                   </div>
 
                   <div className="p-3.5 bg-cyan-50/60 border border-cyan-150 rounded-2xl flex flex-col justify-between">
@@ -1072,7 +1076,7 @@ export const ProjectDetailsPage: React.FC = () => {
                     <div className="my-1.5 flex items-baseline gap-1">
                       <span className="text-2xl font-black text-blue-700">{analyticsSummary.scores.filingReadinessScore}%</span>
                     </div>
-                    <span className="text-[9px] font-semibold text-blue-600">{analyticsSummary.stage}</span>
+                    <span className="text-[9px] font-semibold text-blue-600">{analyticsSummary.stage.replace(/_/g, ' ')}</span>
                   </div>
                 </div>
 
