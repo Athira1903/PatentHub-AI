@@ -7,6 +7,9 @@ const express_1 = require("express");
 const multer_1 = __importDefault(require("multer"));
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const documentController_1 = require("../controllers/documentController");
+const authorize_1 = require("../policies/middleware/authorize");
+const document_policy_1 = require("../policies/document/document.policy");
+const db_1 = require("../config/db");
 const router = (0, express_1.Router)();
 // Configure Multer for project files
 const upload = (0, multer_1.default)({
@@ -27,6 +30,28 @@ const upload = (0, multer_1.default)({
 });
 // Authenticate all document operations
 router.use(authMiddleware_1.authenticateToken);
-router.post('/upload', upload.single('document'), documentController_1.uploadDocument);
-router.delete('/:id', documentController_1.deleteDocument);
+router.post('/upload', upload.single('document'), (0, authorize_1.authorize)(async (user, req) => {
+    const projectId = req.body.projectId;
+    if (!projectId)
+        return false;
+    const project = await db_1.prisma.patentProject.findUnique({
+        where: { id: projectId },
+        include: { members: true },
+    });
+    if (!project)
+        return false;
+    return document_policy_1.DocumentPolicy.canUpload(user, project);
+}), documentController_1.uploadDocument);
+router.delete('/:id', (0, authorize_1.authorize)(async (user, req) => {
+    const docId = req.params.id;
+    if (!docId)
+        return false;
+    const doc = await db_1.prisma.document.findUnique({
+        where: { id: docId },
+        include: { project: { include: { members: true } } },
+    });
+    if (!doc)
+        return false;
+    return document_policy_1.DocumentPolicy.canDelete(user, doc.project, doc);
+}), documentController_1.deleteDocument);
 exports.default = router;

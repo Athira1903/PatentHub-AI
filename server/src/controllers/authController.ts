@@ -38,7 +38,17 @@ const registerSchema = z.object({
   institution: z.string().trim().max(150, 'Institution name cannot exceed 150 characters').optional(),
   department: z.string().trim().min(1, 'Department is required').max(100, 'Department cannot exceed 100 characters'),
   designation: z.string().trim().min(1, 'Designation is required').max(100, 'Designation cannot exceed 100 characters'),
-  userType: z.enum(['Student', 'Guide', 'PatentExpert', 'Admin']),
+  userType: z.enum([
+    'Student',
+    'Guide',
+    'PatentExpert',
+    'Admin',
+    'Inventor',
+    'CoInventor',
+    'Co-Inventor',
+    'Patent Expert',
+    'Administrator',
+  ]),
   employeeOrStudentId: z.string().trim().max(50).optional(),
 });
 
@@ -117,6 +127,23 @@ export const activate = async (req: Request, res: Response): Promise<void> => {
     }
     res.status(400).json({
       message: error.message || 'Activation failed',
+    });
+  }
+};
+
+export const resendActivation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier || typeof identifier !== 'string') {
+      res.status(400).json({ message: 'Please provide your generated username or registered email' });
+      return;
+    }
+
+    const result = await AuthService.resendActivationOtp(identifier.trim());
+    res.status(200).json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      message: error.message || 'Failed to resend activation code',
     });
   }
 };

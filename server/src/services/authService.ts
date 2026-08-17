@@ -23,7 +23,16 @@ export interface RegisterInput {
   institution?: string;
   department: string;
   designation: string;
-  userType: 'Student' | 'Guide' | 'PatentExpert' | 'Admin';
+  userType:
+    | 'Student'
+    | 'Guide'
+    | 'PatentExpert'
+    | 'Admin'
+    | 'Inventor'
+    | 'CoInventor'
+    | 'Co-Inventor'
+    | 'Patent Expert'
+    | 'Administrator';
   employeeOrStudentId?: string;
 }
 
@@ -50,19 +59,27 @@ export class AuthService {
     // Determine Role Name and prefix based on userType input
     let dbRoleName = 'Inventor';
     let prefix = 'STU2026';
-    if (input.userType === 'Guide') {
+    if (input.userType === 'Guide' || (input.userType as any) === 'Faculty Guide') {
       dbRoleName = 'Guide';
       prefix = 'GDE2026';
-    } else if (input.userType === 'PatentExpert') {
+    } else if (input.userType === 'PatentExpert' || (input.userType as any) === 'Patent Expert') {
       dbRoleName = 'PatentExpert';
       prefix = 'PEX2026';
-    } else if (input.userType === 'Admin') {
+    } else if (input.userType === 'CoInventor' || (input.userType as any) === 'Co-Inventor') {
+      dbRoleName = 'CoInventor';
+      prefix = 'COI2026';
+    } else if (input.userType === 'Admin' || (input.userType as any) === 'Administrator') {
       dbRoleName = 'Admin';
       prefix = 'ADM';
+    } else if (input.userType === 'Inventor' || input.userType === 'Student') {
+      dbRoleName = 'Inventor';
+      prefix = 'STU2026';
     }
 
-    const role = await prisma.role.findUnique({
+    const role = await prisma.role.upsert({
       where: { name: dbRoleName },
+      update: {},
+      create: { name: dbRoleName },
     });
     if (!role) {
       throw new Error(`Role '${dbRoleName}' not found in database.`);
@@ -130,7 +147,7 @@ export class AuthService {
     });
 
     // Send Activation Email
-    await MailService.sendActivationEmail(user.email, user.fullName, user.username, otp);
+    const emailSent = await MailService.sendActivationEmail(user.email, user.fullName, user.username, otp);
 
     // Output code to console for easy developer validation
     console.log(`\n==================================================`);
@@ -138,6 +155,7 @@ export class AuthService {
     console.log(`FullName: ${user.fullName}`);
     console.log(`Generated Username: ${user.username}`);
     console.log(`Activation OTP: ${otp}`);
+    console.log(`Email Sent Status: ${emailSent ? 'Delivered via SMTP' : 'Fallback / Local Only'}`);
     console.log(`==================================================\n`);
 
     return {
@@ -148,6 +166,58 @@ export class AuthService {
         email: user.email,
         role: user.role.name,
       },
+      emailSent,
+      activationOtp: otp,
+    };
+  }
+
+  static async resendActivationOtp(identifier: string) {
+    const trimmed = identifier.trim();
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: trimmed },
+          { email: trimmed },
+        ],
+      },
+      include: { role: true },
+    });
+
+    if (!user) {
+      throw new Error('No user account found matching this username or email.');
+    }
+
+    if (user.isActive) {
+      throw new Error('Account is already activated. Please sign in directly.');
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        activationOtp: otp,
+        activationOtpExpires: otpExpires,
+      },
+    });
+
+    const emailSent = await MailService.sendActivationEmail(user.email, user.fullName, user.username, otp);
+
+    console.log(`\n==================================================`);
+    console.log(`[RESEND ACTIVATION OTP SUCCESS]`);
+    console.log(`FullName: ${user.fullName}`);
+    console.log(`Username: ${user.username}`);
+    console.log(`New Activation OTP: ${otp}`);
+    console.log(`Email Sent Status: ${emailSent ? 'Delivered via SMTP' : 'Console / Fallback'}`);
+    console.log(`==================================================\n`);
+
+    return {
+      message: 'New activation code generated and sent successfully.',
+      username: user.username,
+      email: user.email,
+      otp,
+      emailSent,
     };
   }
 

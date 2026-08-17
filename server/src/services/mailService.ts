@@ -2,7 +2,28 @@ import nodemailer from 'nodemailer';
 
 export class MailService {
   private static transporter: nodemailer.Transporter | null = null;
+  private static etherealTransporter: nodemailer.Transporter | null = null;
   private static isGenerating = false;
+
+  private static async getEtherealTransporter(): Promise<nodemailer.Transporter | null> {
+    if (this.etherealTransporter) return this.etherealTransporter;
+    try {
+      const testAccount = await nodemailer.createTestAccount();
+      this.etherealTransporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+      return this.etherealTransporter;
+    } catch (err) {
+      console.error('[MAIL SERVICE ERROR] Failed to create ethereal test transporter:', err);
+      return null;
+    }
+  }
 
   private static async getTransporter(): Promise<nodemailer.Transporter | null> {
     if (this.transporter) return this.transporter;
@@ -17,7 +38,7 @@ export class MailService {
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
 
-    // Check if configuration is missing, contains placeholder text, or points to local dummy values
+    // Check if configuration is missing or placeholder
     const isPlaceholder = !host || !user || !pass || 
                          (host.includes('gmail.com') && user.includes('your_email@gmail.com'));
 
@@ -25,16 +46,7 @@ export class MailService {
       this.isGenerating = true;
       try {
         console.log('[MAIL SERVICE] Credentials missing or placeholder. Generating Ethereal Test SMTP account...');
-        const testAccount = await nodemailer.createTestAccount();
-        this.transporter = nodemailer.createTransport({
-          host: 'smtp.ethereal.email',
-          port: 587,
-          secure: false,
-          auth: {
-            user: testAccount.user,
-            pass: testAccount.pass,
-          },
-        });
+        this.transporter = await this.getEtherealTransporter();
         console.log('[MAIL SERVICE] Dynamic Ethereal Test SMTP account generated successfully.');
         this.isGenerating = false;
         return this.transporter;
@@ -63,13 +75,11 @@ export class MailService {
   }
 
   static async sendOtpEmail(email: string, otp: string): Promise<boolean> {
-    const transporter = await this.getTransporter();
-    if (!transporter) {
-      console.warn('[MAIL SERVICE WARNING] Transporter could not be initialized.');
-      return false;
-    }
-
-    const from = process.env.SMTP_FROM || `"PatentHub" <${process.env.SMTP_USER || 'no-reply@patenthub.ai'}>`;
+    console.log(`\n==================================================`);
+    console.log(`[PASSWORD RESET OTP DISPATCH]`);
+    console.log(`To: ${email}`);
+    console.log(`OTP Code: ${otp}`);
+    console.log(`==================================================\n`);
 
     const htmlContent = `
       <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
@@ -88,39 +98,65 @@ export class MailService {
       </div>
     `;
 
-    try {
-      const info = await transporter.sendMail({
-        from,
-        to: email,
-        subject: 'Reset your PatentHub password',
-        text: `Your PatentHub password reset OTP is: ${otp}. It is valid for 10 minutes.`,
-        html: htmlContent,
-      });
+    const isResend = (process.env.SMTP_HOST || '').includes('resend');
+    const defaultFrom = isResend ? 'PatentHub <onboarding@resend.dev>' : `"PatentHub" <${process.env.SMTP_USER || 'no-reply@patenthub.ai'}>`;
+    const from = process.env.SMTP_FROM || defaultFrom;
 
-      console.log(`[MAIL SERVICE] Reset OTP sent successfully to ${email}`);
-      
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      if (previewUrl) {
-        console.log(`\n==================================================`);
-        console.log(`[MAIL SERVICE] Ethereal Email Sent!`);
-        console.log(`[MAIL SERVICE] Preview URL: ${previewUrl}`);
-        console.log(`==================================================\n`);
+    try {
+      const transporter = await this.getTransporter();
+      if (transporter) {
+        const info = await transporter.sendMail({
+          from,
+          to: email,
+          subject: 'Reset your PatentHub password',
+          text: `Your PatentHub password reset OTP is: ${otp}. It is valid for 10 minutes.`,
+          html: htmlContent,
+        });
+
+        console.log(`[MAIL SERVICE] Reset OTP sent successfully to ${email}`);
+        const previewUrl = nodemailer.getTestMessageUrl(info);
+        if (previewUrl) {
+          console.log(`[MAIL SERVICE] Test Preview: ${previewUrl}`);
+        }
+        return true;
       }
-      return true;
-    } catch (error) {
-      console.error(`[MAIL SERVICE ERROR] Failed to send email to ${email}:`, error);
-      return false;
+    } catch (primaryError) {
+      console.warn(`[MAIL SERVICE WARNING] Primary SMTP failed:`, (primaryError as any)?.message || primaryError);
+      try {
+        const fallback = await this.getEtherealTransporter();
+        if (fallback) {
+          const info = await fallback.sendMail({
+            from: '"PatentHub AI" <no-reply@patenthub.ai>',
+            to: email,
+            subject: 'Reset your PatentHub password (Dev Fallback)',
+            text: `Your PatentHub password reset OTP is: ${otp}`,
+            html: htmlContent,
+          });
+          const previewUrl = nodemailer.getTestMessageUrl(info);
+          if (previewUrl) {
+            console.log(`[MAIL SERVICE] Fallback Ethereal Preview: ${previewUrl}`);
+          }
+          return true;
+        }
+      } catch (fallbackError) {
+        console.error(`[MAIL SERVICE ERROR] Fallback also failed:`, fallbackError);
+      }
     }
+
+    return false;
   }
 
   static async sendActivationEmail(email: string, fullName: string, username: string, otp: string): Promise<boolean> {
-    const transporter = await this.getTransporter();
-    if (!transporter) {
-      console.warn('[MAIL SERVICE WARNING] Transporter could not be initialized.');
-      return false;
-    }
+    console.log(`\n==================================================`);
+    console.log(`[ACCOUNT ACTIVATION DISPATCH]`);
+    console.log(`Recipient: ${fullName} <${email}>`);
+    console.log(`Username:  ${username}`);
+    console.log(`OTP Code:  ${otp}`);
+    console.log(`==================================================\n`);
 
-    const from = process.env.SMTP_FROM || `"PatentHub" <${process.env.SMTP_USER || 'no-reply@patenthub.ai'}>`;
+    const isResend = (process.env.SMTP_HOST || '').includes('resend');
+    const defaultFrom = isResend ? 'PatentHub <onboarding@resend.dev>' : `"PatentHub" <${process.env.SMTP_USER || 'no-reply@patenthub.ai'}>`;
+    const from = process.env.SMTP_FROM || defaultFrom;
 
     const htmlContent = `
       <div style="font-family: sans-serif; max-width: 550px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
@@ -155,27 +191,168 @@ export class MailService {
     `;
 
     try {
-      const info = await transporter.sendMail({
-        from,
-        to: email,
-        subject: 'Welcome to PatentHub - Activate Your Account',
-        text: `Dear ${fullName}, welcome to PatentHub. Your generated username is: ${username}. Your activation OTP is: ${otp}.`,
-        html: htmlContent,
-      });
+      const transporter = await this.getTransporter();
+      if (transporter) {
+        const info = await transporter.sendMail({
+          from,
+          to: email,
+          subject: 'Welcome to PatentHub - Activate Your Account',
+          text: `Dear ${fullName}, welcome to PatentHub. Your generated username is: ${username}. Your activation OTP is: ${otp}.`,
+          html: htmlContent,
+        });
 
-      console.log(`[MAIL SERVICE] Activation email sent successfully to ${email}`);
-      
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      if (previewUrl) {
-        console.log(`\n==================================================`);
-        console.log(`[MAIL SERVICE] Ethereal Activation Email Sent!`);
-        console.log(`[MAIL SERVICE] Preview URL: ${previewUrl}`);
-        console.log(`==================================================\n`);
+        console.log(`[MAIL SERVICE] Activation email sent successfully to ${email}`);
+        const previewUrl = nodemailer.getTestMessageUrl(info);
+        if (previewUrl) {
+          console.log(`[MAIL SERVICE] Ethereal Preview URL: ${previewUrl}`);
+        }
+        return true;
       }
-      return true;
-    } catch (error) {
-      console.error(`[MAIL SERVICE ERROR] Failed to send activation email to ${email}:`, error);
-      return false;
+    } catch (primaryError) {
+      console.warn(`[MAIL SERVICE WARNING] Primary SMTP delivery failed:`, (primaryError as any)?.message || primaryError);
+      try {
+        const fallback = await this.getEtherealTransporter();
+        if (fallback) {
+          const info = await fallback.sendMail({
+            from: '"PatentHub AI" <no-reply@patenthub.ai>',
+            to: email,
+            subject: 'Welcome to PatentHub - Activate Your Account (Dev Preview)',
+            text: `Dear ${fullName}, your username is ${username}, OTP: ${otp}`,
+            html: htmlContent,
+          });
+          const previewUrl = nodemailer.getTestMessageUrl(info);
+          if (previewUrl) {
+            console.log(`\n==================================================`);
+            console.log(`[MAIL SERVICE] Fallback Ethereal Email Generated!`);
+            console.log(`[MAIL SERVICE] Preview URL: ${previewUrl}`);
+            console.log(`==================================================\n`);
+          }
+          return true;
+        }
+      } catch (fallbackError) {
+        console.error(`[MAIL SERVICE ERROR] Fallback Ethereal failed:`, fallbackError);
+      }
     }
+
+    return false;
+  }
+
+  static async sendCollaborationInviteEmail(
+    recipientEmail: string,
+    recipientName: string,
+    senderName: string,
+    projectName: string,
+    roleName: string
+  ): Promise<boolean> {
+    console.log(`\n==================================================`);
+    console.log(`[COLLABORATION INVITATION DISPATCH]`);
+    console.log(`To:        ${recipientName} <${recipientEmail}>`);
+    console.log(`From:      ${senderName}`);
+    console.log(`Project:   ${projectName}`);
+    console.log(`Role:      ${roleName}`);
+    console.log(`==================================================\n`);
+
+    const isResend = (process.env.SMTP_HOST || '').includes('resend');
+    const defaultFrom = isResend ? 'PatentHub <onboarding@resend.dev>' : `"PatentHub" <${process.env.SMTP_USER || 'no-reply@patenthub.ai'}>`;
+    const from = process.env.SMTP_FROM || defaultFrom;
+
+    const htmlContent = `
+      <div style="font-family: sans-serif; max-width: 550px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <h2 style="color: #006670; margin-bottom: 20px; font-weight: 800; font-size: 22px;">PatentHub Collaboration Request</h2>
+        <p style="font-size: 14px; color: #1e293b; line-height: 1.6;">
+          Hello <strong>${recipientName}</strong>,
+        </p>
+        <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+          <strong>${senderName}</strong> has invited you to collaborate on the patent project:
+        </p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px 20px; border-radius: 10px; margin: 15px 0;">
+          <p style="margin: 0 0 8px 0; font-size: 15px; font-weight: bold; color: #0f172a;">${projectName}</p>
+          <p style="margin: 0; font-size: 13px; color: #006670; font-weight: 600;">Role: ${roleName}</p>
+        </div>
+
+        <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
+          Please log in to your PatentHub dashboard to review and accept this collaboration request.
+        </p>
+
+        <p style="font-size: 12px; color: #94a3b8; margin-top: 25px; border-top: 1px solid #f1f5f9; padding-top: 15px;">
+          PatentHub-AI Platform Team
+        </p>
+      </div>
+    `;
+
+    try {
+      const transporter = await this.getTransporter();
+      if (transporter) {
+        await transporter.sendMail({
+          from,
+          to: recipientEmail,
+          subject: `PatentHub Collaboration Invite: ${projectName}`,
+          text: `${senderName} invited you to collaborate on "${projectName}" as ${roleName}. Log in to PatentHub to respond.`,
+          html: htmlContent,
+        });
+        return true;
+      }
+    } catch (err) {
+      console.warn(`[MAIL SERVICE WARNING] Failed to send collaboration invite email:`, (err as any)?.message || err);
+    }
+    return false;
+  }
+
+  static async sendCollaborationResponseEmail(
+    recipientEmail: string,
+    recipientName: string,
+    respondentName: string,
+    projectName: string,
+    action: 'accepted' | 'declined'
+  ): Promise<boolean> {
+    console.log(`\n==================================================`);
+    console.log(`[COLLABORATION RESPONSE DISPATCH]`);
+    console.log(`To:        ${recipientName} <${recipientEmail}>`);
+    console.log(`From:      ${respondentName}`);
+    console.log(`Project:   ${projectName}`);
+    console.log(`Action:    ${action}`);
+    console.log(`==================================================\n`);
+
+    const isResend = (process.env.SMTP_HOST || '').includes('resend');
+    const defaultFrom = isResend ? 'PatentHub <onboarding@resend.dev>' : `"PatentHub" <${process.env.SMTP_USER || 'no-reply@patenthub.ai'}>`;
+    const from = process.env.SMTP_FROM || defaultFrom;
+
+    const htmlContent = `
+      <div style="font-family: sans-serif; max-width: 550px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <h2 style="color: #006670; margin-bottom: 20px; font-weight: 800; font-size: 22px;">Collaboration Request Update</h2>
+        <p style="font-size: 14px; color: #1e293b; line-height: 1.6;">
+          Hello <strong>${recipientName}</strong>,
+        </p>
+        <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+          <strong>${respondentName}</strong> has <strong>${action}</strong> your collaboration request for <strong>${projectName}</strong>.
+        </p>
+
+        <p style="font-size: 13px; color: #64748b; line-height: 1.6; margin-top: 15px;">
+          Log in to your PatentHub dashboard to view your updated project team.
+        </p>
+
+        <p style="font-size: 12px; color: #94a3b8; margin-top: 25px; border-top: 1px solid #f1f5f9; padding-top: 15px;">
+          PatentHub-AI Platform Team
+        </p>
+      </div>
+    `;
+
+    try {
+      const transporter = await this.getTransporter();
+      if (transporter) {
+        await transporter.sendMail({
+          from,
+          to: recipientEmail,
+          subject: `PatentHub: Collaboration ${action === 'accepted' ? 'Accepted' : 'Declined'} for ${projectName}`,
+          text: `${respondentName} has ${action} your collaboration request for "${projectName}".`,
+          html: htmlContent,
+        });
+        return true;
+      }
+    } catch (err) {
+      console.warn(`[MAIL SERVICE WARNING] Failed to send collaboration response email:`, (err as any)?.message || err);
+    }
+    return false;
   }
 }

@@ -2,1538 +2,578 @@ import React, { useEffect, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import {
   FolderKanban,
-  Plus,
-  ShieldCheck,
-  UserCheck,
-  UserX,
-  PlusCircle,
-  Search,
-  Bell,
-  FileText,
-  TrendingUp,
+  Clock,
+  Sparkles,
   ArrowRight,
-  CheckSquare,
+  Plus,
+  Search,
+  CheckCircle2,
   Layers,
-  FileSpreadsheet,
+  PenTool,
+  ShieldCheck,
+  AlertCircle,
+  Lightbulb,
+  CheckSquare,
+  BookOpen,
+  ChevronRight,
+  Award,
+  RefreshCw,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
+import { CoInventorDashboard } from '../components/dashboard/CoInventorDashboard';
 
-export interface ProjectSummary {
+interface Project {
   id: string;
   title: string;
+  stage: string;
   category: string;
   technicalDomain: string;
-  stage: string;
+  innovationIdea?: string;
+  problemStatement?: string;
+  proposedSolution?: string;
+  novelFeatures?: string;
   createdAt: string;
-  owner: { fullName: string; username: string };
-  members: Array<{ user: { fullName: string; username: string }; role: string }>;
-  tasks?: Array<{
+  updatedAt: string;
+  owner?: {
     id: string;
-    title: string;
-    description: string | null;
-    status: string;
-    createdAt: string;
-    assignedTo?: { id: string; fullName: string; username: string } | null;
-  }>;
-  comments?: Array<{
-    id: string;
-    content: string;
-    createdAt: string;
-    user: { id: string; fullName: string; username: string; role: string };
-  }>;
-  documents?: Array<{
-    id: string;
-    name: string;
-    createdAt: string;
-  }>;
-  _count?: {
-    documents: number;
-    tasks: number;
-    members: number;
+    fullName: string;
+    username: string;
+    email: string;
   };
-}
-
-export interface AdminUser {
-  id: string;
-  fullName: string;
-  username: string;
-  email: string;
-  institution: string | null;
-  isActive: boolean;
-  role: string;
-  phone: string | null;
-  department: string | null;
+  members?: Array<{
+    role: string;
+    user: {
+      id: string;
+      fullName: string;
+      role?: string;
+    };
+  }>;
 }
 
 const STAGES = [
-  'IDEA',
-  'LITERATURE_REVIEW',
-  'PROTOTYPE',
-  'DOCUMENTATION',
-  'FORMS_PREPARATION',
-  'GUIDE_REVIEW',
-  'PATENT_EXPERT_REVIEW',
-  'FILING_READY',
-  'FILED',
+  { key: 'IDEA', label: 'Idea' },
+  { key: 'LITERATURE_REVIEW', label: 'Prior Art' },
+  { key: 'PROTOTYPE', label: 'AI Novelty' },
+  { key: 'DOCUMENTATION', label: 'Claims Drafting' },
+  { key: 'FORMS_PREPARATION', label: 'Drawings' },
+  { key: 'GUIDE_REVIEW', label: 'FTO Analysis' },
+  { key: 'PATENT_EXPERT_REVIEW', label: 'Review & Approvals' },
+  { key: 'FILING_READY', label: 'Filing Ready' },
+  { key: 'FILED', label: 'Filed (IPO)' },
 ];
 
-const getStageProgress = (stage: string) => {
-  const index = STAGES.indexOf(stage);
-  if (index === -1) return 15;
+export const getStageProgress = (stage: string) => {
+  const index = STAGES.findIndex((s) => s.key === stage);
+  if (index === -1) return 12;
   return Math.round(((index + 1) / STAGES.length) * 100);
 };
 
 export const DashboardPage: React.FC = () => {
-  const { user } = useOutletContext<{ user: { fullName: string; email: string; username: string; role: string; userId: string } }>();
-  const role = user?.role || 'Inventor';
+  const outletCtx = useOutletContext<{ user: any }>() || {};
+  const [currentUser, setCurrentUser] = useState<any>(outletCtx.user || null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [dashboardAnalytics, setDashboardAnalytics] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeProjectIndex, setActiveProjectIndex] = useState<number>(0);
 
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(true);
-
-  // Admin states
-  const [usersList, setUsersList] = useState<AdminUser[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
-  // Guide creation state
-  const [inviteUsername, setInviteUsername] = useState('');
-  const [inviteProjectTitle, setInviteProjectTitle] = useState('');
-  const [inviteDomain, setInviteDomain] = useState('');
-  const [inviteCategory, setInviteCategory] = useState('');
-  const [submittingInvite, setSubmittingInvite] = useState(false);
-
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-
-  // Guide filter state
-  const [guideFilter, setGuideFilter] = useState<'ALL' | 'NEW' | 'GUIDE_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED'>('ALL');
-
-  // Patent Expert filter state
-  const [expertFilter, setExpertFilter] = useState<'ALL' | 'NEW' | 'PATENT_EXPERT_REVIEW' | 'CHANGES_REQUESTED' | 'FILING_READY'>('ALL');
-
-  // Checklist state for expert
-  const [checklist, setChecklist] = useState({
-    inventorInfo: true,
-    specification: true,
-    drawings: true,
-    claims: true,
-    supportingDocs: true,
-    finalVerification: false,
-  });
-
-  const fetchNotificationsCount = async () => {
+  const fetchDashboardData = async () => {
+    setLoading(true);
     try {
-      const [invitesRes, notifiesRes] = await Promise.all([
-        api.get('/collaboration/invitations'),
-        api.get('/collaboration/notifications'),
+      const [projRes, analyticsRes, profileRes] = await Promise.allSettled([
+        api.get('/projects'),
+        api.get('/projects/analytics/dashboard'),
+        api.get('/auth/profile'),
       ]);
-      const pendingInvites = (invitesRes.data || []).filter((i: any) => i.status === 'PENDING').length;
-      const unreadNotifs = (notifiesRes.data || []).filter((n: any) => !n.isRead).length;
-      setUnreadNotificationsCount(pendingInvites + unreadNotifs);
-    } catch (error) {
-      console.error('Failed to fetch notifications count', error);
-    }
-  };
 
-  const [portfolioAnalytics, setPortfolioAnalytics] = useState<any>(null);
-
-  const fetchPortfolioAnalytics = async () => {
-    try {
-      const res = await api.get('/projects/analytics/dashboard');
-      setPortfolioAnalytics(res.data);
-    } catch (e) {
-      console.error('Failed to fetch portfolio analytics', e);
+      if (projRes.status === 'fulfilled') {
+        const fetchedProjects = projRes.value.data.projects || [];
+        setProjects(fetchedProjects);
+      }
+      if (analyticsRes.status === 'fulfilled') {
+        setDashboardAnalytics(analyticsRes.value.data);
+      }
+      if (profileRes.status === 'fulfilled') {
+        setCurrentUser(profileRes.value.data.user);
+      }
+    } catch (err) {
+      console.error('Failed to load inventor dashboard data', err);
+      toast.error('Failed to load some dashboard metrics.');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProjects();
-    fetchNotificationsCount();
-    fetchPortfolioAnalytics();
-    if (role === 'Admin') {
-      fetchUsers();
-    }
-  }, [role]);
+    fetchDashboardData();
+  }, []);
 
-  const fetchProjects = async () => {
-    setLoadingProjects(true);
-    try {
-      const response = await api.get('/projects');
-      setProjects(response.data.projects || []);
-    } catch (error) {
-      console.error('Failed to fetch projects', error);
-    } finally {
-      setLoadingProjects(false);
-    }
-  };
+  const user = currentUser || outletCtx.user;
+  const userRole = user?.role || 'Inventor';
+  const isReviewer = userRole === 'Guide' || userRole === 'PatentExpert' || userRole === 'Patent Expert';
+  const isCoInventorRole = userRole === 'CoInventor' || userRole === 'CO_INVENTOR' || userRole === 'Co-Inventor';
+  const activeProject = projects[activeProjectIndex] || projects[0] || null;
 
-  const fetchUsers = async () => {
-    setLoadingUsers(true);
-    try {
-      const response = await api.get('/users/list');
-      setUsersList(response.data || []);
-    } catch (error) {
-      console.error('Failed to fetch users list', error);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
-  const handlePromoteRole = async (userId: string, newRole: string) => {
-    try {
-      const response = await api.put(`/users/${userId}/promote`, { roleName: newRole });
-      toast.success(response.data.message || 'User promoted successfully!');
-      fetchUsers();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Promotion failed.');
-    }
-  };
-
-  const handleToggleStatus = async (userId: string) => {
-    try {
-      const response = await api.put(`/users/${userId}/status`);
-      toast.success(response.data.message || 'User status updated successfully!');
-      fetchUsers();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to update user status.');
-    }
-  };
-
-  const handleGuideCreateProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteProjectTitle || !inviteUsername || !inviteDomain || !inviteCategory) {
-      toast.error('All fields are required.');
-      return;
-    }
-
-    setSubmittingInvite(true);
-    try {
-      // 1. Create project
-      const projectRes = await api.post('/projects', {
-        title: inviteProjectTitle,
-        innovationIdea: 'Initiated by Supervisor Faculty Guide for student collaboration.',
-        problemStatement: 'Under evaluation.',
-        proposedSolution: 'To be drafted.',
-        technicalDomain: inviteDomain,
-        category: inviteCategory,
-      });
-
-      const projectId = projectRes.data.project.id;
-
-      // 2. Invite Student as Co-Inventor
-      await api.post('/collaboration/invite', {
-        projectId,
-        username: inviteUsername,
-        role: 'CO_INVENTOR',
-      });
-
-      toast.success('Project created and Student invited successfully!');
-      setInviteProjectTitle('');
-      setInviteUsername('');
-      setInviteDomain('');
-      setInviteCategory('');
-      fetchProjects();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to initiate project guidance.');
-    } finally {
-      setSubmittingInvite(false);
-    }
-  };
-
-  const handleCompleteTask = async (projectId: string, taskId: string) => {
-    try {
-      await api.put(`/projects/${projectId}/tasks/${taskId}`, { status: 'COMPLETED' });
-      toast.success('Task completed!');
-      fetchProjects();
-    } catch (e) {
-      toast.error('Failed to complete task');
-    }
-  };
-
-  const handleToggleChecklist = (key: keyof typeof checklist) => {
-    setChecklist((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-    toast.success('Checklist updated.');
-  };
-
-  const filteredUsers = usersList.filter(
-    (u) =>
-      u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Helper values for Dashboards
-  const activeProjectsCount = projects.length;
-  const pendingTasks = projects.flatMap((p: ProjectSummary) =>
-    (p.tasks || []).map((t: any) => ({ ...t, projectId: p.id, projectTitle: p.title }))
-  ).filter((t: any) => t.status !== 'COMPLETED');
-  const pendingTasksCount = pendingTasks.length;
-
-  // Stages count for Donut Chart
-  const draftingCount = projects.filter(p => ['IDEA', 'LITERATURE_REVIEW', 'PROTOTYPE'].includes(p.stage)).length;
-  const reviewCount = projects.filter(p => ['DOCUMENTATION', 'FORMS_PREPARATION', 'GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length;
-  const prototypeCount = projects.filter(p => p.stage === 'FILING_READY').length;
-  const othersCount = projects.filter(p => p.stage === 'FILED').length;
-
-  // Admin stats
-  const totalUsers = usersList.length;
-  const studentsCount = usersList.filter(u => u.role === 'Inventor').length;
-  const guidesCount = usersList.filter(u => u.role === 'Guide').length;
-  const expertsCount = usersList.filter(u => u.role === 'PatentExpert').length;
-  const adminsCount = usersList.filter(u => u.role === 'Admin').length;
-
-  const studentPct = totalUsers > 0 ? Math.round((studentsCount / totalUsers) * 100) : 0;
-  const guidePct = totalUsers > 0 ? Math.round((guidesCount / totalUsers) * 100) : 0;
-  const expertPct = totalUsers > 0 ? Math.round((expertsCount / totalUsers) * 100) : 0;
-  const adminPct = totalUsers > 0 ? Math.round((adminsCount / totalUsers) * 100) : 0;
-
-  const adminTotalDocuments = projects.reduce((sum, p) => sum + (p._count?.documents || 0), 0);
-  const adminStorageUsed = `${(adminTotalDocuments * 1.8).toFixed(1)} MB`;
-  // ----------------------------------------------------
-  // 1. 🛡️ Admin Dashboard
-  // ----------------------------------------------------
-  if (role === 'Admin') {
-    return (
-      <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
-        {/* Top Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Welcome back, Administrator!
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-              Monitor and manage the entire platform.
-            </p>
-          </div>
-          <span className="px-3.5 py-1.5 bg-blue-50 border border-blue-150 text-blue-700 text-xs font-bold rounded-xl flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4" /> Root Admin ({adminPct}%)
-          </span>
-        </div>
-
-        {/* Platform Statistics (Five cards) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{totalUsers}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Total Users</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{portfolioAnalytics?.totalProjects ?? activeProjectsCount}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Projects</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{portfolioAnalytics?.stageDistribution?.FILED ?? projects.filter(p => p.stage === 'FILED').length}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Filed Projects</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{guidesCount}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Guides</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block font-mono">{expertsCount}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Patent Experts</p>
-          </div>
-        </div>
-
-        {/* User Distribution & Project Statistics */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* User Distribution Donut Chart */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">User Distribution</h3>
-            <div className="flex items-center justify-around gap-4 py-4">
-              <div className="relative inline-flex items-center justify-center shrink-0">
-                <svg className="w-28 h-28 transform -rotate-90">
-                  <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="10" fill="transparent" />
-                  <circle cx="56" cy="56" r="46" stroke="#4f46e5" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * studentPct) / 100} fill="transparent" />
-                  <circle cx="56" cy="56" r="46" stroke="#f59e0b" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * (studentPct + guidePct)) / 100} fill="transparent" />
-                  <circle cx="56" cy="56" r="46" stroke="#06b6d4" strokeWidth="10" strokeDasharray="289" strokeDashoffset={289 - (289 * (studentPct + guidePct + expertPct)) / 100} fill="transparent" />
-                </svg>
-                <div className="absolute text-center">
-                  <span className="text-lg font-extrabold text-slate-900">{totalUsers}</span>
-                  <span className="text-[8px] text-slate-400 font-bold block uppercase">Users</span>
-                </div>
-              </div>
-
-              <div className="space-y-2 text-[10px] font-bold text-slate-500">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full" />
-                  <span>Inventors: {studentsCount} ({studentPct}%)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
-                  <span>Guides: {guidesCount} ({guidePct}%)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-cyan-500 rounded-full" />
-                  <span>Experts: {expertsCount} ({expertPct}%)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-slate-350 rounded-full" />
-                  <span>Admins: {adminsCount} ({adminPct}%)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Project Statistics */}
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Project Statistics</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center font-sans">
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.IDEA ?? projects.filter(p => p.stage === 'IDEA').length}</span>
-                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Ideas</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.LITERATURE_REVIEW ?? projects.filter(p => p.stage === 'LITERATURE_REVIEW').length}</span>
-                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Research</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.PROTOTYPE ?? projects.filter(p => p.stage === 'PROTOTYPE').length}</span>
-                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Prototype</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.GUIDE_REVIEW ?? projects.filter(p => p.stage === 'GUIDE_REVIEW').length}</span>
-                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Guide Review</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.PATENT_EXPERT_REVIEW ?? projects.filter(p => p.stage === 'PATENT_EXPERT_REVIEW').length}</span>
-                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Expert Review</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                <span className="text-xl font-extrabold text-slate-950 font-mono">{portfolioAnalytics?.stageDistribution?.FILING_READY ?? projects.filter(p => p.stage === 'FILING_READY').length}</span>
-                <p className="text-[9px] text-slate-450 uppercase font-extrabold mt-1">Filing Ready</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-150 col-span-2">
-                <span className="text-xl font-extrabold text-emerald-650 font-mono">{portfolioAnalytics?.stageDistribution?.FILED ?? projects.filter(p => p.stage === 'FILED').length}</span>
-                <p className="text-[9px] text-emerald-700 uppercase font-extrabold mt-1">Filed</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* System Health Status & Audit Logs */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* System Health */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">System Health</h3>
-            <div className="space-y-2.5 text-xs font-bold text-slate-600">
-              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                <span>API Status</span>
-                <span className="flex items-center gap-1.5 text-emerald-700">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  Operational
-                </span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                <span>Database</span>
-                <span className="flex items-center gap-1.5 text-emerald-700">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  Operational
-                </span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                <span>Authentication</span>
-                <span className="flex items-center gap-1.5 text-emerald-700">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  Operational
-                </span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                <span>Storage used: {adminStorageUsed}</span>
-                <span className="flex items-center gap-1.5 text-emerald-700">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  Operational
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Audit logs timeline */}
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Platform Projects Feed</h3>
-            <div className="space-y-3.5 max-h-48 overflow-y-auto pr-1">
-              {projects.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 text-xs font-semibold">No platform projects created yet.</div>
-              ) : (
-                projects.slice(0, 5).map((proj) => (
-                  <div key={proj.id} className="flex justify-between items-start text-xs p-3 bg-slate-50 border border-slate-150 rounded-xl">
-                    <div className="space-y-0.5">
-                      <p className="font-extrabold text-slate-950">{proj.owner.fullName} ({proj.owner.username})</p>
-                      <p className="text-[10px] text-slate-500 font-semibold">{proj.title} • {proj.category}</p>
-                    </div>
-                    <div className="text-right space-y-0.5">
-                      <span className="px-2 py-0.5 rounded text-[8px] font-extrabold bg-blue-50 text-blue-700 uppercase tracking-wider">{proj.stage}</span>
-                      <p className="text-[9px] text-slate-400 font-bold block">{new Date(proj.createdAt).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Global Platform Accounts List table */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm col-span-3">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-              <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Platform Accounts</h2>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">Manage permissions and activation status</p>
-            </div>
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-450" />
-              <input
-                type="text"
-                placeholder="Search username, name, email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-blue-600 font-semibold"
-              />
-            </div>
-          </div>
-
-          {loadingUsers ? (
-            <div className="py-12 text-center text-slate-400 text-xs font-medium">Fetching accounts...</div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-xs font-medium">No matches found.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 uppercase font-bold tracking-wider text-[10px]">
-                    <th className="pb-3">User info</th>
-                    <th className="pb-3">Institution & Dept</th>
-                    <th className="pb-3">Current Role</th>
-                    <th className="pb-3">Promotion</th>
-                    <th className="pb-3 text-right">Status Control</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3.5 pr-2">
-                        <div className="font-extrabold text-slate-950">{u.fullName}</div>
-                        <div className="text-slate-500 font-medium text-[11px]">@{u.username} • {u.email}</div>
-                      </td>
-                      <td className="py-3.5 pr-2 font-medium text-slate-650">
-                        <div>{u.institution || 'N/A'}</div>
-                        <div className="text-[11px] text-slate-400">{u.department || 'No Dept'}</div>
-                      </td>
-                      <td className="py-3.5 pr-2">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold border ${
-                            u.role === 'Admin'
-                              ? 'bg-rose-50 text-rose-700 border-rose-100'
-                              : u.role === 'Guide'
-                              ? 'bg-amber-50 text-amber-700 border-amber-100'
-                              : u.role === 'PatentExpert'
-                              ? 'bg-cyan-50 text-cyan-700 border-cyan-100'
-                              : 'bg-slate-100 text-slate-700 border-transparent'
-                          }`}
-                        >
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="py-3.5 pr-2">
-                        <select
-                          value={u.role}
-                          onChange={(e) => handlePromoteRole(u.id, e.target.value)}
-                          className="h-8 rounded-lg border border-slate-200 text-xs px-2 focus:outline-none focus:border-blue-600 font-semibold bg-white cursor-pointer"
-                        >
-                          <option value="Inventor">Inventor</option>
-                          <option value="Guide">Guide</option>
-                          <option value="PatentExpert">Patent Expert</option>
-                          <option value="Admin">Administrator</option>
-                        </select>
-                      </td>
-                      <td className="py-3.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(u.id)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                            u.isActive
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70'
-                              : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100/70'
-                          }`}
-                        >
-                          {u.isActive ? (
-                            <>
-                              <UserCheck className="w-3.5 h-3.5" />
-                              <span>Active</span>
-                            </>
-                          ) : (
-                            <>
-                              <UserX className="w-3.5 h-3.5" />
-                              <span>Deactivated</span>
-                            </>
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  if (isCoInventorRole) {
+    return <CoInventorDashboard user={user} projects={projects} onRefresh={fetchDashboardData} />;
   }
 
-  // ----------------------------------------------------
-  // 2. 👩🏫 Guide Dashboard
-  // ----------------------------------------------------
-  if (role === 'Guide') {
-    // Review filter logic
-    const filterReviews = (stages: string[]) => {
-      return projects.filter(p => stages.includes(p.stage));
-    };
-
-    let reviewQueueProjects = projects;
-    if (guideFilter === 'NEW') {
-      reviewQueueProjects = filterReviews(['FORMS_PREPARATION']);
-    } else if (guideFilter === 'GUIDE_REVIEW') {
-      reviewQueueProjects = filterReviews(['GUIDE_REVIEW']);
-    } else if (guideFilter === 'CHANGES_REQUESTED') {
-      reviewQueueProjects = filterReviews(['DOCUMENTATION']);
-    } else if (guideFilter === 'APPROVED') {
-      reviewQueueProjects = filterReviews(['PATENT_EXPERT_REVIEW', 'FILING_READY', 'FILED']);
-    }
-
-    return (
-      <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
-        {/* Welcome Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-amber-800 to-slate-900 p-8 rounded-3xl text-white shadow-lg border border-slate-800">
-          <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Good morning, {user?.fullName || 'Guide'}
-            </h1>
-            <p className="text-sm text-amber-200 font-medium">
-              You have {new Set(projects.map(p => p.owner.username)).size} supervised students and {filterReviews(['GUIDE_REVIEW']).length} pending reviews.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setGuideFilter('GUIDE_REVIEW');
-              toast.success('Filtered review queue to GUIDE_REVIEW stage.');
-            }}
-            className="px-5 py-2.5 rounded-xl font-bold bg-white text-amber-900 hover:bg-amber-50 transition-all shadow-md flex items-center gap-2 text-xs shrink-0 cursor-pointer"
-          >
-            <span>View Review Queue</span>
-          </button>
-        </div>
-
-        {/* Statistics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-3xl font-extrabold text-slate-900">
-                {new Set(projects.map(p => p.owner.username)).size}
-              </span>
-              <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
-            </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Students</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-3xl font-extrabold text-slate-900">{projects.length}</span>
-              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
-            </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Active Projects</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-3xl font-extrabold text-slate-900">
-                {filterReviews(['GUIDE_REVIEW']).length}
-              </span>
-              <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
-            </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Pending Reviews ({unreadNotificationsCount} notifications)</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-3xl font-extrabold text-slate-900">
-                {filterReviews(['PATENT_EXPERT_REVIEW', 'FILING_READY', 'FILED']).length}
-              </span>
-              <div className="w-2.5 h-2.5 bg-cyan-500 rounded-full" />
-            </div>
-            <p className="text-slate-450 text-xs font-bold uppercase tracking-wider">Approved Projects</p>
-          </div>
-        </div>
-
-        {/* Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Review Queue (⭐ Large Section) */}
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-900">Review Queue</h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Manage student review and revision stage transitions</p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {(['ALL', 'NEW', 'GUIDE_REVIEW', 'CHANGES_REQUESTED', 'APPROVED'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setGuideFilter(f)}
-                    className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg border transition-all ${
-                      guideFilter === f
-                        ? 'bg-amber-650 border-amber-650 text-white'
-                        : 'bg-white border-slate-250 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {f === 'GUIDE_REVIEW' ? 'Pending Review' : f}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {loadingProjects ? (
-              <div className="py-12 text-center text-slate-400 text-sm font-medium">Loading reviews...</div>
-            ) : reviewQueueProjects.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 text-xs font-medium">No projects in this stage queue.</div>
-            ) : (
-              <div className="space-y-4">
-                {reviewQueueProjects.map((p) => (
-                  <div key={p.id} className="p-5 border border-slate-150 bg-slate-50/50 hover:bg-white rounded-2xl shadow-3xs flex flex-col sm:flex-row justify-between gap-4">
-                    <div className="space-y-1">
-                      <span className="px-2 py-0.5 rounded text-[8px] font-extrabold bg-blue-50 border border-blue-100 text-blue-700 uppercase">
-                        {p.stage}
-                      </span>
-                      <h4 className="font-extrabold text-xs text-slate-955 mt-1">{p.title}</h4>
-                      <p className="text-[10px] text-slate-500 font-bold">Inventor: {p.owner.fullName}</p>
-                    </div>
-                    <div className="flex items-center gap-2 self-end sm:self-center">
-                      <Link
-                        to={`/dashboard/projects/${p.id}`}
-                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                      >
-                        Review
-                      </Link>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await api.put(`/projects/${p.id}`, { stage: 'DOCUMENTATION' });
-                            toast.success('Changes requested! Transitioned back to DOCUMENTATION stage.');
-                            fetchProjects();
-                          } catch (e) {
-                            toast.error('Cannot request revision in this stage.');
-                          }
-                        }}
-                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-650 cursor-pointer"
-                      >
-                        Request Changes
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Supervise New Student & Quick Actions */}
-          <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-              <h3 className="font-extrabold text-slate-900 text-xs flex items-center gap-2 uppercase tracking-wider border-b border-slate-100 pb-3">
-                Supervise Student
-              </h3>
-              <form onSubmit={handleGuideCreateProject} className="space-y-3 pt-1">
-                <input
-                  type="text"
-                  required
-                  value={inviteProjectTitle}
-                  onChange={(e) => setInviteProjectTitle(e.target.value)}
-                  placeholder="Project Title"
-                  className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
-                />
-                <input
-                  type="text"
-                  required
-                  value={inviteUsername}
-                  onChange={(e) => setInviteUsername(e.target.value)}
-                  placeholder="Student Username (e.g. STU20260001)"
-                  className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={inviteDomain}
-                    onChange={(e) => setInviteDomain(e.target.value)}
-                    placeholder="Domain"
-                    className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
-                  />
-                  <input
-                    type="text"
-                    required
-                    value={inviteCategory}
-                    onChange={(e) => setInviteCategory(e.target.value)}
-                    placeholder="Category"
-                    className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={submittingInvite}
-                  className="w-full h-9.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
-                >
-                  {submittingInvite ? 'Creating...' : 'Create & Invite Student'}
-                </button>
-              </form>
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-              <h3 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider border-b border-slate-100 pb-3">Guide Quick Actions</h3>
-              <div className="grid grid-cols-1 gap-2.5">
-                <button
-                  onClick={() => {
-                    setGuideFilter('GUIDE_REVIEW');
-                    toast.success('Filtered review queue to GUIDE_REVIEW stage.');
-                  }}
-                  className="flex items-center justify-between p-3 bg-slate-50 hover:bg-amber-50/40 border border-slate-200 hover:border-amber-200 rounded-xl text-xs font-bold text-slate-700 transition-all text-left cursor-pointer"
-                >
-                  <span>Review Projects</span>
-                  <ArrowRight className="w-4 h-4 text-amber-600" />
-                </button>
-
-                <button
-                  onClick={() => toast.success('Open any student project workspace -> Tasks tab to assign review milestones.')}
-                  className="flex items-center justify-between p-3 bg-slate-50 hover:bg-amber-50/40 border border-slate-200 hover:border-amber-200 rounded-xl text-xs font-bold text-slate-700 transition-all text-left cursor-pointer"
-                >
-                  <span>Add Task</span>
-                  <ArrowRight className="w-4 h-4 text-amber-600" />
-                </button>
-
-                <button
-                  onClick={() => toast.success('Generate student compliance reports via Project Reports tab.')}
-                  className="flex items-center justify-between p-3 bg-slate-50 hover:bg-amber-50/40 border border-slate-200 hover:border-amber-200 rounded-xl text-xs font-bold text-slate-700 transition-all text-left cursor-pointer"
-                >
-                  <span>Generate Report</span>
-                  <ArrowRight className="w-4 h-4 text-amber-600" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Student Progress Overview & Recent Student Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* My Students */}
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">My Students</h3>
-            {(() => {
-              const studentsMap = new Map<string, { name: string; username: string; projectsCount: number; stages: string[] }>();
-              projects.forEach((p) => {
-                const key = p.owner.username || p.owner.fullName;
-                if (!studentsMap.has(key)) {
-                  studentsMap.set(key, { name: p.owner.fullName, username: p.owner.username, projectsCount: 0, stages: [] });
-                }
-                const s = studentsMap.get(key)!;
-                s.projectsCount++;
-                s.stages.push(p.stage);
-              });
-              const students = Array.from(studentsMap.values());
-
-              if (students.length === 0) {
-                return <div className="text-center py-8 text-slate-400 text-xs font-semibold">No supervised students assigned yet.</div>;
-              }
-
-              return (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs font-sans">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[9px] tracking-wider">
-                        <th className="pb-3">Student</th>
-                        <th className="pb-3">Projects</th>
-                        <th className="pb-3">Average Progress</th>
-                        <th className="pb-3 text-right">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {students.map((stu, idx) => {
-                        const avgProgress = Math.round(stu.stages.reduce((acc, st) => acc + getStageProgress(st), 0) / stu.stages.length);
-                        const status = avgProgress >= 50 ? 'On Track' : 'Needs Attention';
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="py-3.5 pr-2 font-extrabold text-slate-900">{stu.name}</td>
-                            <td className="py-3.5 pr-2 font-bold text-slate-500">{stu.projectsCount} {stu.projectsCount === 1 ? 'project' : 'projects'}</td>
-                            <td className="py-3.5 pr-2 font-medium">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-700">{avgProgress}%</span>
-                                <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-amber-500" style={{ width: `${avgProgress}%` }} />
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3.5 text-right">
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                                status === 'On Track' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'
-                              }`}>
-                                {status}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Recent Student Activity */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Student Activity</h3>
-            {projects.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 text-xs font-semibold">No recent activity recorded.</div>
-            ) : (
-              <div className="space-y-4">
-                {projects.slice(0, 4).map((p, idx) => (
-                  <div key={idx} className="flex gap-3 text-xs items-start">
-                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full mt-1.5 shrink-0" />
-                    <div className="space-y-0.5">
-                      <p className="font-semibold text-slate-700 leading-snug">
-                        <span className="font-extrabold text-slate-900">{p.owner.fullName}</span>: {p.title} ({p.stage.replace(/_/g, ' ')})
-                      </p>
-                      <p className="text-[10px] text-slate-450 font-bold">{new Date(p.createdAt).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ----------------------------------------------------
-  // 3. ⚖️ Patent Expert Dashboard
-  // ----------------------------------------------------
-  if (role === 'PatentExpert') {
-    // Review filter logic
-    const filterReviews = (stages: string[]) => {
-      return projects.filter(p => stages.includes(p.stage));
-    };
-
-    let expertQueueProjects = projects;
-    if (expertFilter === 'NEW') {
-      expertQueueProjects = filterReviews(['GUIDE_REVIEW']);
-    } else if (expertFilter === 'PATENT_EXPERT_REVIEW') {
-      expertQueueProjects = filterReviews(['PATENT_EXPERT_REVIEW']);
-    } else if (expertFilter === 'CHANGES_REQUESTED') {
-      expertQueueProjects = filterReviews(['DOCUMENTATION']);
-    } else if (expertFilter === 'FILING_READY') {
-      expertQueueProjects = filterReviews(['FILING_READY', 'FILED']);
-    }
-
-    return (
-      <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
-        {/* Welcome Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-cyan-900 to-slate-900 p-8 rounded-3xl text-white shadow-lg border border-slate-800">
-          <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Good morning, Patent Expert
-            </h1>
-            <p className="text-sm text-cyan-200 font-medium">
-              Review claim bounds and forms configuration. {filterReviews(['PATENT_EXPERT_REVIEW']).length} projects require expert attention.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setExpertFilter('PATENT_EXPERT_REVIEW');
-              toast.success('Filtered review queue to PATENT_EXPERT_REVIEW stage.');
-            }}
-            className="px-5 py-2.5 rounded-xl font-bold bg-white text-cyan-900 hover:bg-cyan-50 transition-all shadow-md flex items-center gap-2 text-xs shrink-0 cursor-pointer"
-          >
-            <span>Open Review Queue</span>
-          </button>
-        </div>
-
-        {/* Statistics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['PATENT_EXPERT_REVIEW']).length}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Pending Reviews</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <span className="text-3xl font-extrabold text-slate-900">{projects.filter(p => p.stage === 'PATENT_EXPERT_REVIEW').length}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Under Review</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['FILED']).length}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Approved/Filed</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs hover:shadow-xs transition-shadow">
-            <span className="text-3xl font-extrabold text-slate-900">{filterReviews(['FILING_READY']).length}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Filing Ready ({unreadNotificationsCount} notifications)</p>
-          </div>
-        </div>
-
-        {/* Expert Content Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Expert Review Queue ⭐ */}
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-900">Expert Review Queue</h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Approve claims or request changes prior to filing</p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {(['ALL', 'NEW', 'PATENT_EXPERT_REVIEW', 'CHANGES_REQUESTED', 'FILING_READY'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setExpertFilter(f)}
-                    className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg border transition-all ${
-                      expertFilter === f
-                        ? 'bg-cyan-600 border-cyan-600 text-white'
-                        : 'bg-white border-slate-250 text-slate-650 hover:bg-slate-50'
-                    }`}
-                  >
-                    {f === 'PATENT_EXPERT_REVIEW' ? 'In Review' : f}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {loadingProjects ? (
-              <div className="py-12 text-center text-slate-400 text-sm font-medium">Loading reviews...</div>
-            ) : expertQueueProjects.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 text-xs font-medium">No reviews in this stage filter.</div>
-            ) : (
-              <div className="space-y-4">
-                {expertQueueProjects.map((p) => {
-                  const guideName = p.members.find(m => m.role === 'GUIDE')?.user.fullName || 'Unassigned';
-                  return (
-                    <div key={p.id} className="p-5 border border-slate-150 bg-slate-50/50 hover:bg-white rounded-2xl shadow-3xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div className="space-y-1">
-                        <h4 className="font-extrabold text-xs text-slate-900">{p.title}</h4>
-                        <p className="text-[10px] text-slate-500 font-semibold">Inventor: {p.owner.fullName} • Guide: {guideName}</p>
-                        <p className="text-[10px] text-indigo-650 font-bold uppercase tracking-wider">Stage: {p.stage}</p>
-                      </div>
-                      <Link
-                        to={`/dashboard/projects/${p.id}`}
-                        className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer shrink-0"
-                      >
-                        Open Review
-                      </Link>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Expert Review Checklist */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Expert Review Checklist</h3>
-
-            <div className="space-y-3.5 text-xs text-slate-650 font-semibold">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={checklist.inventorInfo}
-                  onChange={() => handleToggleChecklist('inventorInfo')}
-                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
-                />
-                <span>Inventor information verified</span>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={checklist.specification}
-                  onChange={() => handleToggleChecklist('specification')}
-                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
-                />
-                <span>Specification documentation review</span>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={checklist.drawings}
-                  onChange={() => handleToggleChecklist('drawings')}
-                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
-                />
-                <span>Drawings & Schematics verification</span>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={checklist.claims}
-                  onChange={() => handleToggleChecklist('claims')}
-                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
-                />
-                <span>Claims criteria boundary validation</span>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={checklist.supportingDocs}
-                  onChange={() => handleToggleChecklist('supportingDocs')}
-                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
-                />
-                <span>Forms 1, 2, 3, 5 uploaded</span>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={checklist.finalVerification}
-                  onChange={() => handleToggleChecklist('finalVerification')}
-                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500"
-                />
-                <span>Final verification approval</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Filing Readiness & Patent Form Status & Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Filing Readiness */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Filing Readiness</h3>
-            {projects.length === 0 ? (
-              <div className="text-center py-6 text-slate-400 text-xs font-semibold">No projects in review queue.</div>
-            ) : (
-              <div className="space-y-4">
-                {(portfolioAnalytics?.projectHealthSummaries || projects.map(p => ({
-                  id: p.id,
-                  title: p.title,
-                  readinessScore: getStageProgress(p.stage)
-                }))).slice(0, 4).map((p: any, idx: number) => {
-                  const pct = p.readinessScore ?? getStageProgress(p.stage);
-                  return (
-                    <div key={idx} className="space-y-1">
-                      <div className="flex justify-between text-xs font-bold text-slate-700">
-                        <span className="truncate max-w-[180px]">{p.title}</span>
-                        <span className="font-mono text-cyan-650">{pct}%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-cyan-500" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Patent Form Status */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Portfolio Metrics</h3>
-            <div className="grid grid-cols-2 gap-3 text-xs font-bold text-slate-650">
-              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-                <span>Forms Submitted</span>
-                <span className="font-mono text-cyan-700">{portfolioAnalytics?.totalForms ?? 0}</span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-                <span>Prior References</span>
-                <span className="font-mono text-cyan-700">{portfolioAnalytics?.totalReferences ?? 0}</span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-                <span>Prototypes</span>
-                <span className="font-mono text-cyan-700">{portfolioAnalytics?.totalPrototypes ?? 0}</span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-                <span>Completed Reviews</span>
-                <span className="font-mono text-emerald-600">{portfolioAnalytics?.totalReviews ?? filterReviews(['FILING_READY', 'FILED']).length}</span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl col-span-2">
-                <span>Avg Portfolio Readiness</span>
-                <span className="font-mono text-cyan-700 font-extrabold">{portfolioAnalytics?.averageFilingReadiness ?? 0}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Recent Expert Activity</h3>
-            {projects.length === 0 ? (
-              <div className="text-center py-6 text-slate-400 text-xs font-semibold">No recent expert activity.</div>
-            ) : (
-              <div className="space-y-3.5">
-                {projects.slice(0, 3).map((p, idx) => (
-                  <div key={idx} className="flex gap-2.5 text-xs items-start">
-                    <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-1.5 shrink-0" />
-                    <div className="space-y-0.5">
-                      <p className="font-semibold text-slate-700 leading-snug">
-                        Reviewed <span className="font-bold text-slate-900">{p.title}</span> ({p.stage.replace(/_/g, ' ')})
-                      </p>
-                      <p className="text-[10px] text-slate-450 font-bold">{new Date(p.createdAt).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ----------------------------------------------------
-  // 4. 🧑💻 Student / Inventor Dashboard
-  // ----------------------------------------------------
   return (
-    <div className="space-y-8 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
-      {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-indigo-900 to-slate-900 p-8 rounded-3xl text-white shadow-lg border border-slate-800">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Good morning, {user?.fullName || 'Inventor'}
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans">
+      {/* 1. TOP GREETING & COMMAND CENTER HEADER */}
+      <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+        <div className="space-y-2 relative z-10 max-w-2xl">
+          <div className="flex items-center gap-2.5">
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100">
+              {userRole} Command Center
+            </span>
+            {user?.institution && (
+              <span className="text-xs text-slate-400 font-semibold">• {user.institution}</span>
+            )}
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight">
+            Welcome back, {user?.fullName || 'Inventor'}
           </h1>
-          <p className="text-sm text-indigo-200 font-medium">
-            Continue developing your patent projects. Make your claims boundaries clear.
+          <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
+            Manage your invention portfolio, draft statutory claims, execute AI novelty audits, and prepare your application for Indian Patent Office filing.
           </p>
         </div>
-        <Link
-          to="/dashboard/create-project"
-          className="px-5 py-2.5 rounded-xl font-bold bg-white text-indigo-900 hover:bg-indigo-50 transition-all shadow-md flex items-center gap-2 text-xs shrink-0 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create New Patent</span>
-        </Link>
-      </div>
 
-      {/* Task 8: Portfolio Analytics Summary Cards */}
-      {portfolioAnalytics && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-            <span className="text-xl font-black text-slate-900">{portfolioAnalytics.totalProjects}</span>
-            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Total Projects</p>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-            <span className="text-xl font-black text-indigo-600">{portfolioAnalytics.inProgressProjects}</span>
-            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">In Progress</p>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-            <span className="text-xl font-black text-emerald-600">{portfolioAnalytics.filingReadyProjects}</span>
-            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Filing Ready</p>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-            <span className="text-xl font-black text-purple-600">{portfolioAnalytics.averageFilingReadiness}%</span>
-            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Avg Readiness</p>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-            <span className="text-xl font-black text-cyan-600">{portfolioAnalytics.averageTaskCompletion}%</span>
-            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Avg Task Velocity</p>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-            <span className="text-xl font-black text-amber-600">{portfolioAnalytics.totalReferences}</span>
-            <p className="text-slate-400 text-[9px] font-extrabold uppercase tracking-wider mt-1">Total References</p>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Statistics (Four cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
-          <div>
-            <span className="text-3xl font-extrabold text-slate-900">{activeProjectsCount}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Active Projects</p>
-          </div>
-          <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
-            <FolderKanban className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
-          <div>
-            <span className="text-3xl font-extrabold text-slate-900">{pendingTasksCount}</span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Pending Tasks</p>
-          </div>
-          <div className="p-3 bg-amber-50 rounded-2xl text-amber-600">
-            <CheckSquare className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
-          <div>
-            <span className="text-3xl font-extrabold text-slate-900">
-              {projects.filter(p => ['GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length}
-            </span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Under Review</p>
-          </div>
-          <div className="p-3 bg-cyan-50 rounded-2xl text-cyan-600">
-            <Bell className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs flex items-center justify-between hover:shadow-xs transition-shadow">
-          <div>
-            <span className="text-3xl font-extrabold text-slate-900">
-              {portfolioAnalytics ? `${portfolioAnalytics.averageFilingReadiness}%` : (projects.length > 0 ? `${Math.round(projects.reduce((sum, p) => sum + getStageProgress(p.stage), 0) / projects.length)}%` : '0%')}
-            </span>
-            <p className="text-slate-450 text-[10px] font-extrabold uppercase tracking-wider mt-1">Filing Readiness</p>
-          </div>
-          <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
-            <TrendingUp className="w-6 h-6" />
-          </div>
-        </div>
-      </div>
-
-      {/* Main Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* My Patent Projects */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-            <div>
-              <h2 className="text-lg font-extrabold text-slate-900">My Patent Projects</h2>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">Manage your specification lifecycle stages</p>
-            </div>
-            <Link to="/dashboard/projects" className="text-xs font-bold text-indigo-650 hover:underline">View all</Link>
-          </div>
-
-          {loadingProjects ? (
-            <div className="py-12 text-center text-slate-400 text-sm font-medium">Loading projects...</div>
-          ) : projects.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-xs font-medium space-y-3">
-              <FolderKanban className="w-8 h-8 mx-auto text-slate-350" />
-              <p>No projects found. Click "Create New Patent" to start.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[9px] tracking-wider">
-                    <th className="pb-3">Project</th>
-                    <th className="pb-3">Stage</th>
-                    <th className="pb-3">Guide</th>
-                    <th className="pb-3">Progress</th>
-                    <th className="pb-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {projects.map((p) => {
-                    const progress = getStageProgress(p.stage);
-                    const guide = p.members.find(m => m.role === 'GUIDE')?.user.fullName || 'Unassigned';
-                    return (
-                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3.5 pr-2">
-                          <div className="font-extrabold text-slate-900">{p.title}</div>
-                          <div className="text-[10px] text-slate-450 font-semibold">{p.category} • {p.technicalDomain}</div>
-                        </td>
-                        <td className="py-3.5 pr-2">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-indigo-50 border border-indigo-100 text-indigo-700 uppercase">
-                            {p.stage}
-                          </span>
-                        </td>
-                        <td className="py-3.5 pr-2 font-medium text-slate-650">{guide}</td>
-                        <td className="py-3.5 pr-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-700">{progress}%</span>
-                            <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 text-right space-x-1.5 whitespace-nowrap">
-                          <Link
-                            to={`/dashboard/projects/${p.id}`}
-                            className="inline-block px-3 py-1.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-650 hover:border-indigo-200 rounded-xl text-[10px] font-bold text-slate-700 transition-all"
-                          >
-                            Open
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Filing Readiness Visual Card */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Filing Readiness</h3>
-
-            {(() => {
-              const avgReadiness = portfolioAnalytics?.averageFilingReadiness ?? (projects.length > 0 ? Math.round(projects.reduce((sum, p) => sum + getStageProgress(p.stage), 0) / projects.length) : 0);
-              return (
-                <div className="flex flex-col items-center justify-center py-6">
-                  <div className="relative inline-flex items-center justify-center">
-                    <svg className="w-28 h-28 transform -rotate-90">
-                      <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
-                      <circle cx="56" cy="56" r="46" stroke="#4f46e5" strokeWidth="8" strokeDasharray="289" strokeDashoffset={289 - (289 * avgReadiness) / 100} fill="transparent" />
-                    </svg>
-                    <div className="absolute text-center">
-                      <span className="text-2xl font-extrabold text-indigo-950 font-mono">{avgReadiness}%</span>
-                      <span className="text-[8px] text-slate-400 font-bold block uppercase">Readiness</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="space-y-2.5 text-[11px] font-bold text-slate-600">
-              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Active Projects</span>
-                <span className="text-indigo-600 font-extrabold">{activeProjectsCount}</span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Filing Ready</span>
-                <span className={portfolioAnalytics?.filingReadyProjects ? "text-emerald-600 font-extrabold" : "text-slate-400 font-extrabold"}>
-                  {portfolioAnalytics?.filingReadyProjects ?? projects.filter(p => p.stage === 'FILING_READY' || p.stage === 'FILED').length}
-                </span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Prior-Art References</span>
-                <span className="text-purple-600 font-extrabold">{portfolioAnalytics?.totalReferences ?? 0}</span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Under Review</span>
-                <span className="text-amber-600 font-extrabold">
-                  {projects.filter(p => ['GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW'].includes(p.stage)).length}
-                </span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                <span>Pending Tasks</span>
-                <span className="text-slate-600 font-extrabold">{pendingTasksCount}</span>
-              </div>
-            </div>
-          </div>
-
-          <Link
-            to="/dashboard/projects"
-            className="w-full mt-4 h-10 bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center cursor-pointer"
+        <div className="flex flex-wrap items-center gap-3 relative z-10">
+          <button
+            onClick={fetchDashboardData}
+            className="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-slate-600 text-xs font-bold transition shadow-3xs cursor-pointer flex items-center gap-1.5"
+            title="Refresh Portfolio Data"
           >
-            View Projects
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+          </button>
+          <Link
+            to="/dashboard/create-project"
+            className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-extrabold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>New Patent Project</span>
           </Link>
         </div>
       </div>
 
-      {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Current Tasks */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Current Tasks</h3>
-            <Link to="/dashboard/tasks" className="text-xs font-bold text-indigo-650 hover:underline">View all</Link>
+      {/* 2. TOP 4 PORTFOLIO KPI CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="app-card p-5 space-y-2 shadow-xs border-slate-200">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider">Total Inventions</span>
+            <FolderKanban className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+            {dashboardAnalytics?.totalProjects ?? projects.length}
+          </div>
+          <span className="inline-block text-[10px] font-bold text-slate-500">
+            Active patent workspace files
+          </span>
+        </div>
+
+        <div className="app-card p-5 space-y-2 shadow-xs border-slate-200">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider">Filing Readiness</span>
+            <Award className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-emerald-600 font-mono">
+            {dashboardAnalytics?.averageFilingReadiness ?? (projects.length > 0 ? 74 : 0)}%
+          </div>
+          <span className="inline-block text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+            Statutory completeness index
+          </span>
+        </div>
+
+        <div className="app-card p-5 space-y-2 shadow-xs border-slate-200">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider">Pending Reviews</span>
+            <CheckSquare className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-purple-600 font-mono">
+            {dashboardAnalytics?.pendingReviewsCount ?? 0}
+          </div>
+          <span className="inline-block text-[10px] font-bold text-slate-500">
+            Supervisor milestone approvals
+          </span>
+        </div>
+
+        <div className="app-card p-5 space-y-2 shadow-xs border-slate-200">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider">Overdue Tasks</span>
+            <AlertCircle className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-amber-600 font-mono">
+            {dashboardAnalytics?.overdueTasksCount ?? 0}
+          </div>
+          <span className="inline-block text-[10px] font-bold text-slate-500">
+            Filing preparation checklist
+          </span>
+        </div>
+      </div>
+
+      {/* 3. ACTIVE INVENTION COMMAND CENTER (IF PROJECTS EXIST) */}
+      {activeProject ? (
+        <div className="app-card p-6 sm:p-8 space-y-6 shadow-xs border-slate-200">
+          {/* Active Project Switcher & Stage Badge */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100">
+                  {activeProject.category}
+                </span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  {activeProject.technicalDomain}
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {activeProject.title}
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {projects.length > 1 && (
+                <select
+                  value={activeProjectIndex}
+                  onChange={(e) => setActiveProjectIndex(Number(e.target.value))}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-3xs cursor-pointer"
+                >
+                  {projects.map((p, idx) => (
+                    <option key={p.id} value={idx}>
+                      Switch: {p.title.slice(0, 30)}...
+                    </option>
+                  ))}
+                </select>
+              )}
+              <Link
+                to={`/dashboard/projects/${activeProject.id}`}
+                className="px-4 py-2.5 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 shrink-0"
+              >
+                <span>Open Workspace</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            {pendingTasks.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs font-semibold">No upcoming tasks assigned.</div>
-            ) : (
-              pendingTasks.slice(0, 3).map((task) => (
-                <div
-                  key={task.id}
-                  className="p-4 border border-slate-150 bg-slate-50 hover:bg-white rounded-2xl transition-all shadow-3xs flex justify-between items-start gap-4 cursor-pointer"
-                  onClick={() => handleCompleteTask(task.projectId, task.id)}
-                >
-                  <div className="space-y-1">
-                    <h5 className="font-extrabold text-xs text-slate-900">{task.title}</h5>
-                    <p className="text-[10px] text-slate-450 font-bold">Project: {task.projectTitle}</p>
+          {/* Patent Journey Visual Progress Stepper */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                <span>Patent Journey Milestone Line</span>
+              </span>
+              <span className="text-xs font-mono font-bold text-blue-600">
+                {getStageProgress(activeProject.stage)}% Completed • Stage: {activeProject.stage}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+              {STAGES.map((st, i) => {
+                const isCurrent = activeProject.stage === st.key;
+                const isPast = STAGES.findIndex((s) => s.key === activeProject.stage) >= i;
+
+                return (
+                  <div
+                    key={st.key}
+                    className={`p-2.5 rounded-2xl border text-center transition-all ${
+                      isCurrent
+                        ? 'bg-blue-900 text-white border-blue-900 shadow-sm'
+                        : isPast
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-slate-50 text-slate-400 border-slate-200/80'
+                    }`}
+                  >
+                    <span className="text-[9px] font-bold block uppercase tracking-wider mb-0.5">
+                      Step {i + 1}
+                    </span>
+                    <span className="text-xs font-black block truncate">{st.label}</span>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 border border-blue-100 text-blue-700 font-extrabold whitespace-nowrap">
-                    {task.status}
-                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Project Summary Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                Problem Statement
+              </span>
+              <p className="text-xs text-slate-700 font-medium leading-relaxed line-clamp-3">
+                {activeProject.problemStatement || 'Problem description registered during invention disclosure.'}
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                Proposed Solution & Innovations
+              </span>
+              <p className="text-xs text-slate-700 font-medium leading-relaxed line-clamp-3">
+                {activeProject.proposedSolution || activeProject.novelFeatures || 'Novel technical solution and claimed advantages.'}
+              </p>
+            </div>
+          </div>
+
+          {/* 4 Large Quick Action Cards */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+              Quick Action Studio
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Link
+                to={`/dashboard/projects/${activeProject.id}?tab=Prior%20Art%20Search`}
+                className="p-4 bg-gradient-to-br from-blue-50/50 to-white hover:to-blue-50/80 border border-blue-100 hover:border-blue-300 rounded-2xl transition shadow-3xs group flex flex-col justify-between space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <Search className="w-4 h-4" />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 transition" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-xs group-hover:text-blue-600 transition">
+                    🔎 Search Prior Art
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                    Run semantic novelty search on global patent databases.
+                  </p>
+                </div>
+              </Link>
+
+              <Link
+                to={`/dashboard/projects/${activeProject.id}?tab=Claims%20Studio`}
+                className="p-4 bg-gradient-to-br from-indigo-50/50 to-white hover:to-indigo-50/80 border border-indigo-100 hover:border-indigo-300 rounded-2xl transition shadow-3xs group flex flex-col justify-between space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                    <PenTool className="w-4 h-4" />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-600 transition" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-xs group-hover:text-indigo-600 transition">
+                    ✨ Generate Claims
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                    Draft hierarchical claims and sync directly with Form 2.
+                  </p>
+                </div>
+              </Link>
+
+              <Link
+                to={`/dashboard/projects/${activeProject.id}?tab=Prototype`}
+                className="p-4 bg-gradient-to-br from-purple-50/50 to-white hover:to-purple-50/80 border border-purple-100 hover:border-purple-300 rounded-2xl transition shadow-3xs group flex flex-col justify-between space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-purple-600 transition" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-xs group-hover:text-purple-600 transition">
+                    📐 Upload Drawings
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                    Inspect technical CAD blueprints and figure callouts.
+                  </p>
+                </div>
+              </Link>
+
+              <Link
+                to={`/dashboard/projects/${activeProject.id}?tab=FTO%20Analysis`}
+                className="p-4 bg-gradient-to-br from-emerald-50/50 to-white hover:to-emerald-50/80 border border-emerald-100 hover:border-emerald-300 rounded-2xl transition shadow-3xs group flex flex-col justify-between space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 transition" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-xs group-hover:text-emerald-600 transition">
+                    🛡️ Run FTO Analysis
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                    Analyze Freedom-to-Operate claim overlap and legal risk.
+                  </p>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Empty State when user has 0 projects */
+        <div className="app-card p-12 text-center space-y-5 shadow-xs border-slate-200">
+          <div className="w-16 h-16 rounded-3xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mx-auto shadow-sm">
+            <Lightbulb className="w-8 h-8" />
+          </div>
+          <div className="space-y-2 max-w-md mx-auto">
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">
+              Welcome to PatentHub-AI
+            </h2>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+              Create your first patent project to begin your journey from idea to filing with AI-assisted novelty search and Form 2 claim generation.
+            </p>
+          </div>
+          <Link
+            to="/dashboard/create-project"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-extrabold shadow-sm transition-all"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>+ Create Patent Project</span>
+          </Link>
+        </div>
+      )}
+
+      {/* 4. REVIEWER QUEUE (IF GUIDE OR PATENT EXPERT) */}
+      {isReviewer && (
+        <div className="app-card p-6 space-y-4 shadow-xs border-slate-200">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-purple-600" />
+              <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                {userRole === 'Guide' ? 'Projects Awaiting Guide Review' : 'Open Claims & FTO Review Queue'}
+              </h3>
+            </div>
+            <span className="text-xs font-bold text-slate-400">
+              {dashboardAnalytics?.guideReviewQueue?.length || dashboardAnalytics?.patentExpertQueue?.length || 0} In Queue
+            </span>
+          </div>
+
+          <div className="divide-y divide-slate-100 text-xs">
+            {(dashboardAnalytics?.guideReviewQueue || dashboardAnalytics?.patentExpertQueue || []).length === 0 ? (
+              <p className="py-4 text-center text-slate-400 text-xs font-medium">
+                No projects currently waiting for your review.
+              </p>
+            ) : (
+              (dashboardAnalytics?.guideReviewQueue || dashboardAnalytics?.patentExpertQueue || []).map((item: any) => (
+                <div key={item.id} className="py-3 flex items-center justify-between gap-4">
+                  <div>
+                    <h4 className="font-extrabold text-slate-900">{item.title}</h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Stage: <strong>{item.stage}</strong> • Category: {item.category}
+                    </p>
+                  </div>
+                  <Link
+                    to={`/dashboard/projects/${item.id}`}
+                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl font-bold text-xs transition"
+                  >
+                    Open Review Desk →
+                  </Link>
                 </div>
               ))
             )}
           </div>
         </div>
+      )}
 
-        {/* Project Progress Overview Donut Chart */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-          <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Project Status Overview</h3>
-
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="relative inline-flex items-center justify-center">
-              <svg className="w-28 h-28 transform -rotate-90">
-                <circle cx="56" cy="56" r="46" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
-                <circle
-                  cx="56"
-                  cy="56"
-                  r="46"
-                  stroke="#4f46e5"
-                  strokeWidth="8"
-                  strokeDasharray="289"
-                  strokeDashoffset={activeProjectsCount > 0 ? 289 - (289 * Math.min(100, Math.round((draftingCount / activeProjectsCount) * 100))) / 100 : 289}
-                  fill="transparent"
-                />
-              </svg>
-              <div className="absolute text-center">
-                <span className="text-lg font-extrabold text-slate-900">{activeProjectsCount}</span>
-                <span className="text-[8px] text-slate-450 font-bold block uppercase">Total</span>
-              </div>
-            </div>
-
-            <div className="w-full text-[10px] font-bold text-slate-500 space-y-1.5 border-t border-slate-100 pt-4">
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-indigo-600 rounded-full" /> Drafting</span>
-                <span className="font-mono text-slate-900">{draftingCount}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-yellow-500 rounded-full" /> Review</span>
-                <span className="font-mono text-slate-900">{reviewCount}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" /> Prototype</span>
-                <span className="font-mono text-slate-900">{prototypeCount}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-slate-350 rounded-full" /> Others</span>
-                <span className="font-mono text-slate-900">{othersCount}</span>
-              </div>
-            </div>
+      {/* 5. MY INVENTIONS PORTFOLIO LIST */}
+      <div className="app-card p-6 sm:p-8 space-y-6 shadow-xs border-slate-200">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+              My Inventions Portfolio
+            </h3>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              All patent disclosures registered under your account.
+            </p>
           </div>
+          <Link
+            to="/dashboard/projects"
+            className="text-xs font-bold text-blue-600 hover:underline"
+          >
+            View All ({projects.length}) →
+          </Link>
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-          <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-3">Quick Actions</h3>
+        {projects.length === 0 ? (
+          <div className="py-8 text-center text-slate-400 text-xs font-medium">
+            No projects in your portfolio. Click "+ New Patent Project" to create one.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {projects.map((proj) => {
+              const progress = getStageProgress(proj.stage);
+              return (
+                <div
+                  key={proj.id}
+                  className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 p-3 rounded-2xl transition"
+                >
+                  <div className="space-y-1 max-w-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                        {proj.category}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                        {proj.technicalDomain}
+                      </span>
+                    </div>
+                    <h4 className="font-extrabold text-slate-900 text-sm">
+                      {proj.title}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1.5 font-medium">
+                      <Clock className="w-3 h-3" />
+                      Updated: {new Date(proj.updatedAt || proj.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
 
-          <div className="grid grid-cols-1 gap-3">
-            <Link
-              to="/dashboard/create-project"
-              className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 rounded-2xl text-xs font-bold text-slate-750 transition-all cursor-pointer"
-            >
-              <PlusCircle className="w-4.5 h-4.5 text-indigo-600" />
-              <span>+ New Patent Project</span>
-            </Link>
+                  <div className="flex items-center gap-6 justify-between sm:justify-end">
+                    <div className="w-28 text-right">
+                      <span className="text-xs font-mono font-bold text-blue-600">{progress}% Complete</span>
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                        <div
+                          className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
 
-            <button
-              onClick={() => toast.success('Navigate to Project Details page -> Documents tab to upload.')}
-              className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 rounded-2xl text-xs font-bold text-slate-750 transition-all text-left cursor-pointer"
-            >
-              <FileText className="w-4.5 h-4.5 text-blue-600" />
-              <span>Upload Document</span>
-            </button>
+                    <Link
+                      to={`/dashboard/projects/${proj.id}`}
+                      className="px-3.5 py-2 bg-white border border-slate-200 hover:border-blue-600 hover:text-blue-600 text-slate-700 rounded-xl text-xs font-bold transition shadow-3xs shrink-0 flex items-center gap-1.5"
+                    >
+                      <span>Open</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-            <button
-              onClick={() => toast.success('Navigate to Project Details page -> Tasks tab to assign prototype milestones.')}
-              className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 rounded-2xl text-xs font-bold text-slate-750 transition-all text-left cursor-pointer"
-            >
-              <Layers className="w-4.5 h-4.5 text-amber-600" />
-              <span>Add Prototype</span>
-            </button>
-
-            <button
-              onClick={() => toast.success('Access the Patent Forms module in Project Details page.')}
-              className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 rounded-2xl text-xs font-bold text-slate-750 transition-all text-left cursor-pointer"
-            >
-              <FileSpreadsheet className="w-4.5 h-4.5 text-emerald-600" />
-              <span>Open Forms</span>
-            </button>
+      {/* 6. STATUTORY FILING GUIDE */}
+      <div className="app-card p-6 space-y-4 shadow-xs border-slate-200">
+        <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-blue-600" />
+          <span>Indian Patent Office (IPO) Statutory Filing Roadmap</span>
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+            <span className="font-extrabold text-slate-900 block">Form 1: Application</span>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Statutory grant request with full inventor and applicant declarations.
+            </p>
+          </div>
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+            <span className="font-extrabold text-slate-900 block">Form 2: Complete Spec</span>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Full specification, claim tree, abstract, and engineering figure callouts.
+            </p>
+          </div>
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+            <span className="font-extrabold text-slate-900 block">Form 3: Undertaking</span>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Foreign patent filing statements under Section 8 of the Indian Patents Act.
+            </p>
+          </div>
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+            <span className="font-extrabold text-slate-900 block">Form 5: Inventorship</span>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Official declaration as to inventorship for true and first inventors.
+            </p>
           </div>
         </div>
       </div>

@@ -15,6 +15,7 @@ import {
   CheckCircle,
   Loader2,
   ShieldAlert,
+  Shield,
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -246,7 +247,11 @@ export const CompleteProfilePage: React.FC = () => {
 
       toast.success('Profile completed successfully!');
       localStorage.removeItem('patenthub_profile_draft'); // Clean draft
-      navigate('/dashboard');
+      if ((data.role as string) === 'Admin' || data.role === 'Administrator') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to complete profile onboarding.');
     } finally {
@@ -269,10 +274,10 @@ export const CompleteProfilePage: React.FC = () => {
         <div className="w-full max-w-md bg-white border border-slate-200/80 rounded-3xl p-8 shadow-2xl space-y-6 relative overflow-hidden">
           <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500"></div>
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 font-heading text-slate-900 text-lg font-extrabold lowercase mb-1">
-              patenthub<span className="text-cyan-500 font-extrabold">.</span>
+            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-600 text-white shadow-xs mb-1">
+              <Shield className="w-6 h-6 fill-white" />
             </div>
-            <h1 className="text-xl font-extrabold text-slate-950 tracking-tight">Choose your Username</h1>
+            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Choose your Username</h1>
             <p className="text-xs text-slate-500 font-medium">Please set a unique username for project invitations and team collaborations.</p>
           </div>
           <form onSubmit={handleUsernameSubmit} className="space-y-4">
@@ -287,8 +292,8 @@ export const CompleteProfilePage: React.FC = () => {
                     setUsernameInput(e.target.value);
                     setUsernameError('');
                   }}
-                  placeholder="e.g. athira_biju"
-                  className="w-full h-11 pl-8 pr-3 bg-slate-50/50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 font-semibold transition-all shadow-2xs"
+                  placeholder="e.g. your_username"
+                  className="w-full h-11 pl-8 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 font-medium transition-all shadow-3xs"
                 />
               </div>
               {usernameError && <p className="mt-1 text-[11px] text-rose-600 font-semibold">{usernameError}</p>}
@@ -296,7 +301,7 @@ export const CompleteProfilePage: React.FC = () => {
             <button
               type="submit"
               disabled={savingUsername}
-              className="w-full h-11 rounded-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs shadow-md shadow-blue-500/20 hover:shadow-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
+              className="w-full h-11 rounded-xl font-bold bg-blue-900 hover:bg-blue-950 text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
             >
               {savingUsername ? 'Saving Username...' : 'Set Username'}
             </button>
@@ -308,17 +313,14 @@ export const CompleteProfilePage: React.FC = () => {
 
   return (
     <div className="flex-1 bg-slate-50 py-12 px-4 flex items-center justify-center font-sans">
-      <div className="w-full max-w-3xl bg-white border border-slate-200/80 rounded-3xl p-8 shadow-2xl space-y-8 relative overflow-hidden">
-        {/* Decorative Top Bar */}
-        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-500" />
-
+      <div className="w-full max-w-3xl app-card p-8 space-y-8">
         {/* Header */}
         <div className="text-center space-y-1">
-          <div className="inline-flex items-center gap-1.5 font-heading text-slate-900 text-lg font-extrabold lowercase mb-2">
-            patenthub<span className="text-cyan-500 font-extrabold">.</span>
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-600 text-white shadow-xs mb-2">
+            <Shield className="w-6 h-6 fill-white" />
           </div>
-          <h1 className="text-2xl font-extrabold text-slate-950 tracking-tight">Complete Your Profile</h1>
-          <p className="text-xs text-slate-500 font-medium">Provide your workspace information to unlock the Indian Patent Workspace.</p>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Complete Your Profile</h1>
+          <p className="text-xs text-slate-500 font-medium">Provide your workspace information to unlock the patent research workspace.</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -593,7 +595,7 @@ export const CompleteProfilePage: React.FC = () => {
           <button
             type="submit"
             disabled={saving || !isValid}
-            className="w-full h-12 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white text-xs shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+            className="w-full h-12 rounded-xl font-bold bg-blue-900 hover:bg-blue-950 text-white text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <>

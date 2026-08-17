@@ -387,4 +387,228 @@ export class AnalyticsService {
       projectHealthSummaries: healthSummaries
     };
   }
+
+  /**
+   * Complete real PostgreSQL aggregator for Co-Inventor Workspace
+   */
+  static async getCoInventorDashboardData(userId: string) {
+    // 1. Fetch all projects where user is owner or member
+    const projects = await prisma.patentProject.findMany({
+      where: {
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      },
+      include: {
+        owner: { select: { id: true, fullName: true, username: true, email: true } },
+        members: {
+          include: {
+            user: { select: { id: true, fullName: true, username: true, email: true } }
+          }
+        },
+        tasks: {
+          include: {
+            assignedTo: { select: { id: true, fullName: true, username: true } }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        documents: {
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        },
+        projectReviews: {
+          include: {
+            reviewer: { select: { id: true, fullName: true, username: true } }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        patentForms: true,
+        _count: {
+          select: { documents: true, tasks: true, members: true, patentClaims: true, drawingFigures: true }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    const projectIds = projects.map(p => p.id);
+    const now = new Date();
+    const oneWeekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // 2. Compute project health & filing readiness
+    const detailedProjects = [];
+    let activeProjectsCount = 0;
+    let pendingReviewsCount = 0;
+    let totalMyTasksCount = 0;
+    let tasksDueThisWeekCount = 0;
+
+    const stageMap: Record<string, number> = {
+      IDEA: 0,
+      LITERATURE_REVIEW: 1,
+      PROTOTYPE: 2,
+      DOCUMENTATION: 2,
+      FORMS_PREPARATION: 4,
+      GUIDE_REVIEW: 3,
+      PATENT_EXPERT_REVIEW: 3,
+      FILING_READY: 5,
+      FILED: 5,
+    };
+
+    for (const proj of projects) {
+      if (!proj.isArchived && proj.stage !== 'FILED') {
+        activeProjectsCount++;
+      }
+
+      const readiness = await FilingReadinessService.getFilingReadiness(proj.id);
+      const readinessScore = Math.round((readiness.completedCount / readiness.totalRequiredCount) * 100);
+
+      // Tasks calculation
+      for (const t of proj.tasks) {
+        if (t.status !== 'COMPLETED') {
+          totalMyTasksCount++;
+          if (t.dueDate && new Date(t.dueDate) >= now && new Date(t.dueDate) <= oneWeekFromNow) {
+            tasksDueThisWeekCount++;
+          }
+        }
+      }
+
+      // Reviews calculation
+      for (const r of proj.projectReviews) {
+        if (r.decision === 'PENDING') {
+          pendingReviewsCount++;
+        }
+      }
+
+      detailedProjects.push({
+        id: proj.id,
+        title: proj.title,
+        status: proj.isArchived ? 'ARCHIVED' : proj.stage === 'FILED' ? 'FILED' : 'ACTIVE',
+        summary: proj.problemStatement || proj.innovationIdea || 'Invention workflow and claims drafting docket.',
+        domain: proj.technicalDomain,
+        category: proj.category,
+        stage: proj.stage,
+        currentStageIndex: stageMap[proj.stage] !== undefined ? stageMap[proj.stage] : 2,
+        filingReadiness: readinessScore,
+        owner: proj.owner,
+        members: proj.members,
+        collaboratorCount: proj.members.length + 1,
+        createdAt: proj.createdAt,
+        updatedAt: proj.updatedAt,
+      });
+    }
+
+    // 3. Fetch Real Activity Logs across user's projects
+    const rawActivityLogs = await prisma.activityLog.findMany({
+      where: {
+        projectId: { in: projectIds }
+      },
+      include: {
+        user: { select: { id: true, fullName: true, username: true } },
+        project: { select: { id: true, title: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
+    const recentActivities = rawActivityLogs.map(log => ({
+      id: log.id,
+      actor: log.user?.fullName || log.user?.username || 'Team Member',
+      isCurrentUser: log.userId === userId,
+      action: log.action,
+      time: log.createdAt,
+      projectTitle: log.project?.title || 'Patent Project',
+    }));
+
+    // 4. Fetch Real Recent Documents across user's projects
+    const rawDocuments = await prisma.document.findMany({
+      where: {
+        projectId: { in: projectIds }
+      },
+      include: {
+        project: { select: { id: true, title: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 8
+    });
+
+    const recentDocuments = rawDocuments.map(doc => ({
+      id: doc.id,
+      title: doc.name,
+      category: doc.category,
+      projectTitle: doc.project.title,
+      projectId: doc.projectId,
+      fileUrl: doc.fileUrl,
+      updated: doc.createdAt,
+    }));
+
+    // 5. Generate Real Needs Attention items
+    const needsAttention = [];
+
+    // Add real pending reviews
+    for (const proj of projects) {
+      const pendingRev = proj.projectReviews.find(r => r.decision === 'PENDING');
+      if (pendingRev) {
+        needsAttention.push({
+          id: `rev-${pendingRev.id}`,
+          type: 'CLAIM REVIEW',
+          title: `Review pending for ${pendingRev.reviewType || 'Project Claims'}`,
+          project: proj.title,
+          projectId: proj.id,
+          tag: 'Under Review',
+          tagBg: 'bg-rose-50 text-rose-700 border border-rose-200',
+          actionText: 'Review',
+          tabTarget: 'Reviews',
+        });
+      }
+    }
+
+    // Add real pending tasks
+    for (const proj of projects) {
+      const pendingTask = proj.tasks.find(t => t.status !== 'COMPLETED');
+      if (pendingTask) {
+        needsAttention.push({
+          id: `task-${pendingTask.id}`,
+          type: 'TASK REQUIRED',
+          title: pendingTask.title,
+          project: proj.title,
+          projectId: proj.id,
+          tag: pendingTask.dueDate ? 'Due Soon' : 'Action Required',
+          tagBg: 'bg-amber-50 text-amber-700 border border-amber-200',
+          actionText: 'View Task',
+          tabTarget: 'Tasks',
+        });
+      }
+    }
+
+    // Add real document requirements if forms or specs missing
+    for (const proj of projects) {
+      if (proj._count.documents === 0) {
+        needsAttention.push({
+          id: `doc-${proj.id}`,
+          type: 'DOCUMENT REQUEST',
+          title: 'Upload technical specification & disclosure',
+          project: proj.title,
+          projectId: proj.id,
+          tag: 'Required',
+          tagBg: 'bg-blue-50 text-blue-700 border border-blue-200',
+          actionText: 'Upload Document',
+          tabTarget: 'Documents',
+        });
+      }
+    }
+
+    return {
+      kpis: {
+        myProjects: projects.length,
+        activeProjects: activeProjectsCount,
+        myTasks: totalMyTasksCount,
+        tasksDueThisWeek: tasksDueThisWeekCount,
+        pendingReviews: pendingReviewsCount,
+      },
+      projects: detailedProjects,
+      needsAttention: needsAttention.slice(0, 5),
+      recentActivities,
+      recentDocuments,
+    };
+  }
 }

@@ -53,11 +53,6 @@ const searchUsers = async (req, res) => {
 exports.searchUsers = searchUsers;
 const promoteUser = async (req, res) => {
     try {
-        // Only administrators can promote roles
-        if (req.user?.role !== 'Admin') {
-            res.status(403).json({ message: 'Access denied. Administrator privileges required.' });
-            return;
-        }
         const id = req.params.id;
         const { roleName } = req.body; // 'Inventor' | 'Guide' | 'PatentExpert' | 'Admin'
         if (!roleName) {
@@ -93,11 +88,6 @@ const promoteUser = async (req, res) => {
 exports.promoteUser = promoteUser;
 const toggleUserStatus = async (req, res) => {
     try {
-        // Only administrators can toggle activation status
-        if (req.user?.role !== 'Admin') {
-            res.status(403).json({ message: 'Access denied. Administrator privileges required.' });
-            return;
-        }
         const id = req.params.id;
         const user = await db_1.prisma.user.findUnique({ where: { id } });
         if (!user) {
@@ -120,11 +110,6 @@ const toggleUserStatus = async (req, res) => {
 exports.toggleUserStatus = toggleUserStatus;
 const listUsers = async (req, res) => {
     try {
-        // Only administrators can list all platform users
-        if (req.user?.role !== 'Admin') {
-            res.status(403).json({ message: 'Access denied. Administrator privileges required.' });
-            return;
-        }
         const users = await db_1.prisma.user.findMany({
             select: {
                 id: true,

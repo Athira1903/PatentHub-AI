@@ -91,8 +91,7 @@ export const CreateProject: React.FC = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="glass-card rounded-3xl p-8 sm:p-10 border border-slate-200/80 shadow-xl space-y-8 relative overflow-hidden">
-        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500"></div>
+      <form onSubmit={handleSubmit(onSubmit)} className="app-card p-6 sm:p-8 space-y-6">
 
         {/* Invention Title */}
         <div>
@@ -282,16 +281,16 @@ export const CreateProject: React.FC = () => {
         <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
           <Link
             to="/dashboard/projects"
-            className="px-6 py-3 rounded-2xl font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-colors text-xs uppercase tracking-wider"
+            className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition text-xs"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-7 py-3 rounded-2xl font-extrabold bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40 transition-all flex items-center gap-2 text-xs uppercase tracking-wider disabled:opacity-50 hover:-translate-y-0.5 cursor-pointer"
+            className="px-5 py-2.5 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition flex items-center gap-2 text-xs disabled:opacity-50 cursor-pointer"
           >
-            {isSubmitting ? 'Creating Project...' : 'Create Patent Project'} <ArrowRight className="w-4 h-4" />
+            {isSubmitting ? 'Creating Project...' : 'Create Patent Project'} <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </form>

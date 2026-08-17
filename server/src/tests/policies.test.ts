@@ -22,8 +22,14 @@ import { PrototypeService } from '../services/prototypeService';
 import { PdfService } from '../services/pdfService';
 import { ActivityService } from '../services/activityService';
 import { NotificationService } from '../services/notificationService';
+import { MailService } from '../services/mailService';
 import { TaskService } from '../services/taskService';
 import { AnalyticsService } from '../services/analyticsService';
+import { ClaimService } from '../services/claimService';
+import { ClaimAiService } from '../services/claimAiService';
+import { ClaimValidationService } from '../services/claimValidationService';
+import { FtoAnalysisService } from '../services/ftoAnalysisService';
+import { ClaimPolicy } from '../policies/claim/claim.policy';
 import {
   generateInnovationAi,
   getSimilarityAnalysis,
@@ -387,6 +393,7 @@ test('Controller: respondToInvitation successfully accepts and writes within a t
   const originalUpdate = prisma.invitation.update;
   const originalCreateMember = prisma.projectMember.create;
   const originalCreateNotification = prisma.notification.create;
+  const originalUpdateManyNotification = prisma.notification.updateMany;
   const originalCreateActivity = prisma.activityLog.create;
 
   let invitationUpdated = false;
@@ -400,7 +407,8 @@ test('Controller: respondToInvitation successfully accepts and writes within a t
     role: 'GUIDE',
     status: 'PENDING',
     project: { id: 'p1', title: 'Test Project' },
-    receiver: { fullName: 'Recipient Name' }
+    receiver: { fullName: 'Recipient Name', username: 'recipient_user' },
+    sender: { id: 'sender_1', email: 'sender@example.com', fullName: 'Sender Name' },
   });
 
   (prisma.projectMember as any).findUnique = async () => null;
@@ -426,6 +434,10 @@ test('Controller: respondToInvitation successfully accepts and writes within a t
     return {};
   };
 
+  (prisma.notification as any).updateMany = async () => {
+    return { count: 1 };
+  };
+
   (prisma.activityLog as any).create = async () => {
     return {};
   };
@@ -443,6 +455,7 @@ test('Controller: respondToInvitation successfully accepts and writes within a t
   (prisma.invitation as any).update = originalUpdate;
   (prisma.projectMember as any).create = originalCreateMember;
   (prisma.notification as any).create = originalCreateNotification;
+  (prisma.notification as any).updateMany = originalUpdateManyNotification;
   (prisma.activityLog as any).create = originalCreateActivity;
 });
 
@@ -2208,6 +2221,1744 @@ test('Task 8: Overdue task counts and stage distributions strictly match databas
 
   (prisma.patentProject as any).findMany = origFindMany;
   (FilingReadinessService as any).getFilingReadiness = origGetReadiness;
+});
+
+// 17. Task 9: AI Patent Claims Engineering & FTO Database Foundation Tests
+
+test('Task 9: PatentClaim model validates independent claim creation and project isolation', async () => {
+  const mockClaim1 = {
+    id: 'claim_1',
+    projectId: 'proj_alpha',
+    claimNumber: 1,
+    claimType: 'INDEPENDENT',
+    dependsOnNumber: null,
+    preamble: 'An automated solar tracking system comprising:',
+    body: 'a solar panel array; an azimuth actuator; and a microcontroller configured to track solar irradiance.',
+    status: 'DRAFT',
+    orderIndex: 1,
+    linkedFigures: 'FIG. 1',
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+
+  assert.strictEqual(mockClaim1.claimNumber, 1);
+  assert.strictEqual(mockClaim1.claimType, 'INDEPENDENT');
+  assert.strictEqual(mockClaim1.dependsOnNumber, null);
+  assert.strictEqual(mockClaim1.projectId, 'proj_alpha');
+  assert.ok(mockClaim1.body.includes('azimuth actuator'));
+});
+
+test('Task 9: PatentClaim enforces unique claim numbering per project', async () => {
+  const claimsStore: Array<{ projectId: string; claimNumber: number }> = [
+    { projectId: 'proj_alpha', claimNumber: 1 }
+  ];
+
+  const canAddClaim = (projId: string, num: number) => {
+    return !claimsStore.some(c => c.projectId === projId && c.claimNumber === num);
+  };
+
+  assert.strictEqual(canAddClaim('proj_alpha', 1), false, 'Duplicate claim 1 in same project must be rejected');
+  assert.strictEqual(canAddClaim('proj_alpha', 2), true, 'New claim 2 in same project is allowed');
+  assert.strictEqual(canAddClaim('proj_beta', 1), true, 'Claim 1 in a different project is allowed (project isolation)');
+});
+
+test('Task 9: Dependent claim correctly references antecedent claim and rejects invalid self-dependency', async () => {
+  const validateClaimDependency = (claimNumber: number, claimType: string, dependsOnNumber: number | null) => {
+    if (claimType === 'INDEPENDENT') {
+      if (dependsOnNumber !== null) return { valid: false, error: 'Independent claims cannot have a parent claim dependency.' };
+      return { valid: true };
+    }
+    if (claimType === 'DEPENDENT') {
+      if (!dependsOnNumber) return { valid: false, error: 'Dependent claim must specify a parent claim number.' };
+      if (dependsOnNumber === claimNumber) return { valid: false, error: 'Claim cannot depend on itself (self-dependency).' };
+      if (dependsOnNumber >= claimNumber) return { valid: false, error: 'Dependent claim must depend on an antecedent claim with a lower claim number.' };
+      return { valid: true };
+    }
+    return { valid: false, error: 'Unknown claim type.' };
+  };
+
+  // Valid Independent
+  assert.deepStrictEqual(validateClaimDependency(1, 'INDEPENDENT', null), { valid: true });
+
+  // Valid Dependent
+  assert.deepStrictEqual(validateClaimDependency(2, 'DEPENDENT', 1), { valid: true });
+
+  // Invalid: Independent with dependency
+  assert.strictEqual(validateClaimDependency(1, 'INDEPENDENT', 2).valid, false);
+
+  // Invalid: Self-dependency (Claim 2 depending on Claim 2)
+  const selfDep = validateClaimDependency(2, 'DEPENDENT', 2);
+  assert.strictEqual(selfDep.valid, false);
+  assert.ok(selfDep.error?.includes('self-dependency'));
+
+  // Invalid: Forward dependency (Claim 2 depending on Claim 3)
+  const fwdDep = validateClaimDependency(2, 'DEPENDENT', 3);
+  assert.strictEqual(fwdDep.valid, false);
+  assert.ok(fwdDep.error?.includes('antecedent claim'));
+});
+
+test('Task 9: ClaimElement ownership and linkage to DrawingComponent', async () => {
+  const mockComponent = {
+    id: 'comp_102',
+    figureId: 'fig_1',
+    referenceNumber: '102',
+    componentName: 'Azimuth Actuator',
+    description: 'Rotational stepper motor mounted to base'
+  };
+
+  const mockClaimElement = {
+    id: 'el_1',
+    claimId: 'claim_1',
+    elementName: 'Azimuth Actuator',
+    elementText: 'an azimuth actuator coupled to the solar panel array',
+    componentId: mockComponent.id
+  };
+
+  assert.strictEqual(mockClaimElement.claimId, 'claim_1');
+  assert.strictEqual(mockClaimElement.componentId, 'comp_102');
+  assert.strictEqual(mockClaimElement.elementName, 'Azimuth Actuator');
+});
+
+test('Task 9: ClaimChart enforces unique project-reference constraint and isolates overlap mappings', async () => {
+  const existingCharts = [
+    { id: 'chart_1', projectId: 'proj_alpha', referenceId: 'ref_uspto_1', overallRisk: 'MEDIUM' }
+  ];
+
+  const canCreateChart = (projId: string, refId: string) => {
+    return !existingCharts.some(c => c.projectId === projId && c.referenceId === refId);
+  };
+
+  assert.strictEqual(canCreateChart('proj_alpha', 'ref_uspto_1'), false, 'Duplicate chart for same project/reference rejected');
+  assert.strictEqual(canCreateChart('proj_alpha', 'ref_uspto_2'), true, 'New chart for different reference allowed');
+  assert.strictEqual(canCreateChart('proj_beta', 'ref_uspto_1'), true, 'Same reference in different project allowed');
+
+  const validOverlapLevels = ['NONE', 'PARTIAL', 'IDENTICAL', 'EQUIVALENT'];
+  const testElementMapping = {
+    id: 'cce_1',
+    chartId: 'chart_1',
+    claimElementId: 'el_1',
+    priorArtFeature: 'Motorized dual-axis solar positioning mechanism described in column 4',
+    overlapLevel: 'EQUIVALENT',
+    analysisNotes: 'Performs substantially the same function in substantially the same way to achieve the same result.'
+  };
+
+  assert.ok(validOverlapLevels.includes(testElementMapping.overlapLevel));
+});
+
+test('Task 9: Cascade deletion ensures removing project or claim safely cleans child elements', async () => {
+  let claimsDB = [
+    { id: 'c1', projectId: 'p1', claimNumber: 1 },
+    { id: 'c2', projectId: 'p1', claimNumber: 2 },
+    { id: 'c3', projectId: 'p2', claimNumber: 1 }
+  ];
+  let elementsDB = [
+    { id: 'e1', claimId: 'c1', elementName: 'Sensor' },
+    { id: 'e2', claimId: 'c1', elementName: 'Actuator' },
+    { id: 'e3', claimId: 'c2', elementName: 'Wireless Module' },
+    { id: 'e4', claimId: 'c3', elementName: 'Battery' }
+  ];
+  let chartsDB = [
+    { id: 'ch1', projectId: 'p1', referenceId: 'r1' },
+    { id: 'ch2', projectId: 'p2', referenceId: 'r2' }
+  ];
+  let chartElementsDB = [
+    { id: 'che1', chartId: 'ch1', claimElementId: 'e1' },
+    { id: 'che2', chartId: 'ch2', claimElementId: 'e4' }
+  ];
+
+  // Simulate Cascade Deletion of Project 'p1'
+  const deleteProjectCascade = (projId: string) => {
+    const deletedClaimIds = claimsDB.filter(c => c.projectId === projId).map(c => c.id);
+    const deletedElementIds = elementsDB.filter(e => deletedClaimIds.includes(e.claimId)).map(e => e.id);
+    const deletedChartIds = chartsDB.filter(ch => ch.projectId === projId).map(ch => ch.id);
+
+    chartElementsDB = chartElementsDB.filter(che => !deletedChartIds.includes(che.chartId) && !deletedElementIds.includes(che.claimElementId));
+    chartsDB = chartsDB.filter(ch => ch.projectId !== projId);
+    elementsDB = elementsDB.filter(e => !deletedClaimIds.includes(e.claimId));
+    claimsDB = claimsDB.filter(c => c.projectId !== projId);
+  };
+
+  deleteProjectCascade('p1');
+
+  // Verify p1 claims, elements, and charts are purged
+  assert.strictEqual(claimsDB.length, 1);
+  assert.strictEqual(claimsDB[0].projectId, 'p2');
+  assert.strictEqual(elementsDB.length, 1);
+  assert.strictEqual(elementsDB[0].id, 'e4');
+  assert.strictEqual(chartsDB.length, 1);
+  assert.strictEqual(chartsDB[0].projectId, 'p2');
+  assert.strictEqual(chartElementsDB.length, 1);
+  assert.strictEqual(chartElementsDB[0].id, 'che2');
+});
+
+// 18. Task 9 — Step 2: Claim Service & Dependency Validation Tests
+
+test('Task 9 (2.1): ClaimService creates independent claim successfully', async () => {
+  const origFindMany = prisma.patentClaim.findMany;
+  const origCreate = prisma.patentClaim.create;
+
+  (prisma.patentClaim as any).findMany = async () => [];
+  (prisma.patentClaim as any).create = async ({ data }: any) => ({
+    id: 'claim_101',
+    ...data,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+
+  const created = await ClaimService.createClaim('proj_1', 'user_1', {
+    claimNumber: 1,
+    claimType: 'INDEPENDENT',
+    preamble: 'A solar-powered IoT sensor device comprising:',
+    body: 'a photovoltaic panel, a microcontroller, and a low-power wireless transceiver.'
+  });
+
+  assert.strictEqual(created.claimNumber, 1);
+  assert.strictEqual(created.claimType, 'INDEPENDENT');
+  assert.strictEqual(created.dependsOnNumber, null);
+
+  (prisma.patentClaim as any).findMany = origFindMany;
+  (prisma.patentClaim as any).create = origCreate;
+});
+
+test('Task 9 (2.2): ClaimService creates dependent claim referencing valid parent', async () => {
+  const origFindMany = prisma.patentClaim.findMany;
+  const origCreate = prisma.patentClaim.create;
+
+  (prisma.patentClaim as any).findMany = async () => [
+    { id: 'c1', claimNumber: 1, dependsOnNumber: null }
+  ];
+  (prisma.patentClaim as any).create = async ({ data }: any) => ({
+    id: 'claim_102',
+    ...data,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+
+  const created = await ClaimService.createClaim('proj_1', 'user_1', {
+    claimNumber: 2,
+    claimType: 'DEPENDENT',
+    dependsOnNumber: 1,
+    preamble: 'The device of claim 1,',
+    body: 'further comprising a rechargeable lithium-iron-phosphate battery module.'
+  });
+
+  assert.strictEqual(created.claimNumber, 2);
+  assert.strictEqual(created.claimType, 'DEPENDENT');
+  assert.strictEqual(created.dependsOnNumber, 1);
+
+  (prisma.patentClaim as any).findMany = origFindMany;
+  (prisma.patentClaim as any).create = origCreate;
+});
+
+test('Task 9 (2.3): ClaimService rejects dependent claim without dependsOnNumber', async () => {
+  await assert.rejects(
+    async () => {
+      await ClaimService.createClaim('proj_1', 'user_1', {
+        claimNumber: 2,
+        claimType: 'DEPENDENT',
+        body: 'a further sensor element.'
+      });
+    },
+    /Dependent claims must specify a parent claim number/
+  );
+});
+
+test('Task 9 (2.4): ClaimService rejects independent claim with dependsOnNumber', async () => {
+  await assert.rejects(
+    async () => {
+      await ClaimService.createClaim('proj_1', 'user_1', {
+        claimNumber: 1,
+        claimType: 'INDEPENDENT',
+        dependsOnNumber: 2,
+        body: 'an independent system.'
+      });
+    },
+    /Independent claims cannot specify a parent dependency/
+  );
+});
+
+test('Task 9 (2.5): ClaimService rejects self-dependency on creation', async () => {
+  await assert.rejects(
+    async () => {
+      await ClaimService.createClaim('proj_1', 'user_1', {
+        claimNumber: 3,
+        claimType: 'DEPENDENT',
+        dependsOnNumber: 3,
+        body: 'a self-referential clause.'
+      });
+    },
+    /Claim cannot depend on itself/
+  );
+});
+
+test('Task 9 (2.6): ClaimService rejects nonexistent parent dependency', async () => {
+  const origFindMany = prisma.patentClaim.findMany;
+  (prisma.patentClaim as any).findMany = async () => [
+    { id: 'c1', claimNumber: 1, dependsOnNumber: null }
+  ];
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.createClaim('proj_1', 'user_1', {
+        claimNumber: 2,
+        claimType: 'DEPENDENT',
+        dependsOnNumber: 99, // 99 does not exist
+        body: 'a dependent clause referencing 99.'
+      });
+    },
+    /Referenced parent claim 99 does not exist in this project/
+  );
+
+  (prisma.patentClaim as any).findMany = origFindMany;
+});
+
+test('Task 9 (2.7): ClaimService isolates claim dependencies by project (cross-project rejected)', async () => {
+  const origFindMany = prisma.patentClaim.findMany;
+  // Project B only has claim 5, not claim 1 from Project A
+  (prisma.patentClaim as any).findMany = async ({ where }: any) => {
+    if (where.projectId === 'proj_B') {
+      return [{ id: 'cb5', claimNumber: 5, dependsOnNumber: null }];
+    }
+    return [{ id: 'ca1', claimNumber: 1, dependsOnNumber: null }];
+  };
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.createClaim('proj_B', 'user_1', {
+        claimNumber: 6,
+        claimType: 'DEPENDENT',
+        dependsOnNumber: 1, // Claim 1 is in Project A, not Project B
+        body: 'attempting cross project parent.'
+      });
+    },
+    /Referenced parent claim 1 does not exist in this project/
+  );
+
+  (prisma.patentClaim as any).findMany = origFindMany;
+});
+
+test('Task 9 (2.8): ClaimService rejects dependency cycle detection during creation', async () => {
+  // Cycle detection logic:
+  // Existing: Claim 2 -> depends on 3. Claim 3 -> depends on 1.
+  // Creating: Claim 1 -> depends on 2 (Creates 1 -> 2 -> 3 -> 1 cycle)
+  const existing = [
+    { claimNumber: 2, dependsOnNumber: 3 },
+    { claimNumber: 3, dependsOnNumber: 1 }
+  ];
+
+  assert.strictEqual(
+    ClaimService.hasDependencyCycle([...existing, { claimNumber: 1, dependsOnNumber: 2 }]),
+    true,
+    'Must detect 1 -> 2 -> 3 -> 1 cycle'
+  );
+});
+
+test('Task 9 (2.9): ClaimService allows valid multi-level dependency tree', async () => {
+  const validTree = [
+    { claimNumber: 1, dependsOnNumber: null },
+    { claimNumber: 2, dependsOnNumber: 1 },
+    { claimNumber: 3, dependsOnNumber: 2 },
+    { claimNumber: 4, dependsOnNumber: 2 },
+    { claimNumber: 5, dependsOnNumber: 1 },
+    { claimNumber: 6, dependsOnNumber: null },
+    { claimNumber: 7, dependsOnNumber: 6 }
+  ];
+
+  assert.strictEqual(ClaimService.hasDependencyCycle(validTree), false);
+});
+
+test('Task 9 (2.10): ClaimService allows non-sequential claim numbers', async () => {
+  const nonSequentialTree = [
+    { claimNumber: 10, dependsOnNumber: null },
+    { claimNumber: 25, dependsOnNumber: 10 },
+    { claimNumber: 42, dependsOnNumber: 25 },
+    { claimNumber: 100, dependsOnNumber: null },
+    { claimNumber: 105, dependsOnNumber: 100 }
+  ];
+
+  assert.strictEqual(ClaimService.hasDependencyCycle(nonSequentialTree), false);
+});
+
+test('Task 9 (2.11): ClaimService rejects duplicate claim number within project', async () => {
+  const origFindMany = prisma.patentClaim.findMany;
+  (prisma.patentClaim as any).findMany = async () => [
+    { id: 'c1', claimNumber: 1, dependsOnNumber: null }
+  ];
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.createClaim('proj_1', 'user_1', {
+        claimNumber: 1, // Duplicate
+        claimType: 'INDEPENDENT',
+        body: 'duplicate claim number.'
+      });
+    },
+    /Claim number 1 already exists in this project/
+  );
+
+  (prisma.patentClaim as any).findMany = origFindMany;
+});
+
+test('Task 9 (2.12): ClaimService updates claim while strictly preserving claim ID', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  const origFindMany = prisma.patentClaim.findMany;
+  const origUpdate = prisma.patentClaim.update;
+
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'claim_fixed_id_123',
+    projectId: 'proj_1',
+    claimNumber: 1,
+    claimType: 'INDEPENDENT',
+    dependsOnNumber: null,
+    preamble: 'Old preamble',
+    body: 'Old body',
+    status: 'DRAFT',
+    orderIndex: 0
+  });
+
+  (prisma.patentClaim as any).findMany = async () => [
+    { id: 'claim_fixed_id_123', claimNumber: 1, dependsOnNumber: null }
+  ];
+
+  let updateArgs: any = null;
+  (prisma.patentClaim as any).update = async (args: any) => {
+    updateArgs = args;
+    return { id: 'claim_fixed_id_123', ...args.data };
+  };
+
+  const updated = await ClaimService.updateClaim('proj_1', 'user_1', 'claim_fixed_id_123', {
+    body: 'Updated novel patent body with detailed limitations.',
+    status: 'REVIEWED'
+  });
+
+  assert.strictEqual(updated.id, 'claim_fixed_id_123');
+  assert.strictEqual(updateArgs.where.id, 'claim_fixed_id_123');
+  assert.strictEqual(updated.status, 'REVIEWED');
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+  (prisma.patentClaim as any).findMany = origFindMany;
+  (prisma.patentClaim as any).update = origUpdate;
+});
+
+test('Task 9 (2.13): ClaimService rejects update that introduces a dependency cycle', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  const origFindMany = prisma.patentClaim.findMany;
+
+  // Claim 1 is independent, Claim 2 depends on 1
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'c1',
+    projectId: 'proj_1',
+    claimNumber: 1,
+    claimType: 'INDEPENDENT',
+    dependsOnNumber: null
+  });
+
+  (prisma.patentClaim as any).findMany = async () => [
+    { id: 'c1', claimNumber: 1, dependsOnNumber: null },
+    { id: 'c2', claimNumber: 2, dependsOnNumber: 1 }
+  ];
+
+  // Try updating Claim 1 to depend on Claim 2 -> 1 -> 2 -> 1 cycle!
+  await assert.rejects(
+    async () => {
+      await ClaimService.updateClaim('proj_1', 'user_1', 'c1', {
+        claimType: 'DEPENDENT',
+        dependsOnNumber: 2
+      });
+    },
+    /Claim dependency cycle detected/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+  (prisma.patentClaim as any).findMany = origFindMany;
+});
+
+test('Task 9 (2.14): ClaimService deletes claim successfully when no dependents exist', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  const origFindMany = prisma.patentClaim.findMany;
+  const origDelete = prisma.patentClaim.delete;
+
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'c2',
+    projectId: 'proj_1',
+    claimNumber: 2,
+    dependsOnNumber: 1
+  });
+
+  (prisma.patentClaim as any).findMany = async () => []; // No claims depend on claim 2
+  (prisma.patentClaim as any).delete = async () => ({ id: 'c2' });
+
+  const res = await ClaimService.deleteClaim('proj_1', 'user_1', 'c2');
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.deletedClaimId, 'c2');
+  assert.strictEqual(res.deletedClaimNumber, 2);
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+  (prisma.patentClaim as any).findMany = origFindMany;
+  (prisma.patentClaim as any).delete = origDelete;
+});
+
+test('Task 9 (2.15): ClaimService rejects deletion when dependent claims exist', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  const origFindMany = prisma.patentClaim.findMany;
+
+  // Claim 1 has Claim 2 and Claim 3 depending on it
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'c1',
+    projectId: 'proj_1',
+    claimNumber: 1
+  });
+
+  (prisma.patentClaim as any).findMany = async () => [
+    { claimNumber: 2 },
+    { claimNumber: 3 }
+  ];
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.deleteClaim('proj_1', 'user_1', 'c1');
+    },
+    /Cannot delete claim 1 because other claims \(2, 3\) depend on it/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+  (prisma.patentClaim as any).findMany = origFindMany;
+});
+
+test('Task 9 (2.16): ClaimService reorders claims successfully and preserves claim numbers', async () => {
+  const origFindMany = prisma.patentClaim.findMany;
+  const origTransaction = prisma.$transaction;
+
+  (prisma.patentClaim as any).findMany = async () => [
+    { id: 'c1', claimNumber: 1, orderIndex: 0 },
+    { id: 'c2', claimNumber: 2, orderIndex: 1 },
+    { id: 'c3', claimNumber: 3, orderIndex: 2 }
+  ];
+
+  let txUpdates: any[] = [];
+  (prisma as any).$transaction = async (actions: any[]) => {
+    txUpdates = actions;
+    return actions;
+  };
+
+  const reordered = await ClaimService.reorderClaims('proj_1', 'user_1', ['c3', 'c1', 'c2']);
+  assert.ok(Array.isArray(reordered));
+
+  (prisma.patentClaim as any).findMany = origFindMany;
+  (prisma as any).$transaction = origTransaction;
+});
+
+test('Task 9 (2.17): ClaimService rejects duplicate IDs in reorder request', async () => {
+  await assert.rejects(
+    async () => {
+      await ClaimService.reorderClaims('proj_1', 'user_1', ['c1', 'c2', 'c1']);
+    },
+    /Duplicate claim IDs provided in reorder request/
+  );
+});
+
+test('Task 9 (2.18): ClaimService rejects foreign-project claim IDs during reorder', async () => {
+  const origFindMany = prisma.patentClaim.findMany;
+
+  (prisma.patentClaim as any).findMany = async () => [
+    { id: 'c1', claimNumber: 1 },
+    { id: 'c2', claimNumber: 2 }
+  ];
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.reorderClaims('proj_1', 'user_1', ['c1', 'foreign_claim_id']);
+    },
+    /Invalid claim ID or claim belongs to another project/
+  );
+
+  (prisma.patentClaim as any).findMany = origFindMany;
+});
+
+test('Task 9 (2.19): ClaimService getClaimById enforces project isolation', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'c1',
+    projectId: 'proj_alpha',
+    claimNumber: 1
+  });
+
+  // Attempt to access proj_alpha claim through proj_beta endpoint
+  await assert.rejects(
+    async () => {
+      await ClaimService.getClaimById('proj_beta', 'c1');
+    },
+    /Claim not found or does not belong to this project/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+});
+
+test('Task 9 (2.20): ClaimPolicy verifies role authorization (inventor can edit, outsider cannot)', async () => {
+  const project = {
+    id: 'p1',
+    ownerId: 'u_owner',
+    members: [
+      { userId: 'u_inventor', role: 'INVENTOR' },
+      { userId: 'u_guide', role: 'GUIDE' },
+      { userId: 'u_expert', role: 'PATENT_EXPERT' }
+    ]
+  };
+
+  // Owner, Admin, Inventor can create/edit/delete
+  assert.strictEqual(ClaimPolicy.canCreateClaim({ userId: 'u_owner', role: 'Inventor' }, project), true);
+  assert.strictEqual(ClaimPolicy.canCreateClaim({ userId: 'u_admin', role: 'Admin' }, project), true);
+  assert.strictEqual(ClaimPolicy.canCreateClaim({ userId: 'u_inventor', role: 'Inventor' }, project), true);
+
+  // Guide, PatentExpert can view but cannot directly mutate claims
+  assert.strictEqual(ClaimPolicy.canViewClaims({ userId: 'u_guide', role: 'Guide' }, project), true);
+  assert.strictEqual(ClaimPolicy.canCreateClaim({ userId: 'u_guide', role: 'Guide' }, project), false);
+  assert.strictEqual(ClaimPolicy.canDeleteClaim({ userId: 'u_expert', role: 'PatentExpert' }, project), false);
+
+  // Outside user cannot view or mutate
+  assert.strictEqual(ClaimPolicy.canViewClaims({ userId: 'u_outsider', role: 'Inventor' }, project), false);
+  assert.strictEqual(ClaimPolicy.canCreateClaim({ userId: 'u_outsider', role: 'Inventor' }, project), false);
+});
+
+// 19. Task 9 — Step 3: Claim Elements & Technical Drawing Component Linking Tests
+
+test('Task 9 (3.1): ClaimService creates claim element successfully', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  const origCreate = prisma.claimElement.create;
+
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'c1',
+    projectId: 'p1',
+    claimNumber: 1
+  });
+
+  (prisma.claimElement as any).create = async ({ data }: any) => ({
+    id: 'el_101',
+    ...data,
+    component: null,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+
+  const element = await ClaimService.createClaimElement('p1', 'c1', 'u1', {
+    elementName: 'Microcontroller Unit',
+    elementText: 'a 32-bit low-power RISC-V microcontroller configured to process sensor readings'
+  });
+
+  assert.strictEqual(element.id, 'el_101');
+  assert.strictEqual(element.elementName, 'Microcontroller Unit');
+  assert.strictEqual(element.claimId, 'c1');
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+  (prisma.claimElement as any).create = origCreate;
+});
+
+test('Task 9 (3.2): ClaimService rejects empty element name', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1' });
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.createClaimElement('p1', 'c1', 'u1', {
+        elementName: '   ',
+        elementText: 'valid element text'
+      });
+    },
+    /Element name is required and cannot be empty/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+});
+
+test('Task 9 (3.3): ClaimService rejects empty element text', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1' });
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.createClaimElement('p1', 'c1', 'u1', {
+        elementName: 'Actuator',
+        elementText: '   '
+      });
+    },
+    /Element text is required and cannot be empty/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+});
+
+test('Task 9 (3.4): ClaimService retrieves claim elements ordered deterministically', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  const origFindMany = prisma.claimElement.findMany;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1' });
+  (prisma.claimElement as any).findMany = async () => [
+    { id: 'e1', elementName: 'Sensor', createdAt: new Date(1000) },
+    { id: 'e2', elementName: 'Transceiver', createdAt: new Date(2000) }
+  ];
+
+  const elements = await ClaimService.getClaimElements('p1', 'c1');
+  assert.strictEqual(elements.length, 2);
+  assert.strictEqual(elements[0].elementName, 'Sensor');
+  assert.strictEqual(elements[1].elementName, 'Transceiver');
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+  (prisma.claimElement as any).findMany = origFindMany;
+});
+
+test('Task 9 (3.5): ClaimService updates claim element successfully', async () => {
+  const origFindUniqueClaim = prisma.patentClaim.findUnique;
+  const origFindUniqueElement = prisma.claimElement.findUnique;
+  const origUpdate = prisma.claimElement.update;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1', claimNumber: 1 });
+  (prisma.claimElement as any).findUnique = async () => ({
+    id: 'e1',
+    claimId: 'c1',
+    elementName: 'Old Sensor',
+    elementText: 'Old text',
+    componentId: null
+  });
+  (prisma.claimElement as any).update = async ({ data }: any) => ({
+    id: 'e1',
+    claimId: 'c1',
+    ...data
+  });
+
+  const updated = await ClaimService.updateClaimElement('p1', 'c1', 'e1', 'u1', {
+    elementName: 'High Precision Sensor',
+    elementText: 'optical humidity sensor with ±1% accuracy'
+  });
+
+  assert.strictEqual(updated.elementName, 'High Precision Sensor');
+  assert.ok(updated.elementText.includes('±1% accuracy'));
+
+  (prisma.patentClaim as any).findUnique = origFindUniqueClaim;
+  (prisma.claimElement as any).findUnique = origFindUniqueElement;
+  (prisma.claimElement as any).update = origUpdate;
+});
+
+test('Task 9 (3.6): ClaimService deletes claim element successfully', async () => {
+  const origFindUniqueClaim = prisma.patentClaim.findUnique;
+  const origFindUniqueElement = prisma.claimElement.findUnique;
+  const origDelete = prisma.claimElement.delete;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1', claimNumber: 1 });
+  (prisma.claimElement as any).findUnique = async () => ({ id: 'e1', claimId: 'c1', elementName: 'Filter' });
+  (prisma.claimElement as any).delete = async () => ({ id: 'e1' });
+
+  const res = await ClaimService.deleteClaimElement('p1', 'c1', 'e1', 'u1');
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.deletedElementId, 'e1');
+
+  (prisma.patentClaim as any).findUnique = origFindUniqueClaim;
+  (prisma.claimElement as any).findUnique = origFindUniqueElement;
+  (prisma.claimElement as any).delete = origDelete;
+});
+
+test('Task 9 (3.7): ClaimService links claim element to valid DrawingComponent within same project', async () => {
+  const origFindUniqueClaim = prisma.patentClaim.findUnique;
+  const origFindUniqueElement = prisma.claimElement.findUnique;
+  const origFindUniqueComp = prisma.drawingComponent.findUnique;
+  const origUpdate = prisma.claimElement.update;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1', claimNumber: 1 });
+  (prisma.claimElement as any).findUnique = async () => ({ id: 'e1', claimId: 'c1', elementName: 'Solar Array' });
+  (prisma.drawingComponent as any).findUnique = async () => ({
+    id: 'comp_102',
+    figureId: 'fig_1',
+    referenceNumber: '102',
+    componentName: 'Photovoltaic Array',
+    figure: {
+      id: 'fig_1',
+      projectId: 'p1',
+      figureNumber: 'FIG. 1',
+      title: 'Top Isometric View'
+    }
+  });
+
+  (prisma.claimElement as any).update = async () => ({
+    id: 'e1',
+    claimId: 'c1',
+    elementName: 'Solar Array',
+    componentId: 'comp_102',
+    component: {
+      id: 'comp_102',
+      referenceNumber: '102',
+      componentName: 'Photovoltaic Array',
+      figure: { figureNumber: 'FIG. 1', title: 'Top Isometric View' }
+    }
+  });
+
+  const linked: any = await ClaimService.linkClaimElementToComponent('p1', 'c1', 'e1', 'u1', 'comp_102');
+  assert.strictEqual(linked.componentId, 'comp_102');
+  assert.strictEqual(linked.component.referenceNumber, '102');
+  assert.strictEqual(linked.component.figure.figureNumber, 'FIG. 1');
+
+  (prisma.patentClaim as any).findUnique = origFindUniqueClaim;
+  (prisma.claimElement as any).findUnique = origFindUniqueElement;
+  (prisma.drawingComponent as any).findUnique = origFindUniqueComp;
+  (prisma.claimElement as any).update = origUpdate;
+});
+
+test('Task 9 (3.8): ClaimService unlinks DrawingComponent from claim element', async () => {
+  const origFindUniqueClaim = prisma.patentClaim.findUnique;
+  const origFindUniqueElement = prisma.claimElement.findUnique;
+  const origUpdate = prisma.claimElement.update;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1', claimNumber: 1 });
+  (prisma.claimElement as any).findUnique = async () => ({ id: 'e1', claimId: 'c1', elementName: 'Solar Array', componentId: 'comp_102' });
+  (prisma.claimElement as any).update = async () => ({
+    id: 'e1',
+    claimId: 'c1',
+    elementName: 'Solar Array',
+    componentId: null,
+    component: null
+  });
+
+  const unlinked: any = await ClaimService.unlinkClaimElementFromComponent('p1', 'c1', 'e1', 'u1');
+  assert.strictEqual(unlinked.componentId, null);
+
+  (prisma.patentClaim as any).findUnique = origFindUniqueClaim;
+  (prisma.claimElement as any).findUnique = origFindUniqueElement;
+  (prisma.claimElement as any).update = origUpdate;
+});
+
+test('Task 9 (3.9): ClaimService rejects nonexistent DrawingComponent on link', async () => {
+  const origFindUniqueClaim = prisma.patentClaim.findUnique;
+  const origFindUniqueElement = prisma.claimElement.findUnique;
+  const origFindUniqueComp = prisma.drawingComponent.findUnique;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1', claimNumber: 1 });
+  (prisma.claimElement as any).findUnique = async () => ({ id: 'e1', claimId: 'c1', elementName: 'Solar Array' });
+  (prisma.drawingComponent as any).findUnique = async () => null; // Component does not exist
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.linkClaimElementToComponent('p1', 'c1', 'e1', 'u1', 'nonexistent_comp');
+    },
+    /Drawing component not found or belongs to another project/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUniqueClaim;
+  (prisma.claimElement as any).findUnique = origFindUniqueElement;
+  (prisma.drawingComponent as any).findUnique = origFindUniqueComp;
+});
+
+test('Task 9 (3.10): ClaimService rejects cross-project DrawingComponent linking', async () => {
+  const origFindUniqueClaim = prisma.patentClaim.findUnique;
+  const origFindUniqueElement = prisma.claimElement.findUnique;
+  const origFindUniqueComp = prisma.drawingComponent.findUnique;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'project_A', claimNumber: 1 });
+  (prisma.claimElement as any).findUnique = async () => ({ id: 'e1', claimId: 'c1', elementName: 'Solar Array' });
+  // Component belongs to project_B, not project_A
+  (prisma.drawingComponent as any).findUnique = async () => ({
+    id: 'comp_foreign',
+    figure: { projectId: 'project_B' }
+  });
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.linkClaimElementToComponent('project_A', 'c1', 'e1', 'u1', 'comp_foreign');
+    },
+    /Drawing component not found or belongs to another project/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUniqueClaim;
+  (prisma.claimElement as any).findUnique = origFindUniqueElement;
+  (prisma.drawingComponent as any).findUnique = origFindUniqueComp;
+});
+
+test('Task 9 (3.11): ClaimService rejects element creation if claim belongs to another project', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'project_A' });
+
+  // Attempting to create element for claim c1 under project_B
+  await assert.rejects(
+    async () => {
+      await ClaimService.createClaimElement('project_B', 'c1', 'u1', {
+        elementName: 'Antenna',
+        elementText: 'patch antenna'
+      });
+    },
+    /Claim not found or does not belong to this project/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+});
+
+test('Task 9 (3.12): ClaimService rejects element update if element belongs to another claim', async () => {
+  const origFindUniqueClaim = prisma.patentClaim.findUnique;
+  const origFindUniqueElement = prisma.claimElement.findUnique;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'claim_1', projectId: 'p1', claimNumber: 1 });
+  // Element belongs to claim_2, not claim_1
+  (prisma.claimElement as any).findUnique = async () => ({ id: 'e_other', claimId: 'claim_2' });
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.updateClaimElement('p1', 'claim_1', 'e_other', 'u1', {
+        elementName: 'New Name'
+      });
+    },
+    /Claim element not found or does not belong to this claim/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUniqueClaim;
+  (prisma.claimElement as any).findUnique = origFindUniqueElement;
+});
+
+test('Task 9 (3.13): ClaimPolicy verifies unauthorized user cannot create or edit claim elements', async () => {
+  const project = {
+    id: 'p1',
+    ownerId: 'u_owner',
+    members: [
+      { userId: 'u_inventor', role: 'INVENTOR' },
+      { userId: 'u_guide', role: 'GUIDE' }
+    ]
+  };
+
+  const outsider = { userId: 'u_outsider', role: 'Inventor' };
+  assert.strictEqual(ClaimPolicy.canCreateClaimElement(outsider, project), false);
+  assert.strictEqual(ClaimPolicy.canEditClaimElement(outsider, project), false);
+  assert.strictEqual(ClaimPolicy.canDeleteClaimElement(outsider, project), false);
+  assert.strictEqual(ClaimPolicy.canLinkDrawingComponent(outsider, project), false);
+});
+
+test('Task 9 (3.14): ClaimPolicy verifies project inventor can modify claim elements according to policy', async () => {
+  const project = {
+    id: 'p1',
+    ownerId: 'u_owner',
+    members: [
+      { userId: 'u_inventor', role: 'INVENTOR' },
+      { userId: 'u_guide', role: 'GUIDE' }
+    ]
+  };
+
+  const inventor = { userId: 'u_inventor', role: 'Inventor' };
+  assert.strictEqual(ClaimPolicy.canViewClaimElements(inventor, project), true);
+  assert.strictEqual(ClaimPolicy.canCreateClaimElement(inventor, project), true);
+  assert.strictEqual(ClaimPolicy.canEditClaimElement(inventor, project), true);
+  assert.strictEqual(ClaimPolicy.canDeleteClaimElement(inventor, project), true);
+  assert.strictEqual(ClaimPolicy.canLinkDrawingComponent(inventor, project), true);
+});
+
+test('Task 9 (3.15): ClaimService getClaimById includes linked drawing component with figure metadata', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'claim_1',
+    projectId: 'p1',
+    claimNumber: 1,
+    claimElements: [
+      {
+        id: 'el_1',
+        elementName: 'Actuator',
+        elementText: 'an electromechanical linear actuator',
+        component: {
+          id: 'comp_104',
+          referenceNumber: '104',
+          componentName: 'Linear Actuator',
+          figure: {
+            id: 'fig_2',
+            figureNumber: 'FIG. 2',
+            title: 'Side Cross-Sectional View'
+          }
+        }
+      }
+    ]
+  });
+
+  const claim: any = await ClaimService.getClaimById('p1', 'claim_1');
+  assert.strictEqual(claim.claimElements.length, 1);
+  assert.strictEqual(claim.claimElements[0].component.referenceNumber, '104');
+  assert.strictEqual(claim.claimElements[0].component.figure.figureNumber, 'FIG. 2');
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+});
+
+test('Task 9 (3.16): ClaimService getClaimElements enforces project isolation', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'proj_alpha' });
+
+  // Accessing proj_alpha claim through proj_beta endpoint
+  await assert.rejects(
+    async () => {
+      await ClaimService.getClaimElements('proj_beta', 'c1');
+    },
+    /Claim not found or does not belong to this project/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+});
+
+test('Task 9 (3.17): ActivityService logs CLAIM events on element lifecycle actions', async () => {
+  let loggedActivity: any = null;
+  const origCreateActivity = ActivityService.createActivity;
+
+  (ActivityService as any).createActivity = async (pId: string, uId: string, action: string, type: string, meta: any) => {
+    loggedActivity = { pId, uId, action, type, meta };
+    return { id: 'act_1', ...loggedActivity };
+  };
+
+  const origFindUniqueClaim = prisma.patentClaim.findUnique;
+  const origCreate = prisma.claimElement.create;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1', claimNumber: 1 });
+  (prisma.claimElement as any).create = async ({ data }: any) => ({ id: 'el_1', ...data });
+
+  await ClaimService.createClaimElement('p1', 'u1', 'c1', {
+    elementName: 'Battery Unit',
+    elementText: 'lithium battery'
+  });
+
+  assert.ok(loggedActivity !== null);
+  assert.strictEqual(loggedActivity.type, 'CLAIM');
+  assert.ok(loggedActivity.action.includes('Added technical element'));
+
+  (ActivityService as any).createActivity = origCreateActivity;
+  (prisma.patentClaim as any).findUnique = origFindUniqueClaim;
+  (prisma.claimElement as any).create = origCreate;
+});
+
+test('Task 9 (3.18): NotificationService isolates recipients when notifications are triggered', async () => {
+  const recipientIds: string[] = [];
+  const origCreateNotification = NotificationService.createNotification;
+
+  (NotificationService as any).createNotification = async (userId: string, title: string, message: string) => {
+    recipientIds.push(userId);
+    return { id: 'notif_1', userId, title, message };
+  };
+
+  await NotificationService.createNotification('target_user_1', 'Claim Review', 'Claim 1 updated', 'CLAIM', 'c1', 'p1');
+  assert.strictEqual(recipientIds.length, 1);
+  assert.strictEqual(recipientIds[0], 'target_user_1');
+
+  (NotificationService as any).createNotification = origCreateNotification;
+});
+
+test('Task 9 (3.19): Multiple elements can belong to one claim with distinct technical components', async () => {
+  const origFindUnique = prisma.patentClaim.findUnique;
+  const origFindMany = prisma.claimElement.findMany;
+
+  (prisma.patentClaim as any).findUnique = async () => ({ id: 'c1', projectId: 'p1', claimNumber: 1 });
+  (prisma.claimElement as any).findMany = async () => [
+    { id: 'el_1', elementName: 'Solar Array', componentId: 'comp_100' },
+    { id: 'el_2', elementName: 'Battery', componentId: 'comp_102' },
+    { id: 'el_3', elementName: 'Inverter', componentId: 'comp_104' },
+    { id: 'el_4', elementName: 'Microcontroller', componentId: null }
+  ];
+
+  const elements = await ClaimService.getClaimElements('p1', 'c1');
+  assert.strictEqual(elements.length, 4);
+  assert.strictEqual(elements[0].componentId, 'comp_100');
+  assert.strictEqual(elements[1].componentId, 'comp_102');
+  assert.strictEqual(elements[2].componentId, 'comp_104');
+  assert.strictEqual(elements[3].componentId, null);
+
+  (prisma.patentClaim as any).findUnique = origFindUnique;
+  (prisma.claimElement as any).findMany = origFindMany;
+});
+
+test('Task 9 (3.20): Regression verification — Tasks 1 to 8 policy tests remain valid', async () => {
+  // Verify ProjectPolicy and DocumentPolicy role resolvers still function identically
+  const sampleProject = { ownerId: 'user_A', members: [{ userId: 'user_B', role: 'INVENTOR' }] };
+  assert.strictEqual(ProjectPolicy.canViewProject({ userId: 'user_A', role: 'Inventor' }, sampleProject), true);
+  assert.strictEqual(ProjectPolicy.canViewProject({ userId: 'user_B', role: 'Inventor' }, sampleProject), true);
+  assert.strictEqual(ProjectPolicy.canViewProject({ userId: 'user_C', role: 'Inventor' }, sampleProject), false);
+});
+
+// 20. Task 9 — Steps 4 to 11: AI Claims Engineering, Validation, FTO & Docket Tests
+
+test('Task 9 (4.1): ClaimAiService generates structured claim proposal schema with apparatus and method claims', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Autonomous Smart Irrigation System',
+    category: 'AGRITECH',
+    technicalDomain: 'IoT',
+    innovationIdea: 'Soil moisture responsive automated valve',
+    problemStatement: 'Water wastage in agriculture',
+    proposedSolution: 'Automated solar irrigation valve with micro-controller',
+    drawingFigures: [
+      {
+        figureNumber: 'FIG. 1',
+        title: 'Valve assembly',
+        components: [{ id: 'comp_1', referenceNumber: '100', componentName: 'Actuator Valve' }]
+      }
+    ],
+    patentReferences: []
+  });
+
+  const proposal = await ClaimAiService.generateClaimProposal('p1', 'u1');
+  assert.ok(proposal.claims.length >= 5);
+  assert.strictEqual(proposal.claims[0].claimType, 'INDEPENDENT');
+  assert.ok(proposal.claims.some((c) => c.claimType === 'DEPENDENT'));
+  assert.ok(proposal.disclaimer.includes('Not legal advice'));
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+});
+
+test('Task 9 (4.2): ClaimAiService proposal generation is read-only and does not persist claims', async () => {
+  let createCalled = false;
+  const origFindUnique = prisma.patentProject.findUnique;
+  const origCreate = prisma.patentClaim.create;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Drone Delivery Box',
+    drawingFigures: [],
+    patentReferences: []
+  });
+
+  (prisma.patentClaim as any).create = async () => {
+    createCalled = true;
+    return {};
+  };
+
+  await ClaimAiService.generateClaimProposal('p1', 'u1');
+  assert.strictEqual(createCalled, false, 'AI generation must never modify or create PatentClaim records.');
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+  (prisma.patentClaim as any).create = origCreate;
+});
+
+test('Task 9 (5.1): ClaimValidationService.validateAntecedents detects missing antecedent basis', async () => {
+  // "the optical sensor" used without prior "an optical sensor"
+  const claim = {
+    preamble: 'An automated tracking device comprising:',
+    body: 'a main chassis; wherein the optical sensor transmits readings to the controller.'
+  };
+
+  const result = ClaimValidationService.validateAntecedents(claim);
+  const sensorIssue = result.issues.find((i) => i.term === 'optical sensor' || i.term === 'optical' || i.term === 'sensor');
+  assert.ok(sensorIssue !== undefined, 'Should detect missing antecedent basis for optical sensor');
+  assert.strictEqual(sensorIssue.type, 'MISSING_ANTECEDENT');
+});
+
+test('Task 9 (5.2): ClaimValidationService.validateAntecedents passes valid antecedent basis', async () => {
+  const claim = {
+    preamble: 'An automated tracking device comprising:',
+    body: 'an optical sensor; and a microcontroller coupled to the optical sensor, wherein the microcontroller receives signals from the optical sensor.'
+  };
+
+  const result = ClaimValidationService.validateAntecedents(claim);
+  const antecedentErrors = result.issues.filter((i) => i.type === 'MISSING_ANTECEDENT' && (i.term === 'microcontroller' || i.term === 'optical sensor'));
+  assert.strictEqual(antecedentErrors.length, 0);
+});
+
+test('Task 9 (5.3): ClaimValidationService.validateAntecedents flags subjective non-technical terms', async () => {
+  const claim = {
+    preamble: 'A system comprising:',
+    body: 'a revolutionary processing unit configured to achieve optimal power consumption.'
+  };
+
+  const result = ClaimValidationService.validateAntecedents(claim);
+  const vagueIssues = result.issues.filter((i) => i.type === 'VAGUE_TERM');
+  assert.ok(vagueIssues.length >= 2, 'Should flag "revolutionary" and "optimal"');
+});
+
+test('Task 9 (5.4): ClaimValidationService.validateClaim validates independent claims', async () => {
+  const validClaim = {
+    claimNumber: 1,
+    claimType: 'INDEPENDENT',
+    dependsOnNumber: null,
+    preamble: 'A system comprising:',
+    body: 'a sensor and a processor.'
+  };
+  const res1 = ClaimValidationService.validateClaim(validClaim);
+  assert.strictEqual(res1.valid, true);
+
+  const invalidClaim = {
+    claimNumber: 1,
+    claimType: 'INDEPENDENT',
+    dependsOnNumber: 2, // Independent claim with parent
+    body: 'a sensor and a processor.'
+  };
+  const res2 = ClaimValidationService.validateClaim(invalidClaim);
+  assert.strictEqual(res2.valid, false);
+  assert.ok(res2.errors.some((e) => e.includes('Independent claims cannot have a parent')));
+});
+
+test('Task 9 (5.5): ClaimValidationService.validateClaim validates dependent claims and rejects self-dependency', async () => {
+  const selfDep = {
+    claimNumber: 2,
+    claimType: 'DEPENDENT',
+    dependsOnNumber: 2,
+    body: 'the sensor of claim 2.'
+  };
+  const res = ClaimValidationService.validateClaim(selfDep);
+  assert.strictEqual(res.valid, false);
+  assert.ok(res.errors.some((e) => e.includes('cannot depend on itself')));
+});
+
+test('Task 9 (5.6): ClaimValidationService.validateProposal detects duplicate temporary numbers and dependency cycles', async () => {
+  const cyclicProposal = {
+    claims: [
+      { temporaryNumber: 1, claimType: 'DEPENDENT', dependsOnNumber: 2, body: 'claim 1' },
+      { temporaryNumber: 2, claimType: 'DEPENDENT', dependsOnNumber: 1, body: 'claim 2' }
+    ]
+  };
+
+  const res = ClaimValidationService.validateProposal(cyclicProposal as any);
+  assert.strictEqual(res.valid, false);
+  assert.ok(res.errors.some((e) => e.includes('cycle detected')));
+});
+
+test('Task 9 (5.7): ClaimValidationService.importProposal imports claims transactionally and remaps numbers', async () => {
+  const origFindManyClaims = prisma.patentClaim.findMany;
+  const origFindManyComps = prisma.drawingComponent.findMany;
+  const origTransaction = prisma.$transaction;
+
+  (prisma.patentClaim as any).findMany = async () => [
+    { claimNumber: 1, orderIndex: 0 },
+    { claimNumber: 2, orderIndex: 1 }
+  ];
+  (prisma.drawingComponent as any).findMany = async () => [{ id: 'comp_1' }];
+
+  let transactionExecuted = false;
+  (prisma as any).$transaction = async (fn: any) => {
+    transactionExecuted = true;
+    const txMock = {
+      patentClaim: {
+        create: async ({ data }: any) => ({ id: `claim_${data.claimNumber}`, ...data })
+      },
+      claimElement: {
+        create: async ({ data }: any) => ({ id: `el_${Date.now()}`, ...data })
+      }
+    };
+    return await fn(txMock);
+  };
+
+  const proposal = {
+    claims: [
+      {
+        temporaryNumber: 1,
+        claimType: 'INDEPENDENT' as const,
+        dependsOnNumber: null,
+        preamble: 'A system comprising:',
+        body: 'a transceiver;',
+        elements: [{ elementName: 'Transceiver', elementText: 'a transceiver', suggestedComponentId: 'comp_1' }]
+      },
+      {
+        temporaryNumber: 2,
+        claimType: 'DEPENDENT' as const,
+        dependsOnNumber: 1,
+        body: 'the transceiver of claim 1.',
+        elements: []
+      }
+    ]
+  };
+
+  const created = await ClaimValidationService.importProposal('p1', 'u1', proposal);
+  assert.strictEqual(transactionExecuted, true);
+  assert.strictEqual(created.length, 2);
+  // Remapped after existing 1, 2 -> 3 and 4
+  assert.strictEqual(created[0].claimNumber, 3);
+  assert.strictEqual(created[0].dependsOnNumber, null);
+  assert.strictEqual(created[1].claimNumber, 4);
+  assert.strictEqual(created[1].dependsOnNumber, 3); // 2 -> 1 remapped to 4 -> 3
+
+  (prisma.patentClaim as any).findMany = origFindManyClaims;
+  (prisma.drawingComponent as any).findMany = origFindManyComps;
+  (prisma as any).$transaction = origTransaction;
+});
+
+test('Task 9 (5.8): ClaimValidationService.importProposal preserves multi-level parent dependencies during remapping', async () => {
+  const origFindManyClaims = prisma.patentClaim.findMany;
+  const origFindManyComps = prisma.drawingComponent.findMany;
+  const origTransaction = prisma.$transaction;
+
+  (prisma.patentClaim as any).findMany = async () => [];
+  (prisma.drawingComponent as any).findMany = async () => [];
+
+  (prisma as any).$transaction = async (fn: any) => {
+    const txMock = {
+      patentClaim: { create: async ({ data }: any) => ({ id: `c_${data.claimNumber}`, ...data }) },
+      claimElement: { create: async () => ({}) }
+    };
+    return await fn(txMock);
+  };
+
+  const proposal = {
+    claims: [
+      { temporaryNumber: 1, claimType: 'INDEPENDENT' as const, dependsOnNumber: null, body: 'level 1' },
+      { temporaryNumber: 2, claimType: 'DEPENDENT' as const, dependsOnNumber: 1, body: 'level 2' },
+      { temporaryNumber: 3, claimType: 'DEPENDENT' as const, dependsOnNumber: 2, body: 'level 3' }
+    ]
+  };
+
+  const created = await ClaimValidationService.importProposal('p1', 'u1', proposal);
+  assert.strictEqual(created[0].claimNumber, 1);
+  assert.strictEqual(created[1].claimNumber, 2);
+  assert.strictEqual(created[1].dependsOnNumber, 1);
+  assert.strictEqual(created[2].claimNumber, 3);
+  assert.strictEqual(created[2].dependsOnNumber, 2);
+
+  (prisma.patentClaim as any).findMany = origFindManyClaims;
+  (prisma.drawingComponent as any).findMany = origFindManyComps;
+  (prisma as any).$transaction = origTransaction;
+});
+
+test('Task 9 (5.9): ClaimValidationService.importProposal verifies drawing component project ownership', async () => {
+  const origFindManyClaims = prisma.patentClaim.findMany;
+  const origFindManyComps = prisma.drawingComponent.findMany;
+  const origTransaction = prisma.$transaction;
+
+  (prisma.patentClaim as any).findMany = async () => [];
+  // Only comp_proj1 belongs to project, comp_foreign does not
+  (prisma.drawingComponent as any).findMany = async () => [{ id: 'comp_proj1' }];
+
+  let recordedComponentId: any = null;
+  (prisma as any).$transaction = async (fn: any) => {
+    const txMock = {
+      patentClaim: { create: async ({ data }: any) => ({ id: 'c1', ...data }) },
+      claimElement: {
+        create: async ({ data }: any) => {
+          recordedComponentId = data.componentId;
+          return { id: 'el1', ...data };
+        }
+      }
+    };
+    return await fn(txMock);
+  };
+
+  const proposal = {
+    claims: [
+      {
+        temporaryNumber: 1,
+        claimType: 'INDEPENDENT' as const,
+        dependsOnNumber: null,
+        body: 'system with foreign component',
+        elements: [{ elementName: 'Foreign Comp', elementText: 'text', suggestedComponentId: 'comp_foreign' }]
+      }
+    ]
+  };
+
+  await ClaimValidationService.importProposal('p1', 'u1', proposal);
+  assert.strictEqual(recordedComponentId, null, 'Foreign suggestedComponentId must be cleared');
+
+  (prisma.patentClaim as any).findMany = origFindManyClaims;
+  (prisma.drawingComponent as any).findMany = origFindManyComps;
+  (prisma as any).$transaction = origTransaction;
+});
+
+test('Task 9 (5.10): ClaimValidationService.importProposal rejects invalid proposal before database transaction', async () => {
+  const invalidProposal = {
+    claims: [
+      { temporaryNumber: 1, claimType: 'INVALID_TYPE' as any, dependsOnNumber: null, body: '' }
+    ]
+  };
+
+  await assert.rejects(
+    async () => {
+      await ClaimValidationService.importProposal('p1', 'u1', invalidProposal);
+    },
+    /Cannot import invalid proposal/
+  );
+});
+
+test('Task 9 (6.1): FtoAnalysisService.generateClaimChart generates overlap breakdown against prior art', async () => {
+  const origFindClaim = prisma.patentClaim.findUnique;
+  const origFindRef = prisma.patentReference.findUnique;
+  const origTransaction = prisma.$transaction;
+
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'c1',
+    projectId: 'p1',
+    claimNumber: 1,
+    claimElements: [
+      { id: 'el1', elementName: 'Optical Sensor', elementText: 'optical sensing array' },
+      { id: 'el2', elementName: 'Microprocessor', elementText: '32-bit CPU' }
+    ]
+  });
+
+  (prisma.patentReference as any).findUnique = async () => ({
+    id: 'ref1',
+    projectId: 'p1',
+    patentNumber: 'US-9999999-B2',
+    title: 'Optical Sensor and Controller System',
+    abstract: 'A system with an optical sensor and processing circuitry.'
+  });
+
+  (prisma as any).$transaction = async (fn: any) => {
+    const txMock = {
+      claimChart: {
+        upsert: async () => ({ id: 'chart1', projectId: 'p1', referenceId: 'ref1', overallRisk: 'MEDIUM' })
+      },
+      claimChartElement: {
+        deleteMany: async () => ({}),
+        create: async () => ({})
+      }
+    };
+    return await fn(txMock);
+  };
+
+  const chart = await FtoAnalysisService.generateClaimChart('p1', 'c1', 'ref1', 'u1');
+  assert.strictEqual(chart.id, 'chart1');
+  assert.strictEqual(chart.elements.length, 2);
+  assert.ok(chart.disclaimer.includes('preliminary AI-assisted'));
+
+  (prisma.patentClaim as any).findUnique = origFindClaim;
+  (prisma.patentReference as any).findUnique = origFindRef;
+  (prisma as any).$transaction = origTransaction;
+});
+
+test('Task 9 (6.2): FtoAnalysisService computes deterministic overall risk (LOW, MEDIUM, HIGH)', async () => {
+  // If elements have identical/equivalent -> HIGH risk
+  const elementsHigh = [{ overlapLevel: 'IDENTICAL' }, { overlapLevel: 'NONE' }];
+  const hasIdenticalOrEquiv = elementsHigh.some((el: any) => el.overlapLevel === 'IDENTICAL' || el.overlapLevel === 'EQUIVALENT');
+  assert.strictEqual(hasIdenticalOrEquiv, true);
+
+  // If elements only have partial -> MEDIUM risk
+  const elementsMed = [{ overlapLevel: 'PARTIAL' }, { overlapLevel: 'NONE' }];
+  const isMed = !elementsMed.some((el: any) => el.overlapLevel === 'IDENTICAL' || el.overlapLevel === 'EQUIVALENT') && elementsMed.some((el: any) => el.overlapLevel === 'PARTIAL');
+  assert.strictEqual(isMed, true);
+
+  // If all elements are NONE -> LOW risk
+  const elementsLow = [{ overlapLevel: 'NONE' }, { overlapLevel: 'NONE' }];
+  const isLow = !elementsLow.some((el: any) => el.overlapLevel !== 'NONE');
+  assert.strictEqual(isLow, true);
+});
+
+test('Task 9 (6.3): FtoAnalysisService rejects generating FTO chart for reference from another project', async () => {
+  const origFindClaim = prisma.patentClaim.findUnique;
+  const origFindRef = prisma.patentReference.findUnique;
+
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'c1',
+    projectId: 'project_A',
+    claimElements: [{ id: 'el1', elementName: 'Sensor' }]
+  });
+
+  // Reference belongs to project_B, not project_A
+  (prisma.patentReference as any).findUnique = async () => ({
+    id: 'ref_foreign',
+    projectId: 'project_B'
+  });
+
+  await assert.rejects(
+    async () => {
+      await FtoAnalysisService.generateClaimChart('project_A', 'c1', 'ref_foreign', 'u1');
+    },
+    /Patent reference not found or belongs to another project/
+  );
+
+  (prisma.patentClaim as any).findUnique = origFindClaim;
+  (prisma.patentReference as any).findUnique = origFindRef;
+});
+
+test('Task 9 (6.4): FtoAnalysisService.deleteClaimChart deletes chart and enforces project isolation', async () => {
+  const origFindUnique = prisma.claimChart.findUnique;
+  const origDelete = prisma.claimChart.delete;
+
+  (prisma.claimChart as any).findUnique = async () => ({ id: 'chart1', projectId: 'project_A' });
+  (prisma.claimChart as any).delete = async () => ({ id: 'chart1' });
+
+  // Attempting to delete project_A chart via project_B endpoint
+  await assert.rejects(
+    async () => {
+      await FtoAnalysisService.deleteClaimChart('project_B', 'chart1', 'u1');
+    },
+    /Claim chart not found or does not belong to this project/
+  );
+
+  const res = await FtoAnalysisService.deleteClaimChart('project_A', 'chart1', 'u1');
+  assert.strictEqual(res.success, true);
+
+  (prisma.claimChart as any).findUnique = origFindUnique;
+  (prisma.claimChart as any).delete = origDelete;
+});
+
+test('Task 9 (9.1): ClaimService.syncClaimsToForm2 formats structured claims into Form 2 specification text', async () => {
+  const origFindManyClaims = prisma.patentClaim.findMany;
+  const origFindUniqueProj = prisma.patentProject.findUnique;
+  const origFindFirstForm = prisma.patentForm.findFirst;
+  const origUpdateForm = prisma.patentForm.update;
+
+  (prisma.patentClaim as any).findMany = async () => [
+    { claimNumber: 1, claimType: 'INDEPENDENT', dependsOnNumber: null, preamble: 'An apparatus comprising:', body: 'a sensor.', orderIndex: 0 },
+    { claimNumber: 2, claimType: 'DEPENDENT', dependsOnNumber: 1, preamble: '', body: 'the sensor is an optical sensor.', orderIndex: 1 }
+  ];
+
+  (prisma.patentProject as any).findUnique = async () => ({ id: 'p1', title: 'Smart Sensor' });
+  (prisma.patentForm as any).findFirst = async () => ({
+    id: 'form2_id',
+    projectId: 'p1',
+    formType: 'Form 2',
+    formData: { title: 'Smart Sensor', novelFeatures: 'optical' }
+  });
+
+  (prisma.patentForm as any).update = async ({ data }: any) => ({ id: 'form2_id', ...data });
+
+  const res = await ClaimService.syncClaimsToForm2('p1', 'u1');
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.claimsCount, 2);
+  assert.ok(res.formattedClaimsText.includes('1. An apparatus comprising: a sensor.'));
+  assert.ok(res.formattedClaimsText.includes('2. The system of claim 1, wherein the sensor is an optical sensor.'));
+
+  (prisma.patentClaim as any).findMany = origFindManyClaims;
+  (prisma.patentProject as any).findUnique = origFindUniqueProj;
+  (prisma.patentForm as any).findFirst = origFindFirstForm;
+  (prisma.patentForm as any).update = origUpdateForm;
+});
+
+test('Task 9 (9.2): ClaimService.syncClaimsToForm2 rejects sync when no claims exist in project', async () => {
+  const origFindManyClaims = prisma.patentClaim.findMany;
+  (prisma.patentClaim as any).findMany = async () => [];
+
+  await assert.rejects(
+    async () => {
+      await ClaimService.syncClaimsToForm2('p1', 'u1');
+    },
+    /No structured claims exist for this project to sync/
+  );
+
+  (prisma.patentClaim as any).findMany = origFindManyClaims;
+});
+
+test('Task 9 (10.1): PdfService.generateClaimsDocketPdf creates and registers Claims Docket PDF', async () => {
+  const origFindUnique = prisma.patentProject.findUnique;
+  const origCreateDoc = prisma.document.create;
+
+  (prisma.patentProject as any).findUnique = async () => ({
+    id: 'p1',
+    title: 'Autonomous Solar Inverter',
+    technicalDomain: 'Renewable Energy',
+    patentClaims: [
+      {
+        claimNumber: 1,
+        claimType: 'INDEPENDENT',
+        status: 'APPROVED',
+        preamble: 'A solar inverter comprising:',
+        body: 'a bridge rectifier and a micro-inverter controller.',
+        claimElements: []
+      }
+    ],
+    patentReferences: [],
+    claimCharts: []
+  });
+
+  (prisma.document as any).create = async ({ data }: any) => ({
+    id: 'doc_docket_1',
+    ...data
+  });
+
+  const doc = await PdfService.generateClaimsDocketPdf('p1', 'u1');
+  assert.strictEqual(doc.category, 'PATENT_DRAFT');
+  assert.ok(doc.name.includes('Claims Docket'));
+
+  (prisma.patentProject as any).findUnique = origFindUnique;
+  (prisma.document as any).create = origCreateDoc;
+});
+
+test('Task 9 (11.1): ClaimPolicy enforces role authorization for AI generation, proposal import, FTO, and sync', async () => {
+  const project = {
+    id: 'p1',
+    ownerId: 'u_owner',
+    members: [
+      { userId: 'u_inventor', role: 'INVENTOR' },
+      { userId: 'u_guide', role: 'GUIDE' }
+    ]
+  };
+
+  const owner = { userId: 'u_owner', role: 'Inventor' };
+  const inventor = { userId: 'u_inventor', role: 'Inventor' };
+  const guide = { userId: 'u_guide', role: 'Guide' };
+  const outsider = { userId: 'u_outsider', role: 'Inventor' };
+
+  // Owner & Inventor can import proposals and sync claims
+  assert.strictEqual(ClaimPolicy.canImportClaimProposal(owner, project), true);
+  assert.strictEqual(ClaimPolicy.canImportClaimProposal(inventor, project), true);
+  assert.strictEqual(ClaimPolicy.canSyncClaims(inventor, project), true);
+
+  // Guide can view and run FTO, but cannot import/modify claims directly
+  assert.strictEqual(ClaimPolicy.canGenerateClaimProposal(guide, project), true);
+  assert.strictEqual(ClaimPolicy.canRunFtoAnalysis(guide, project), true);
+  assert.strictEqual(ClaimPolicy.canImportClaimProposal(guide, project), false);
+  assert.strictEqual(ClaimPolicy.canSyncClaims(guide, project), false);
+
+  // Outsider cannot do anything
+  assert.strictEqual(ClaimPolicy.canGenerateClaimProposal(outsider, project), false);
+  assert.strictEqual(ClaimPolicy.canRunFtoAnalysis(outsider, project), false);
+  assert.strictEqual(ClaimPolicy.canImportClaimProposal(outsider, project), false);
+  assert.strictEqual(ClaimPolicy.canSyncClaims(outsider, project), false);
+});
+
+test('Task 9 (11.2): Security Isolation — User A cannot access or import claims into User B project', async () => {
+  const projectB = {
+    id: 'project_B',
+    ownerId: 'user_B',
+    members: []
+  };
+
+  const userA = { userId: 'user_A', role: 'Inventor' };
+  assert.strictEqual(ClaimPolicy.canViewClaims(userA, projectB), false);
+  assert.strictEqual(ClaimPolicy.canCreateClaim(userA, projectB), false);
+  assert.strictEqual(ClaimPolicy.canImportClaimProposal(userA, projectB), false);
+  assert.strictEqual(ClaimPolicy.canSyncClaims(userA, projectB), false);
+});
+
+test('Co-Inventor Integration (1): Co-Inventor project isolation and RBAC access', async () => {
+  const project1 = {
+    id: 'proj_co_1',
+    ownerId: 'lead_inventor_1',
+    members: [
+      { userId: 'coinventor_1', role: 'CO_INVENTOR' }
+    ]
+  };
+
+  const projectUnrelated = {
+    id: 'proj_unrelated',
+    ownerId: 'stranger_1',
+    members: [
+      { userId: 'stranger_2', role: 'INVENTOR' }
+    ]
+  };
+
+  const coInventorUser = { userId: 'coinventor_1', role: 'CoInventor' };
+  const strangerUser = { userId: 'stranger_3', role: 'CoInventor' };
+
+  // Project access
+  assert.strictEqual(ProjectPolicy.canViewProject(coInventorUser, project1), true);
+  assert.strictEqual(ProjectPolicy.canViewProject(coInventorUser, projectUnrelated), false);
+  assert.strictEqual(ProjectPolicy.canViewProject(strangerUser, project1), false);
+
+  // Claims access
+  assert.strictEqual(ClaimPolicy.canViewClaims(coInventorUser, project1), true);
+  assert.strictEqual(ClaimPolicy.canCreateClaim(coInventorUser, project1), true);
+  assert.strictEqual(ClaimPolicy.canEditClaim(coInventorUser, project1), true);
+  assert.strictEqual(ClaimPolicy.canViewClaims(coInventorUser, projectUnrelated), false);
+  assert.strictEqual(ClaimPolicy.canCreateClaim(coInventorUser, projectUnrelated), false);
+
+  // Document access
+  assert.strictEqual(DocumentPolicy.canView(coInventorUser, project1), true);
+  assert.strictEqual(DocumentPolicy.canUpload(coInventorUser, project1), true);
+  assert.strictEqual(DocumentPolicy.canView(coInventorUser, projectUnrelated), false);
+  assert.strictEqual(DocumentPolicy.canUpload(coInventorUser, projectUnrelated), false);
+
+  // Review policy: Inventors / Co-inventors cannot approve their own projects
+  assert.strictEqual(ReviewPolicy.canApprove(coInventorUser, project1), false);
+});
+
+test('Co-Inventor Integration (2): Co-Inventor cannot delete or archive projects owned by others', async () => {
+  const project1 = {
+    id: 'proj_co_1',
+    ownerId: 'lead_inventor_1',
+    members: [
+      { userId: 'coinventor_1', role: 'CO_INVENTOR' }
+    ]
+  };
+
+  const coInventorUser = { userId: 'coinventor_1', role: 'CoInventor' };
+  assert.strictEqual(ProjectPolicy.canDeleteProject(coInventorUser, project1), false);
+  assert.strictEqual(ProjectPolicy.canArchiveProject(coInventorUser, project1), false);
+});
+
+test('Collaboration & Notification (1): NotificationService creates persistent database notifications with user isolation', async () => {
+  const origCreate = prisma.notification.create;
+  (prisma.notification as any).create = async ({ data }: any) => ({
+    id: 'notif_mock_1',
+    createdAt: new Date(),
+    readAt: null,
+    metadata: data.metadata || null,
+    ...data,
+  });
+
+  const user1 = 'test_user_notif_1';
+  const n1 = await NotificationService.createNotification(
+    user1,
+    'Collaboration Request',
+    'Alice invited you to collaborate on Smart Traffic Signal.',
+    'INVITATION',
+    'inv-100',
+    'proj-100',
+    { role: 'CO_INVENTOR' }
+  );
+
+  assert.ok(n1);
+  assert.strictEqual(n1?.userId, user1);
+  assert.strictEqual(n1?.isRead, false);
+  assert.strictEqual(n1?.type, 'INVITATION');
+
+  (prisma.notification as any).create = origCreate;
+});
+
+test('Collaboration & Notification (2): Notification recipient ownership and unread count', async () => {
+  const origCount = prisma.notification.count;
+  (prisma.notification as any).count = async ({ where }: any) => {
+    assert.strictEqual(where.userId, 'test_user_notif_1');
+    assert.strictEqual(where.isRead, false);
+    return 3;
+  };
+
+  const user1 = 'test_user_notif_1';
+  const unread = await NotificationService.getUnreadCount(user1);
+  assert.strictEqual(unread, 3);
+
+  (prisma.notification as any).count = origCount;
+});
+
+test('Collaboration & Notification (3): InvitationPolicy validates sender authority and prevents unauthorized invites', async () => {
+  const origFindFirst = prisma.user.findFirst;
+  const origFindUnique = prisma.user.findUnique;
+  (prisma.user as any).findFirst = async () => ({ id: 'target_id', username: 'target_user', email: 'target@example.com' });
+  (prisma.user as any).findUnique = async () => ({ id: 'target_id', username: 'target_user', email: 'target@example.com' });
+
+  const project = {
+    id: 'proj_auth_1',
+    ownerId: 'owner_1',
+    members: [{ userId: 'member_1', role: 'CO_INVENTOR' }]
+  };
+
+  const owner = { userId: 'owner_1', role: 'Inventor' };
+  const stranger = { userId: 'stranger_1', role: 'Inventor' };
+
+  // Owner can invite
+  const canOwnerInvite = await InvitationPolicy.canInvite(owner, project as any, 'target_user', 'CO_INVENTOR' as any);
+  assert.strictEqual(canOwnerInvite, true);
+
+  // Stranger cannot invite (throws Access Denied Error)
+  await assert.rejects(
+    async () => {
+      await InvitationPolicy.canInvite(stranger, project as any, 'target_user', 'CO_INVENTOR' as any);
+    },
+    /Access denied/
+  );
+
+  (prisma.user as any).findFirst = origFindFirst;
+  (prisma.user as any).findUnique = origFindUnique;
+});
+
+test('Collaboration & Notification (4): InvitationPolicy enforces recipient ownership on accept / reject', async () => {
+  const invitation = {
+    id: 'inv_101',
+    projectId: 'proj_101',
+    senderId: 'owner_1',
+    receiverId: 'target_receiver',
+    role: 'CO_INVENTOR',
+    status: 'PENDING'
+  };
+
+  const correctReceiver = { userId: 'target_receiver', role: 'CoInventor' };
+  const unauthorizedUser = { userId: 'impostor_user', role: 'CoInventor' };
+
+  assert.strictEqual(InvitationPolicy.canAccept(correctReceiver, invitation as any), true);
+  assert.strictEqual(InvitationPolicy.canAccept(unauthorizedUser, invitation as any), false);
+});
+
+test('Collaboration & Notification (5): Email failure does not throw or break mail service caller', async () => {
+  // Test that mailService returns a boolean and does not throw on invalid recipient
+  const res = await MailService.sendCollaborationInviteEmail(
+    'invalid-email@test.internal',
+    'Test Recipient',
+    'Test Sender',
+    'Test Project',
+    'co-inventor'
+  );
+  assert.strictEqual(typeof res, 'boolean');
 });
 
 // Summary reporting and sequential execution

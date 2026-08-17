@@ -35,20 +35,30 @@ class AuthService {
         // Determine Role Name and prefix based on userType input
         let dbRoleName = 'Inventor';
         let prefix = 'STU2026';
-        if (input.userType === 'Guide') {
+        if (input.userType === 'Guide' || input.userType === 'Faculty Guide') {
             dbRoleName = 'Guide';
             prefix = 'GDE2026';
         }
-        else if (input.userType === 'PatentExpert') {
+        else if (input.userType === 'PatentExpert' || input.userType === 'Patent Expert') {
             dbRoleName = 'PatentExpert';
             prefix = 'PEX2026';
         }
-        else if (input.userType === 'Admin') {
+        else if (input.userType === 'CoInventor' || input.userType === 'Co-Inventor') {
+            dbRoleName = 'CoInventor';
+            prefix = 'COI2026';
+        }
+        else if (input.userType === 'Admin' || input.userType === 'Administrator') {
             dbRoleName = 'Admin';
             prefix = 'ADM';
         }
-        const role = await db_1.prisma.role.findUnique({
+        else if (input.userType === 'Inventor' || input.userType === 'Student') {
+            dbRoleName = 'Inventor';
+            prefix = 'STU2026';
+        }
+        const role = await db_1.prisma.role.upsert({
             where: { name: dbRoleName },
+            update: {},
+            create: { name: dbRoleName },
         });
         if (!role) {
             throw new Error(`Role '${dbRoleName}' not found in database.`);
@@ -114,13 +124,14 @@ class AuthService {
             },
         });
         // Send Activation Email
-        await mailService_1.MailService.sendActivationEmail(user.email, user.fullName, user.username, otp);
+        const emailSent = await mailService_1.MailService.sendActivationEmail(user.email, user.fullName, user.username, otp);
         // Output code to console for easy developer validation
         console.log(`\n==================================================`);
         console.log(`[USER REGISTRATION SUCCESS]`);
         console.log(`FullName: ${user.fullName}`);
         console.log(`Generated Username: ${user.username}`);
         console.log(`Activation OTP: ${otp}`);
+        console.log(`Email Sent Status: ${emailSent ? 'Delivered via SMTP' : 'Fallback / Local Only'}`);
         console.log(`==================================================\n`);
         return {
             user: {
@@ -130,6 +141,50 @@ class AuthService {
                 email: user.email,
                 role: user.role.name,
             },
+            emailSent,
+            activationOtp: otp,
+        };
+    }
+    static async resendActivationOtp(identifier) {
+        const trimmed = identifier.trim();
+        const user = await db_1.prisma.user.findFirst({
+            where: {
+                OR: [
+                    { username: trimmed },
+                    { email: trimmed },
+                ],
+            },
+            include: { role: true },
+        });
+        if (!user) {
+            throw new Error('No user account found matching this username or email.');
+        }
+        if (user.isActive) {
+            throw new Error('Account is already activated. Please sign in directly.');
+        }
+        const otp = String(Math.floor(100000 + Math.random() * 900000));
+        const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+        await db_1.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                activationOtp: otp,
+                activationOtpExpires: otpExpires,
+            },
+        });
+        const emailSent = await mailService_1.MailService.sendActivationEmail(user.email, user.fullName, user.username, otp);
+        console.log(`\n==================================================`);
+        console.log(`[RESEND ACTIVATION OTP SUCCESS]`);
+        console.log(`FullName: ${user.fullName}`);
+        console.log(`Username: ${user.username}`);
+        console.log(`New Activation OTP: ${otp}`);
+        console.log(`Email Sent Status: ${emailSent ? 'Delivered via SMTP' : 'Console / Fallback'}`);
+        console.log(`==================================================\n`);
+        return {
+            message: 'New activation code generated and sent successfully.',
+            username: user.username,
+            email: user.email,
+            otp,
+            emailSent,
         };
     }
     static async activateAccount(input) {

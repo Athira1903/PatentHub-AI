@@ -46,6 +46,20 @@ const createProfileSchema = zod_1.z.object({
     profileImage: zod_1.z.string().trim().optional().nullable(),
 });
 const updateProfileSchema = createProfileSchema.partial();
+const mapRoleNameToDbRole = (roleString) => {
+    if (!roleString)
+        return 'Inventor';
+    const clean = roleString.trim();
+    if (clean === 'Guide' || clean === 'Faculty Guide')
+        return 'Guide';
+    if (clean === 'Patent Expert' || clean === 'PatentExpert')
+        return 'PatentExpert';
+    if (clean === 'Co-Inventor' || clean === 'CoInventor')
+        return 'CoInventor';
+    if (clean === 'Administrator' || clean === 'Admin')
+        return 'Admin';
+    return 'Inventor';
+};
 const createProfile = async (req, res) => {
     try {
         const userId = req.user?.userId;
@@ -95,12 +109,20 @@ const createProfile = async (req, res) => {
                 },
             });
         }
-        // Sync full name and institution in the User model if updated
+        // Look up and assign exact database role
+        const dbRoleName = mapRoleNameToDbRole(validatedData.role);
+        const roleRecord = await db_1.prisma.role.upsert({
+            where: { name: dbRoleName },
+            update: {},
+            create: { name: dbRoleName },
+        });
+        // Sync full name, institution, and roleId in User model
         await db_1.prisma.user.update({
             where: { id: userId },
             data: {
                 fullName: validatedData.fullName,
                 institution: validatedData.institution,
+                roleId: roleRecord.id,
             },
         });
         res.status(200).json({
@@ -135,6 +157,7 @@ const getProfile = async (req, res) => {
                         email: true,
                         fullName: true,
                         username: true,
+                        role: true,
                     },
                 },
             },
@@ -180,14 +203,25 @@ const updateProfile = async (req, res) => {
                 profileImage: validatedData.profileImage,
             },
         });
-        // Keep User table synced
-        if (validatedData.fullName || validatedData.institution) {
+        // Keep User table synced including role
+        const userUpdateData = {};
+        if (validatedData.fullName)
+            userUpdateData.fullName = validatedData.fullName;
+        if (validatedData.institution)
+            userUpdateData.institution = validatedData.institution;
+        if (validatedData.role) {
+            const dbRoleName = mapRoleNameToDbRole(validatedData.role);
+            const roleRecord = await db_1.prisma.role.upsert({
+                where: { name: dbRoleName },
+                update: {},
+                create: { name: dbRoleName },
+            });
+            userUpdateData.roleId = roleRecord.id;
+        }
+        if (Object.keys(userUpdateData).length > 0) {
             await db_1.prisma.user.update({
                 where: { id: userId },
-                data: {
-                    fullName: validatedData.fullName,
-                    institution: validatedData.institution,
-                },
+                data: userUpdateData,
             });
         }
         res.status(200).json({

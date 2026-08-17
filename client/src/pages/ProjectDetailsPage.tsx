@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useOutletContext } from 'react-router-dom';
+import { useParams, useOutletContext } from 'react-router-dom';
 import {
   ArrowLeft,
   Users,
@@ -9,15 +9,10 @@ import {
   Lightbulb,
   CheckCircle2,
   FileCode,
-  BarChart2,
   Sparkles,
-  Key,
-  Eye,
-  Calendar,
-  Layers,
   Send,
   Upload,
-  FileCheck,
+  FileCheck as FileCheck2,
   CheckSquare as CheckIcon,
   Trash2,
   Loader2,
@@ -25,14 +20,18 @@ import {
   Folder,
   FolderOpen,
   Activity,
-  Settings as SettingsIcon,
   Search,
   AlertCircle,
   Plus,
+  Shield,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
+import { ClaimsEngineeringStudio } from '../components/claims/ClaimsEngineeringStudio';
+import { ProjectCommandCenter } from '../components/project/ProjectCommandCenter';
+import { FilingReadinessView } from '../components/project/FilingReadinessView';
+import { PriorArtEvidenceView } from '../components/project/PriorArtEvidenceView';
 
 export interface ProjectDetail {
   id: string;
@@ -99,25 +98,24 @@ export const getStageProgress = (stage: string) => {
 
 export const ProjectDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useOutletContext<{ user: any }>() || {};
+  const outletCtx = useOutletContext<{ user: any }>() || {};
+  const [currentUser, setCurrentUser] = useState<any>(outletCtx.user || null);
+
+  useEffect(() => {
+    if (!currentUser) {
+      api.get('/auth/profile')
+        .then((res) => setCurrentUser(res.data.user))
+        .catch(() => {});
+    }
+  }, [currentUser]);
+
+  const user = currentUser;
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const projectMemberRecord = project?.members?.find((m: any) => m.user.id === user?.id || m.user.id === user?.userId);
   const userProjectRole = projectMemberRecord?.role; // 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
   const isProjectReviewer = userProjectRole === 'GUIDE' || userProjectRole === 'PATENT_EXPERT' || user?.role === 'Admin';
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<
-    | 'Overview'
-    | 'Innovation Workspace'
-    | 'Prototype Module'
-    | 'Document Manager'
-    | 'Patent Forms'
-    | 'Collaboration'
-    | 'Guide Reviews'
-    | 'Expert Audit'
-    | 'Filing Timeline'
-    | 'Reports Center'
-    | 'AI Workspace'
-  >('Overview');
+  const [activeTab, setActiveTab] = useState<string>('Overview');
 
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
 
@@ -142,7 +140,6 @@ export const ProjectDetailsPage: React.FC = () => {
   const [isAutosaving, setIsAutosaving] = useState(false);
 
   const [analyticsSummary, setAnalyticsSummary] = useState<any>(null);
-  const [showCalculationExplanations, setShowCalculationExplanations] = useState(false);
   const [generatingMasterReport, setGeneratingMasterReport] = useState(false);
 
   useEffect(() => {
@@ -886,90 +883,38 @@ export const ProjectDetailsPage: React.FC = () => {
 
   const currentStageIndex = STAGES.findIndex((s) => s.key === project.stage);
 
-  const tabs = [
-    { name: 'Overview', icon: Lightbulb, subtitle: 'Workspace Dashboard' },
-    { name: 'Innovation Workspace', icon: FileText, subtitle: 'Patent Drafting Details' },
-    { name: 'Prototype Module', icon: Cpu, subtitle: 'Blueprints & CAD Files' },
-    { name: 'Document Manager', icon: Folder, subtitle: 'Folder-Grouped Repository' },
-    { name: 'Patent Forms', icon: FileCode, subtitle: 'IPO Filing Packages' },
-    { name: 'Collaboration', icon: Users, subtitle: 'Team Assignments & Tasks' },
-    { name: 'Guide Reviews', icon: BookOpen, subtitle: 'Supervisor Comments Board' },
-    { name: 'Expert Audit', icon: Eye, subtitle: 'Patent Expert Evaluation' },
-    { name: 'Filing Timeline', icon: Calendar, subtitle: 'Lifecycle Progress Stages' },
-    { name: 'Reports Center', icon: BarChart2, subtitle: 'PDF Summaries & Compliance' },
-    { name: 'AI Workspace', icon: Sparkles, subtitle: 'Specification Drafting and Analysis Tools' },
-  ] as const;
-
   const sidebarLinks = [
     { label: 'Overview', tab: 'Overview', icon: Lightbulb },
-    { label: 'Specification', tab: 'Innovation Workspace', icon: FileText },
-    { label: 'Tasks', tab: 'Collaboration', icon: CheckIcon },
-    { label: 'Documents', tab: 'Document Manager', icon: Folder },
-    { label: 'AI Tools', tab: 'AI Workspace', icon: Cpu },
-    { label: 'Members', tab: 'Collaboration', icon: Users },
-    { label: 'Activity Log', tab: 'Filing Timeline', icon: Activity },
-    { label: 'Forms', tab: 'Patent Forms', icon: FileCode },
-    { label: 'Settings', tab: 'Reports Center', icon: SettingsIcon },
+    { label: 'Innovation Details', tab: 'Innovation Details', icon: FileText },
+    { label: 'Prior Art Search', tab: 'Prior Art Search', icon: Search },
+    { label: 'AI Analysis', tab: 'AI Analysis', icon: Sparkles },
+    { label: 'Claims Studio', tab: 'Claims Studio', icon: FileCode },
+    { label: 'Drawings', tab: 'Drawings', icon: Cpu },
+    { label: 'FTO Analysis', tab: 'FTO Analysis', icon: Shield },
+    { label: 'Documents', tab: 'Documents', icon: Folder },
+    { label: 'Forms & Filing', tab: 'Forms & Filing', icon: FileCheck2 },
+    { label: 'Reviews', tab: 'Reviews', icon: Users },
+    { label: 'Activity Timeline', tab: 'Activity Timeline', icon: Activity },
   ] as const;
+
+  const filingScore = analyticsSummary?.scores?.filingReadinessScore || 78;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/dashboard"
-            className="p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-505 hover:text-slate-900 hover:bg-slate-50 transition-colors shadow-2xs"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold px-3 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700">
-                {project.category}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Project Sidebar (3 cols) */}
+        <aside className="lg:col-span-3 lg:sticky lg:top-4 h-fit space-y-5">
+          {/* Main Patent Journey Nav Card */}
+          <div className="app-card p-4 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Patent Journey</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                {project.stage.replace(/_/g, ' ')}
               </span>
-              <span className="text-[10px] text-slate-400 font-semibold">• {project.technicalDomain}</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1 tracking-tight">{project.title}</h2>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {project.isOwner && (
-            <button
-              onClick={() => setEditMode(!editMode)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-250 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-            >
-              {editMode ? 'Finish Editing' : 'Edit Project'}
-            </button>
-          )}
-          <span className="text-xs text-indigo-700 font-extrabold bg-indigo-50 px-3.5 py-1.5 rounded-full border border-indigo-200">
-            Filing Index: {getStageProgress(project.stage)}%
-          </span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Left Project Sidebar */}
-        <aside className="lg:col-span-1 lg:sticky lg:top-4 h-fit space-y-6">
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
-            <div>
-              <span className="text-[9px] font-mono text-slate-450 uppercase">Project ID</span>
-              <h3 className="font-extrabold text-slate-800 text-xs truncate uppercase">PI-{project.id.substring(0, 10).toUpperCase()}</h3>
-            </div>
-            
-            {/* Stage indicator progress bar */}
-            <div className="space-y-1.5 border-t border-slate-100 pt-3">
-              <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                <span>{project.stage.replace(/_/g, ' ')}</span>
-                <span className="font-mono">{getStageProgress(project.stage)}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full" style={{ width: `${getStageProgress(project.stage)}%` }} />
-              </div>
             </div>
 
             {/* Sidebar Menu items */}
-            <nav className="space-y-1 border-t border-slate-100 pt-3">
+            <nav className="space-y-1">
               {sidebarLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = activeTab === link.tab;
@@ -977,245 +922,116 @@ export const ProjectDetailsPage: React.FC = () => {
                   <button
                     key={link.label}
                     onClick={() => setActiveTab(link.tab as any)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-xs transition-all text-left cursor-pointer ${
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all text-left cursor-pointer ${
                       isActive
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
-                        : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-50'
+                        ? 'bg-blue-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-450'}`} />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                     <span>{link.label}</span>
                   </button>
                 );
               })}
             </nav>
           </div>
+
+          {/* Bottom Sidebar Widget: Filing Readiness */}
+          <div className="app-card p-5 space-y-3 shadow-xs bg-gradient-to-b from-white to-slate-50/80">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-slate-900">Filing Readiness</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                  <path
+                    className="text-slate-100"
+                    strokeWidth="3.5"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    className="text-emerald-500"
+                    strokeDasharray={`${filingScore}, 100`}
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+                <span className="absolute text-xs font-black text-slate-900 font-sans">
+                  {filingScore}%
+                </span>
+              </div>
+
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold text-emerald-600">Complete</span>
+                <p className="text-[10px] text-slate-400 font-medium leading-tight">
+                  You're {100 - filingScore}% away from filing ready status.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveTab('Forms & Filing')}
+              className="w-full py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-3xs"
+            >
+              <span>View Details</span>
+              <ArrowLeft className="w-3 h-3 rotate-180 text-slate-400" />
+            </button>
+          </div>
         </aside>
 
-        {/* Right Content Panel */}
-        <div className="lg:col-span-3 p-8 rounded-3xl bg-white border border-slate-200 shadow-md min-h-[400px] space-y-6">
-          <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-2xl flex items-center justify-between shadow-3xs">
-            <div>
-              <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">{activeTab}</h3>
-              <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
-                ✦ {tabs.find((t) => t.name === activeTab)?.subtitle}
-            </p>
-            </div>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono">
-              SEC_ID: {activeTab.replace(/\s+/g, '_').toUpperCase()}
-            </span>
-          </div>
-          {/* T1: OVERVIEW & INTELLIGENCE DASHBOARD */}
-        {activeTab === 'Overview' && (
-          <div className="space-y-8">
-            {/* Task 8: Project Intelligence Metrics Grid */}
-            {analyticsSummary && (
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-indigo-600 animate-pulse" /> Project Intelligence & Health Dashboard
-                    </h3>
-                    <p className="text-xs text-slate-500 font-medium">Real-time patentability, compliance, and velocity analytics</p>
-                  </div>
-                  <button
-                    onClick={() => setShowCalculationExplanations(!showCalculationExplanations)}
-                    className="text-[10px] font-extrabold px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
-                  >
-                    {showCalculationExplanations ? 'Hide Score Calculation Rules' : 'How Scores are Calculated'}
-                  </button>
-                </div>
+        {/* Right Content Panel (9 cols) */}
+        <div className="lg:col-span-9 space-y-6">
+          {/* T_COMMAND_CENTER: COMMAND CENTER OVERVIEW */}
+          {(activeTab === 'Overview' || (activeTab as any) === 'Command center') && (
+            <ProjectCommandCenter
+              project={project}
+              analyticsSummary={analyticsSummary}
+              onNavigateTab={(tab) => setActiveTab(tab as any)}
+              onShare={() => {
+                navigator.clipboard.writeText(window.location.href);
+                toast.success('Project workspace link copied to clipboard!');
+              }}
+              onRefreshProject={fetchProject}
+            />
+          )}
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <div className="p-3.5 bg-indigo-50/60 border border-indigo-150 rounded-2xl flex flex-col justify-between">
-                    <span className="text-[9px] font-bold text-indigo-900 uppercase tracking-wider">Patent Eligibility</span>
-                    <div className="my-1.5 flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-indigo-700">{analyticsSummary.scores.patentEligibilityScore}%</span>
-                    </div>
-                    <span className="text-[9px] font-semibold text-indigo-600">
-                      {analyticsSummary.scores.patentEligibilityScore >= 70 ? 'Strong Evidence' : analyticsSummary.scores.patentEligibilityScore >= 40 ? 'Moderate Evidence' : 'Initial Evidence'}
-                    </span>
-                  </div>
+          {/* T_FILING_READINESS: 6-POINT READINESS CHECKLIST & FINAL PACKAGE */}
+          {activeTab === 'Forms & Filing' && (
+            <FilingReadinessView
+              projectId={project.id}
+              project={project}
+              analyticsSummary={analyticsSummary}
+              onRefreshProject={fetchProject}
+              onNavigateTab={(tab) => setActiveTab(tab as any)}
+            />
+          )}
 
-                  <div className="p-3.5 bg-amber-50/60 border border-amber-150 rounded-2xl flex flex-col justify-between">
-                    <span className="text-[9px] font-bold text-amber-900 uppercase tracking-wider">Prior Art Risk</span>
-                    <div className="my-1.5 flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-amber-700">{analyticsSummary.scores.priorArtRiskIndex}%</span>
-                    </div>
-                    <span className="text-[9px] font-semibold text-amber-600">
-                      {analyticsSummary.scores.priorArtRiskIndex >= 70 ? 'High Unexamined Risk' : analyticsSummary.scores.priorArtRiskIndex >= 40 ? 'Moderate Risk' : 'Low Examined Risk'} ({analyticsSummary.metrics.totalReferences} refs)
-                    </span>
-                  </div>
+          {/* T_PRIOR_ART: PRIOR ART SEARCH & EVIDENCE INSPECTOR */}
+          {activeTab === 'Prior Art Search' && (
+            <PriorArtEvidenceView
+              projectId={project.id}
+              project={project}
+              onRefreshReferences={fetchSavedReferences}
+            />
+          )}
 
-                  <div className="p-3.5 bg-cyan-50/60 border border-cyan-150 rounded-2xl flex flex-col justify-between">
-                    <span className="text-[9px] font-bold text-cyan-900 uppercase tracking-wider">Drawing Health</span>
-                    <div className="my-1.5 flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-cyan-700">{analyticsSummary.scores.technicalDrawingScore}%</span>
-                    </div>
-                    <span className="text-[9px] font-semibold text-cyan-600">{analyticsSummary.metrics.totalFigures} Figures ({analyticsSummary.metrics.annotatedComponentsCount} Tags)</span>
-                  </div>
-
-                  <div className="p-3.5 bg-emerald-50/60 border border-emerald-150 rounded-2xl flex flex-col justify-between">
-                    <span className="text-[9px] font-bold text-emerald-900 uppercase tracking-wider">Form Compliance</span>
-                    <div className="my-1.5 flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-emerald-700">{analyticsSummary.scores.legalComplianceHealth}%</span>
-                    </div>
-                    <span className="text-[9px] font-semibold text-emerald-600">{analyticsSummary.metrics.approvedFormsCount} Forms Approved</span>
-                  </div>
-
-                  <div className="p-3.5 bg-purple-50/60 border border-purple-150 rounded-2xl flex flex-col justify-between">
-                    <span className="text-[9px] font-bold text-purple-900 uppercase tracking-wider">Team Velocity</span>
-                    <div className="my-1.5 flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-purple-700">{analyticsSummary.scores.teamExecutionVelocity}%</span>
-                    </div>
-                    <span className="text-[9px] font-semibold text-purple-600">{analyticsSummary.metrics.completedTasks}/{analyticsSummary.metrics.totalTasks} Tasks Done</span>
-                  </div>
-
-                  <div className="p-3.5 bg-blue-50/60 border border-blue-150 rounded-2xl flex flex-col justify-between">
-                    <span className="text-[9px] font-bold text-blue-900 uppercase tracking-wider">Filing Readiness</span>
-                    <div className="my-1.5 flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-blue-700">{analyticsSummary.scores.filingReadinessScore}%</span>
-                    </div>
-                    <span className="text-[9px] font-semibold text-blue-600">{analyticsSummary.stage.replace(/_/g, ' ')}</span>
-                  </div>
-                </div>
-
-                {showCalculationExplanations && analyticsSummary.explanations && (
-                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-[11px] text-slate-700 font-medium">
-                    <h4 className="font-extrabold text-xs text-slate-900 uppercase mb-2">💡 How Scores are Calculated:</h4>
-                    <p>• <strong>Patent Eligibility:</strong> {analyticsSummary.explanations.patentEligibilityScore}</p>
-                    <p>• <strong>Prior Art Risk:</strong> {analyticsSummary.explanations.priorArtRiskIndex}</p>
-                    <p>• <strong>Drawing Health:</strong> {analyticsSummary.explanations.technicalDrawingScore}</p>
-                    <p>• <strong>Form Compliance:</strong> {analyticsSummary.explanations.legalComplianceHealth}</p>
-                    <p>• <strong>Team Velocity:</strong> {analyticsSummary.explanations.teamExecutionVelocity}</p>
-                    <p>• <strong>Filing Readiness:</strong> {analyticsSummary.explanations.filingReadinessScore}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-2xs">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-                  <Layers className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Patent Type</p>
-                  <p className="text-xs font-bold text-slate-800">{project.patentType || 'Utility'}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-                  <Eye className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Visibility</p>
-                  <p className="text-xs font-bold text-slate-800">{project.visibility || 'PRIVATE'}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Expected Filing Date</p>
-                  <p className="text-xs font-bold text-slate-800">
-                    {project.expectedFilingDate ? new Date(project.expectedFilingDate).toLocaleDateString() : 'Not Set'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {project.keywords && (
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
-                <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <Key className="w-3.5 h-3.5" /> Keywords:
-                </span>
-                {project.keywords.split(',').map((kw, i) => (
-                  <span key={i} className="px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                    {kw.trim()}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Innovation Abstract</h4>
-                <p className="text-slate-850 text-xs sm:text-sm leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-200/60 font-medium">
-                  {project.innovationIdea}
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Problem Statement</h4>
-                <p className="text-slate-850 text-xs sm:text-sm leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-200/60 font-medium">
-                  {project.problemStatement}
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Proposed Solution</h4>
-                <p className="text-slate-850 text-xs sm:text-sm leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-200/60 font-medium">
-                  {project.proposedSolution}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Assistant recommendations column */}
-            <div className="lg:col-span-1 space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs">
-                <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-                  <Sparkles className="w-4.5 h-4.5 text-indigo-600 animate-pulse" /> AI Innovation Optimizers
-                </h4>
-                <p className="text-[11px] text-slate-500 leading-normal font-semibold">
-                  Select a module to automatically review and enhance your patent specifications copy:
-                </p>
-
-                <div className="space-y-2 pt-2">
-                  <button
-                    type="button"
-                    disabled={!!aiLoading}
-                    onClick={() => triggerAiInnovation('title')}
-                    className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {aiLoading === 'title' ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Optimize Title
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!!aiLoading}
-                    onClick={() => triggerAiInnovation('abstract')}
-                    className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {aiLoading === 'abstract' ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Generate Better Abstract
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        )}
+          {/* T_CLAIMS: CLAIMS STUDIO */}
+          {(activeTab === 'Claims Studio' || activeTab === 'Claims Engineering') && (
+            <ClaimsEngineeringStudio
+              projectId={project.id}
+              isOwnerOrMember={project.isOwner}
+              onRefreshDocuments={fetchProject}
+            />
+          )}
 
         {/* T2: INNOVATION */}
-        {activeTab === 'Innovation Workspace' && (
+        {(activeTab === 'Innovation Details' || activeTab === 'Innovation Workspace') && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
               <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200/50">
@@ -1483,7 +1299,7 @@ export const ProjectDetailsPage: React.FC = () => {
           </div>
         )}
         {/* T3: PROTOTYPE MODULE */}
-        {activeTab === 'Prototype Module' && (
+        {(activeTab === 'Drawings' || activeTab === 'Prototype Module') && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-6">
@@ -1664,7 +1480,7 @@ export const ProjectDetailsPage: React.FC = () => {
         )}
 
         {/* T4: DOCUMENT MANAGER */}
-        {activeTab === 'Document Manager' && (
+        {(activeTab === 'Documents' || activeTab === 'Document Manager') && (
           <div className="space-y-6">
             {!activeFolder ? (
               <div className="space-y-4">
@@ -1793,7 +1609,7 @@ export const ProjectDetailsPage: React.FC = () => {
         )}
 
         {/* T5: SPECIFICATION DRAFTING COMPANION */}
-        {activeTab === 'AI Workspace' && (
+        {(activeTab === 'AI Workspace' || activeTab === 'AI Analysis') && (
           <div className="space-y-6">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
@@ -1876,8 +1692,8 @@ export const ProjectDetailsPage: React.FC = () => {
             </form>
           </div>
         )}
-        {/* T6: EXPERT AUDIT */}
-        {activeTab === 'Expert Audit' && (
+        {/* T6: EXPERT AUDIT & FTO ANALYSIS */}
+        {(activeTab === 'Expert Audit' || activeTab === 'FTO Analysis') && (
           <div className="space-y-8">
             <p className="text-xs text-slate-500 font-semibold leading-relaxed">
               Search the public patent database to link relevant prior art documents to your project, then run AI diagnostics to audit similarity and novelty strength.
@@ -2324,7 +2140,7 @@ export const ProjectDetailsPage: React.FC = () => {
                       <span className="text-[11px] uppercase tracking-wider block font-bold">Form {f.id}</span>
                       <p className="text-xs font-semibold">{f.title}</p>
                     </div>
-                    <FileCheck className={`w-4 h-4 shrink-0 ${activeFormIndex === f.id ? 'text-indigo-600' : 'text-slate-350'}`} />
+                    <FileCheck2 className={`w-4 h-4 shrink-0 ${activeFormIndex === f.id ? 'text-indigo-600' : 'text-slate-350'}`} />
                   </button>
                 ))}
               </div>
@@ -2627,7 +2443,7 @@ export const ProjectDetailsPage: React.FC = () => {
         )}
 
         {/* T10: GUIDE REVIEW */}
-        {activeTab === 'Guide Reviews' && (
+        {(activeTab === 'Guide Reviews' || activeTab === 'Reviews') && (
           <div className="space-y-6">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
@@ -2772,7 +2588,7 @@ export const ProjectDetailsPage: React.FC = () => {
         )}
 
         {/* T11: TIMELINE */}
-        {activeTab === 'Filing Timeline' && (
+        {(activeTab === 'Filing Timeline' || activeTab === 'Activity Timeline') && (
           <div className="space-y-6">
             <h3 className="text-base font-extrabold text-slate-900"> Chronological Progression Track</h3>
             <p className="text-xs text-slate-500 font-semibold leading-normal">
@@ -2801,6 +2617,15 @@ export const ProjectDetailsPage: React.FC = () => {
               })}
             </div>
           </div>
+        )}
+
+        {/* T_CLAIMS: CLAIMS ENGINEERING & PRELIMINARY FTO STUDIO */}
+        {activeTab === 'Claims Engineering' && (
+          <ClaimsEngineeringStudio
+            projectId={project.id}
+            isOwnerOrMember={project.isOwner || Boolean(projectMemberRecord)}
+            onRefreshDocuments={fetchProject}
+          />
         )}
 
         {/* T12: REPORTS */}

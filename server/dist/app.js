@@ -11,7 +11,9 @@ const projectRoutes_1 = __importDefault(require("./routes/projectRoutes"));
 const profileRoutes_1 = __importDefault(require("./routes/profileRoutes"));
 const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const collaborationRoutes_1 = __importDefault(require("./routes/collaborationRoutes"));
+const notificationRoutes_1 = __importDefault(require("./routes/notificationRoutes"));
 const documentRoutes_1 = __importDefault(require("./routes/documentRoutes"));
+const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -23,7 +25,9 @@ app.use('/api/projects', projectRoutes_1.default);
 app.use('/api/profile', profileRoutes_1.default);
 app.use('/api/users', userRoutes_1.default);
 app.use('/api/collaboration', collaborationRoutes_1.default);
+app.use('/api/notifications', notificationRoutes_1.default);
 app.use('/api/documents', documentRoutes_1.default);
+app.use('/api/admin', adminRoutes_1.default);
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
     res.status(200).json({

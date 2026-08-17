@@ -68,6 +68,6 @@ export class AuthenticationPolicy {
    * Check if user has system Administrator permissions.
    */
   static isAdmin(user: { role: string }): boolean {
-    return user.role === 'Admin';
+    return user.role === 'Admin' || user.role === 'Administrator';
   }
 }

@@ -97,6 +97,8 @@ model PatentProject {
   projectReviews   ProjectReview[]
   prototypes       Prototype[]
   drawingFigures   DrawingFigure[]
+  patentClaims     PatentClaim[]
+  claimCharts      ClaimChart[]
 }
 
 model ProjectMember {
@@ -255,6 +257,7 @@ model PatentReference {
   assignee       String?
   publishDate    DateTime?
   source         String        @default("USPTO") // "USPTO", "MOCK"
+  claimCharts    ClaimChart[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -331,14 +334,82 @@ model DrawingFigure {
 }
 
 model DrawingComponent {
-  id              String        @id @default(uuid())
+  id              String         @id @default(uuid())
   figureId        String
-  figure          DrawingFigure @relation(fields: [figureId], references: [id], onDelete: Cascade)
-  referenceNumber String        // "100", "102", "104"
-  componentName   String        // "Sensor Array"
-  description     String?       @db.Text
+  figure          DrawingFigure  @relation(fields: [figureId], references: [id], onDelete: Cascade)
+  referenceNumber String         // "100", "102", "104"
+  componentName   String         // "Sensor Array"
+  description     String?        @db.Text
   xRatio          Float?
   yRatio          Float?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  claimElements   ClaimElement[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model PatentClaim {
+  id              String         @id @default(uuid())
+  projectId       String
+  project         PatentProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  claimNumber     Int            // 1, 2, 3...
+  claimType       String         // "INDEPENDENT", "DEPENDENT"
+  dependsOnNumber Int?           // Nullable (e.g. 1 for Claim 2 depending on Claim 1)
+  preamble        String         // e.g. "An automated system comprising:"
+  body            String         @db.Text
+  status          String         @default("DRAFT") // DRAFT, REVIEWED, APPROVED
+  orderIndex      Int            @default(0)
+  linkedFigures   String?        // Comma-separated figure references, e.g. "FIG. 1, FIG. 2"
+  claimElements   ClaimElement[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([projectId, claimNumber])
+  @@index([projectId, orderIndex])
+}
+
+model ClaimElement {
+  id            String              @id @default(uuid())
+  claimId       String
+  claim         PatentClaim         @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  elementName   String              // e.g. "Sensor Array"
+  elementText   String              @db.Text
+  componentId   String?
+  component     DrawingComponent?   @relation(fields: [componentId], references: [id], onDelete: SetNull)
+  chartMappings ClaimChartElement[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([claimId])
+}
+
+model ClaimChart {
+  id          String              @id @default(uuid())
+  projectId   String
+  project     PatentProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  referenceId String
+  reference   PatentReference     @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  overallRisk String              @default("LOW") // LOW, MEDIUM, HIGH
+  summary     String?             @db.Text
+  elements    ClaimChartElement[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([projectId, referenceId])
+  @@index([projectId])
+}
+
+model ClaimChartElement {
+  id              String       @id @default(uuid())
+  chartId         String
+  chart           ClaimChart   @relation(fields: [chartId], references: [id], onDelete: Cascade)
+  claimElementId  String
+  claimElement    ClaimElement @relation(fields: [claimElementId], references: [id], onDelete: Cascade)
+  priorArtFeature String       @db.Text
+  overlapLevel    String       @default("NONE") // "NONE", "PARTIAL", "IDENTICAL", "EQUIVALENT"
+  analysisNotes   String?      @db.Text
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([chartId])
+  @@index([claimElementId])
 }

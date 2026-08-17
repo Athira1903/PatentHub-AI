@@ -6,7 +6,9 @@ import projectRoutes from './routes/projectRoutes';
 import profileRoutes from './routes/profileRoutes';
 import userRoutes from './routes/userRoutes';
 import collaborationRoutes from './routes/collaborationRoutes';
+import notificationRoutes from './routes/notificationRoutes';
 import documentRoutes from './routes/documentRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 const app = express();
 
@@ -22,7 +24,9 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/collaboration', collaborationRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check endpoint
 app.get('/api/health', (_req: Request, res: Response) => {

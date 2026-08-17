@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProjectService = void 0;
 const db_1 = require("../config/db");
+const client_1 = require("@prisma/client");
 class ProjectService {
     static async createProject(input) {
         return db_1.prisma.patentProject.create({
@@ -121,9 +122,6 @@ class ProjectService {
         if (!project) {
             throw new Error('Patent project not found');
         }
-        if (project.ownerId !== userId) {
-            throw new Error('Only the project owner can modify project details');
-        }
         return db_1.prisma.patentProject.update({
             where: { id: projectId },
             data: input,
@@ -142,9 +140,6 @@ class ProjectService {
         if (!project) {
             throw new Error('Patent project not found');
         }
-        if (project.ownerId !== userId) {
-            throw new Error('Only the project owner can archive this project');
-        }
         return db_1.prisma.patentProject.update({
             where: { id: projectId },
             data: { isArchived },
@@ -155,25 +150,22 @@ class ProjectService {
         if (!project) {
             throw new Error('Patent project not found');
         }
-        if (project.ownerId !== userId) {
-            throw new Error('Only the project owner can delete this project');
-        }
         return db_1.prisma.patentProject.delete({ where: { id: projectId } });
     }
     static async inviteMemberByUsername(projectId, ownerId, username, role = 'CO_INVENTOR') {
+        if (!Object.values(client_1.ProjectRole).includes(role)) {
+            throw new Error(`Invalid project role: ${role}`);
+        }
         const project = await db_1.prisma.patentProject.findUnique({ where: { id: projectId } });
         if (!project) {
             throw new Error('Patent project not found');
-        }
-        if (project.ownerId !== ownerId) {
-            throw new Error('Only the project owner can invite team members');
         }
         const targetUser = await db_1.prisma.user.findUnique({ where: { username } });
         if (!targetUser) {
             throw new Error(`User with username '${username}' not found`);
         }
         if (targetUser.id === ownerId) {
-            throw new Error('You are already the owner of this project');
+            throw new Error('You cannot add yourself to the project');
         }
         const existingMember = await db_1.prisma.projectMember.findUnique({
             where: {
@@ -182,6 +174,16 @@ class ProjectService {
         });
         if (existingMember) {
             throw new Error(`User '${username}' is already a member of this project`);
+        }
+        const existingInvite = await db_1.prisma.invitation.findFirst({
+            where: {
+                projectId,
+                receiverId: targetUser.id,
+                status: 'PENDING',
+            },
+        });
+        if (existingInvite) {
+            throw new Error('A pending invitation has already been sent to this user');
         }
         return db_1.prisma.projectMember.create({
             data: {
@@ -201,11 +203,6 @@ class ProjectService {
         });
         if (!project) {
             throw new Error('Project not found');
-        }
-        const isOwner = project.ownerId === userId;
-        const isMember = project.members.some((m) => m.userId === userId);
-        if (!isOwner && !isMember) {
-            throw new Error('Access denied. You are not a member of this project.');
         }
         let assignedToId = null;
         if (assignedToUsername) {
@@ -235,11 +232,6 @@ class ProjectService {
         if (!project) {
             throw new Error('Project not found');
         }
-        const isOwner = project.ownerId === userId;
-        const isMember = project.members.some((m) => m.userId === userId);
-        if (!isOwner && !isMember) {
-            throw new Error('Access denied. You are not a member of this project.');
-        }
         const task = await db_1.prisma.task.findUnique({ where: { id: taskId } });
         if (!task || task.projectId !== projectId) {
             throw new Error('Task not found in this project');
@@ -263,9 +255,6 @@ class ProjectService {
         });
         if (!project) {
             throw new Error('Project not found');
-        }
-        if (project.ownerId !== userId) {
-            throw new Error('Only the project owner can delete tasks');
         }
         const task = await db_1.prisma.task.findUnique({ where: { id: taskId } });
         if (!task || task.projectId !== projectId) {

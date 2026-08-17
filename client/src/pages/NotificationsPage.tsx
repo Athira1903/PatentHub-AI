@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Clock, Mail, CheckSquare, Search } from 'lucide-react';
+import { Bell, Search } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -34,7 +34,7 @@ export const NotificationsPage: React.FC = () => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'UNREAD' | 'MENTIONS' | 'TASKS'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'UNREAD' | 'INVITATIONS' | 'TASKS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export const NotificationsPage: React.FC = () => {
     try {
       const [invitesRes, notifiesRes] = await Promise.all([
         api.get('/collaboration/invitations'),
-        api.get('/collaboration/notifications'),
+        api.get('/notifications'),
       ]);
       setInvitations(invitesRes.data || []);
       setNotifications(notifiesRes.data || []);
@@ -69,7 +69,7 @@ export const NotificationsPage: React.FC = () => {
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      await api.put(`/collaboration/notifications/${notificationId}/read`);
+      await api.put(`/notifications/${notificationId}/read`);
       setNotifications((prev) =>
         prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
       );
@@ -99,23 +99,19 @@ export const NotificationsPage: React.FC = () => {
 
   // Filter items based on activeTab
   const filteredFeed = feedItems.filter((item) => {
-    // 1. Search Query filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    // 1. Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
       if (item.type === 'INVITATION') {
         const inv = item.raw as Invitation;
-        if (
-          !inv.project.title.toLowerCase().includes(query) &&
-          !inv.sender.fullName.toLowerCase().includes(query) &&
-          !inv.sender.username.toLowerCase().includes(query)
-        ) {
-          return false;
-        }
+        const matchTitle = inv.project?.title?.toLowerCase().includes(q);
+        const matchSender = inv.sender?.fullName?.toLowerCase().includes(q);
+        if (!matchTitle && !matchSender) return false;
       } else {
         const notif = item.raw as NotificationItem;
-        if (!notif.title.toLowerCase().includes(query) && !notif.message.toLowerCase().includes(query)) {
-          return false;
-        }
+        const matchTitle = notif.title?.toLowerCase().includes(q);
+        const matchMsg = notif.message?.toLowerCase().includes(q);
+        if (!matchTitle && !matchMsg) return false;
       }
     }
 
@@ -123,18 +119,18 @@ export const NotificationsPage: React.FC = () => {
     if (activeTab === 'UNREAD') {
       return !item.isRead;
     }
-    if (activeTab === 'MENTIONS') {
-      return item.type === 'MENTION' || (item.type !== 'INVITATION' && (item.raw as NotificationItem).message.toLowerCase().includes('mentioned'));
+    if (activeTab === 'INVITATIONS') {
+      return item.type === 'INVITATION' || item.type === 'COLLABORATION_ACCEPTED' || item.type === 'COLLABORATION_DECLINED';
     }
     if (activeTab === 'TASKS') {
-      return item.type === 'TASK' || (item.type !== 'INVITATION' && (item.raw as NotificationItem).message.toLowerCase().includes('task'));
+      return item.type === 'TASK' || (item.type !== 'INVITATION' && (item.raw as NotificationItem).message?.toLowerCase().includes('task'));
     }
     return true;
   });
 
   const handleMarkAllAsRead = async () => {
     try {
-      await api.put('/collaboration/notifications/read-all');
+      await api.put('/notifications/read-all');
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       toast.success('All notifications marked as read');
     } catch (error) {
@@ -143,70 +139,71 @@ export const NotificationsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto py-2 animate-fade-in font-sans">
+    <div className="space-y-8 max-w-5xl mx-auto py-2 animate-fade-in font-sans pb-8">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Notifications</h2>
-          <p className="text-xs text-slate-500 font-semibold mt-0.5">
-            Accept project workspace invitations and audit active system alerts.
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Notifications & Alerts</h1>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+            Accept project workspace invitations and review queue alerts
           </p>
         </div>
         <button
           onClick={handleMarkAllAsRead}
-          className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+          className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
         >
-          <Bell className="w-3.5 h-3.5 text-indigo-600" /> Mark All as Read
+          <Bell className="w-3.5 h-3.5 text-blue-600" />
+          <span>Mark all as read</span>
         </button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+      <div className="app-card p-6 space-y-6">
         {/* Navigation Tabs and Search bar */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
           <div className="flex flex-wrap gap-2">
-            {(['ALL', 'UNREAD', 'MENTIONS', 'TASKS'] as const).map((tab) => (
+            {(['ALL', 'UNREAD', 'INVITATIONS', 'TASKS'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === tab
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900'
                 }`}
               >
                 {tab === 'ALL'
                   ? 'All Alerts'
                   : tab === 'UNREAD'
                   ? 'Unread'
-                  : tab === 'MENTIONS'
-                  ? 'Mentions'
+                  : tab === 'INVITATIONS'
+                  ? 'Invitations'
                   : 'Tasks'}
               </button>
             ))}
           </div>
 
           <div className="relative w-full md:w-64">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search notifications..."
+              placeholder="Search alerts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-600"
             />
           </div>
         </div>
 
         {/* Dynamic Inbox List Feed */}
         {loading ? (
-          <div className="py-16 text-center text-slate-400 text-xs font-semibold">Loading inbox feed...</div>
+          <div className="py-16 text-center text-slate-400 text-xs font-medium">Loading notifications feed...</div>
         ) : filteredFeed.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 text-xs font-semibold space-y-2">
-            <Bell className="w-10 h-10 mx-auto text-slate-300" />
+          <div className="py-16 text-center text-slate-400 text-xs font-medium space-y-2">
+            <Bell className="w-8 h-8 mx-auto text-slate-300" />
             <p>No notifications found matching this filter.</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3.5">
             {filteredFeed.map((item) => {
               if (item.type === 'INVITATION') {
                 const invite = item.raw as Invitation;
@@ -214,97 +211,90 @@ export const NotificationsPage: React.FC = () => {
                 return (
                   <div
                     key={item.feedId}
-                    className="p-5 border border-slate-200 bg-slate-50/30 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-indigo-400/30 transition-colors shadow-3xs"
+                    className="p-5 border border-slate-200/80 bg-slate-50/40 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition shadow-3xs"
                   >
                     <div className="space-y-1.5 max-w-xl">
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-150 text-[9px] font-bold uppercase tracking-wider">
-                          <Mail className="w-3 h-3" /> Project Invitation
+                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-100">
+                          Invitation
                         </span>
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">• {invite.project.technicalDomain}</span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {item.date.toLocaleDateString()}
+                        </span>
                       </div>
-                      <h4 className="font-extrabold text-sm text-slate-900 leading-tight">
-                        Join Workspace: "{invite.project.title}"
+                      <h4 className="text-sm font-extrabold text-slate-900">
+                        {invite.sender?.fullName} invited you to join{' '}
+                        <strong className="text-blue-600">{invite.project?.title}</strong> as a {roleLabel}
                       </h4>
-                      <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                        You have been invited by <strong className="text-slate-700">@{invite.sender.username}</strong> ({invite.sender.fullName}) 
-                        to collaborate as a <strong className="text-slate-750">{roleLabel}</strong>.
+                      <p className="text-xs text-slate-500 font-medium line-clamp-2">
+                        {invite.project?.innovationIdea}
                       </p>
-                      <div className="text-[10px] text-slate-400 flex items-center gap-1 font-bold pt-1">
-                        <Clock className="w-3.5 h-3.5" /> {item.date.toLocaleDateString()}
-                      </div>
                     </div>
 
                     {invite.status === 'PENDING' ? (
-                      <div className="flex items-center gap-2 w-full md:w-auto justify-end shrink-0">
+                      <div className="flex items-center gap-2">
                         <button
-                          type="button"
-                          onClick={() => handleRespond(invite.id, 'REJECTED')}
-                          className="px-3.5 py-2 bg-white hover:bg-rose-50 text-rose-650 hover:text-rose-700 rounded-xl text-xs font-bold border border-slate-200 hover:border-rose-200 shadow-3xs transition-all cursor-pointer"
-                        >
-                          Decline
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => handleRespond(invite.id, 'ACCEPTED')}
-                          className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                          className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                         >
                           Accept
                         </button>
+                        <button
+                          onClick={() => handleRespond(invite.id, 'REJECTED')}
+                          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition cursor-pointer"
+                        >
+                          Decline
+                        </button>
                       </div>
                     ) : (
-                      <span className="px-3 py-1 bg-slate-100 text-slate-450 border border-slate-200 rounded-xl text-xs font-bold">
+                      <span
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                          invite.status === 'ACCEPTED'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
                         {invite.status}
                       </span>
                     )}
                   </div>
                 );
-              } else {
-                const notif = item.raw as NotificationItem;
-                const isTask = notif.type === 'TASK' || notif.message.toLowerCase().includes('task');
-                return (
-                  <div
-                    key={item.feedId}
-                    className={`p-4 border rounded-2xl flex justify-between items-start gap-4 transition-all shadow-3xs ${
-                      notif.isRead
-                        ? 'bg-white border-slate-200 text-slate-500'
-                        : 'bg-indigo-50/20 border-indigo-100/70 text-slate-800'
-                    }`}
-                  >
-                    <div className="flex gap-3">
-                      <div className="mt-0.5 shrink-0">
-                        {isTask ? (
-                          <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-                            <CheckSquare className="w-4 h-4" />
-                          </div>
-                        ) : (
-                          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                            <Bell className="w-4 h-4" />
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <h4 className={`font-extrabold text-xs text-slate-900 ${notif.isRead ? '' : 'font-bold text-slate-950'}`}>
-                          {notif.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-0.5">{notif.message}</p>
-                        <div className="text-[9px] text-slate-400 flex items-center gap-1 font-bold mt-2">
-                          <Clock className="w-3 h-3" /> {item.date.toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-
-                    {!notif.isRead && (
-                      <button
-                        onClick={() => handleMarkAsRead(notif.id)}
-                        className="px-2.5 py-1 text-[9px] font-bold border border-indigo-200 hover:border-indigo-500 bg-white text-indigo-700 hover:bg-indigo-50 rounded-lg shrink-0 transition-colors cursor-pointer"
-                      >
-                        Mark Read
-                      </button>
-                    )}
-                  </div>
-                );
               }
+
+              // Normal Notification
+              const notif = item.raw as NotificationItem;
+              return (
+                <div
+                  key={item.feedId}
+                  className={`p-4 border rounded-2xl flex items-start justify-between gap-4 transition shadow-3xs ${
+                    notif.isRead
+                      ? 'bg-white border-slate-200/80 text-slate-600'
+                      : 'bg-blue-50/30 border-blue-200/80 text-slate-900'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-blue-50 text-blue-600 shrink-0 mt-0.5">
+                      <Bell className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <h4 className="text-xs font-extrabold text-slate-900">{notif.title}</h4>
+                      <p className="text-[11px] text-slate-600 font-medium leading-relaxed">{notif.message}</p>
+                      <span className="text-[10px] text-slate-400 font-medium block pt-0.5">
+                        {item.date.toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {!notif.isRead && (
+                    <button
+                      onClick={() => handleMarkAsRead(notif.id)}
+                      className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-blue-700 rounded-lg text-[10px] font-bold shrink-0 shadow-3xs cursor-pointer"
+                    >
+                      Mark read
+                    </button>
+                  )}
+                </div>
+              );
             })}
           </div>
         )}

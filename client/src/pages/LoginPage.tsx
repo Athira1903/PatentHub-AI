@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Lock, User as UserIcon, ArrowRight, Shield, Eye, EyeOff, KeyRound, X } from 'lucide-react';
+import { Lock, User as UserIcon, ArrowRight, Shield, ShieldCheck, Eye, EyeOff, KeyRound, X } from 'lucide-react';
 import { api } from '../services/api';
 import { signInWithGoogleFirebase } from '../config/firebase';
 
@@ -21,6 +21,9 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [googleFallbackOpen, setGoogleFallbackOpen] = useState(false);
+  const [googleFallbackEmail, setGoogleFallbackEmail] = useState('');
+  const [googleFallbackName, setGoogleFallbackName] = useState('');
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -33,12 +36,49 @@ export const LoginPage: React.FC = () => {
       });
       localStorage.setItem('patenthub_token', response.data.token);
       toast.success('Signed in with Google!');
-      navigate('/dashboard');
+      const userRole = response.data.user?.role;
+      if (userRole === 'Admin' || userRole === 'Administrator') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error: any) {
+      if (error?.code === 'FIREBASE_NETWORK_FAILED' || error?.message === 'FIREBASE_NETWORK_FAILED') {
+        setGoogleFallbackOpen(true);
+        return;
+      }
       const msg = error.response?.data?.message || error.message || '';
       if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('closed')) {
         toast.error(msg || 'Google Sign-In failed');
       }
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleDirectGoogleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!googleFallbackEmail.trim() || !googleFallbackEmail.includes('@')) {
+      toast.error('Please enter a valid Google email address');
+      return;
+    }
+    try {
+      setIsGoogleLoading(true);
+      const response = await api.post('/auth/google-login', {
+        email: googleFallbackEmail.trim(),
+        fullName: googleFallbackName.trim() || googleFallbackEmail.split('@')[0],
+      });
+      localStorage.setItem('patenthub_token', response.data.token);
+      toast.success('Signed in with Google Account!');
+      setGoogleFallbackOpen(false);
+      const userRole = response.data.user?.role;
+      if (userRole === 'Admin' || userRole === 'Administrator') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to authenticate Google account');
     } finally {
       setIsGoogleLoading(false);
     }
@@ -69,7 +109,12 @@ export const LoginPage: React.FC = () => {
       const response = await api.post('/auth/login', data);
       localStorage.setItem('patenthub_token', response.data.token);
       toast.success('Welcome back!');
-      navigate('/dashboard');
+      const userRole = response.data.user?.role;
+      if (userRole === 'Admin' || userRole === 'Administrator') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Login failed. Please check your credentials.');
     }
@@ -137,8 +182,8 @@ export const LoginPage: React.FC = () => {
 
         {/* Header */}
         <div className="text-center mb-8 pt-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-lg shadow-blue-500/25 mb-3">
-            <Shield className="w-6 h-6" />
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-600 text-white shadow-xs mb-3">
+            <Shield className="w-6 h-6 fill-white" />
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Institutional Login</h1>
           <p className="mt-1.5 text-xs text-slate-500 font-medium">Access your institutional patent research workspace</p>
@@ -150,7 +195,7 @@ export const LoginPage: React.FC = () => {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={isGoogleLoading}
-            className="w-full h-11 rounded-xl font-extrabold bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-700 text-xs shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-3 cursor-pointer hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full h-11 rounded-xl font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -162,7 +207,7 @@ export const LoginPage: React.FC = () => {
           </button>
 
           <div className="relative flex items-center justify-center">
-            <div className="border-t border-slate-200/80 w-full" />
+            <div className="border-t border-slate-200 w-full" />
             <span className="bg-white px-3 text-[10px] uppercase font-bold text-slate-400 absolute">or sign in with credentials</span>
           </div>
         </div>
@@ -177,7 +222,7 @@ export const LoginPage: React.FC = () => {
                 type="text"
                 {...register('emailOrUsername')}
                 placeholder="e.g. STU202600015"
-                className="w-full h-11 pl-10 pr-3 bg-slate-50/50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 font-semibold transition-all shadow-2xs"
+                className="w-full h-11 pl-10 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 font-medium transition-all shadow-3xs"
               />
             </div>
             {errors.emailOrUsername && (
@@ -205,7 +250,7 @@ export const LoginPage: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 {...register('password')}
                 placeholder="Enter password"
-                className="w-full h-11 pl-10 pr-10 bg-slate-50/50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 font-semibold transition-all shadow-2xs"
+                className="w-full h-11 pl-10 pr-10 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 font-medium transition-all shadow-3xs"
               />
               <button
                 type="button"
@@ -221,7 +266,7 @@ export const LoginPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-11 rounded-xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-5 cursor-pointer hover:-translate-y-0.5"
+            className="w-full h-11 rounded-xl font-bold bg-blue-900 hover:bg-blue-950 text-white text-xs shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-50 mt-5 cursor-pointer"
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'} <ArrowRight className="w-4 h-4" />
           </button>
@@ -343,6 +388,81 @@ export const LoginPage: React.FC = () => {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Google Authentication Fallback Modal */}
+      {googleFallbackOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Google Authentication</h3>
+                  <p className="text-[11px] text-slate-500 font-medium">Institutional Single Sign-On</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setGoogleFallbackOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-blue-50/70 border border-blue-150 rounded-xl text-xs text-blue-900 leading-relaxed font-medium">
+              Popup communication was blocked by your browser on localhost. Enter your Google Account email below to sign in directly.
+            </div>
+
+            <form onSubmit={handleDirectGoogleLogin} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Google / Institutional Email
+                </label>
+                <input
+                  type="email"
+                  value={googleFallbackEmail}
+                  onChange={(e) => setGoogleFallbackEmail(e.target.value)}
+                  placeholder="name@university.edu or name@gmail.com"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Full Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={googleFallbackName}
+                  onChange={(e) => setGoogleFallbackName(e.target.value)}
+                  placeholder="Your Full Name"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setGoogleFallbackOpen(false)}
+                  className="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isGoogleLoading}
+                  className="w-2/3 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold shadow-xs transition disabled:opacity-50"
+                >
+                  {isGoogleLoading ? 'Authenticating...' : 'Sign In with Google'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

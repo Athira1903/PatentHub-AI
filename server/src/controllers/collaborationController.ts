@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { prisma } from '../config/db';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import { ProjectRole } from '@prisma/client';
+import { MailService } from '../services/mailService';
 
 export const inviteMember = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -11,10 +12,11 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
-    const { projectId, username, role } = req.body; // role: 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
+    const { projectId, username, identifier, role } = req.body; // role: 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
+    const targetQuery = (identifier || username || '').trim();
 
-    if (!projectId || !username || !role) {
-      res.status(400).json({ message: 'Project ID, username, and role are required.' });
+    if (!projectId || !targetQuery || !role) {
+      res.status(400).json({ message: 'Project ID, identifier (email or username), and role are required.' });
       return;
     }
 
@@ -27,12 +29,23 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       where: { id: projectId },
     });
 
-    const receiver = await prisma.user.findUnique({
-      where: { username },
+    let receiver = await prisma.user.findUnique({
+      where: { username: targetQuery },
     });
 
+    if (!receiver) {
+      receiver = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: targetQuery },
+            { email: targetQuery.toLowerCase() },
+          ],
+        },
+      });
+    }
+
     if (!project || !receiver) {
-      res.status(404).json({ message: 'Project or receiver not found.' });
+      res.status(404).json({ message: `User with identifier '${targetQuery}' or project was not found.` });
       return;
     }
 
@@ -82,15 +95,24 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       },
     });
 
-    // Create Notification for the receiver
+    // Create Persistent In-App Notification for the receiver
     const cleanRoleName = role.toLowerCase().replace('_', ' ');
     await prisma.notification.create({
       data: {
         userId: receiver.id,
-        title: 'Project Invitation',
-        message: `${sender?.fullName || sender?.username} invited you to join "${project.title}" as a ${cleanRoleName}.`,
+        title: 'Collaboration Request',
+        message: `${sender?.fullName || sender?.username} invited you to collaborate on "${project.title}" as ${cleanRoleName}.`,
         type: 'INVITATION',
         referenceId: invitation.id,
+        projectId,
+        metadata: {
+          invitationId: invitation.id,
+          projectId: project.id,
+          projectName: project.title,
+          senderName: sender?.fullName || sender?.username,
+          senderId: sender?.id,
+          role: role,
+        },
       },
     });
 
@@ -99,12 +121,22 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       data: {
         userId: senderId,
         projectId,
-        action: `Sent invitation to ${receiver.fullName} to join as ${cleanRoleName}.`,
+        action: `Sent collaboration request to ${receiver.fullName} to join as ${cleanRoleName}.`,
+        type: 'INVITATION',
       },
     });
 
+    // Attempt email notification asynchronously (never blocks DB transaction)
+    MailService.sendCollaborationInviteEmail(
+      receiver.email,
+      receiver.fullName,
+      sender?.fullName || sender?.username || 'Lead Inventor',
+      project.title,
+      cleanRoleName
+    ).catch((err) => console.warn('[COLLABORATION EMAIL WARNING]', err?.message || err));
+
     res.status(201).json({
-      message: `Invitation successfully sent to @${username}!`,
+      message: `Collaboration request successfully sent to @${receiver.username}!`,
       invitation,
     });
   } catch (error: any) {
@@ -187,19 +219,38 @@ export const respondToInvitation = async (req: AuthenticatedRequest, res: Respon
           },
         });
       }
+
+      // Mark the original invitation notification as read
+      await tx.notification.updateMany({
+        where: {
+          userId: receiverId,
+          referenceId: invitationId,
+        },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
     });
 
     const cleanRoleName = invitation.role.toLowerCase().replace('_', ' ');
 
     if (status === 'ACCEPTED') {
-      // Notify the sender
+      // Notify the original sender/inventor
       await prisma.notification.create({
         data: {
           userId: invitation.senderId,
-          title: 'Invitation Accepted',
-          message: `${invitation.receiver.fullName} has accepted your invitation to join "${invitation.project.title}" as a ${cleanRoleName}.`,
-          type: 'GENERAL',
+          title: 'Collaboration Accepted',
+          message: `${invitation.receiver.fullName} accepted your collaboration request for "${invitation.project.title}".`,
+          type: 'COLLABORATION_ACCEPTED',
           referenceId: invitation.projectId,
+          projectId: invitation.projectId,
+          metadata: {
+            projectId: invitation.projectId,
+            projectName: invitation.project.title,
+            receiverName: invitation.receiver.fullName,
+            role: invitation.role,
+          },
         },
       });
 
@@ -209,19 +260,55 @@ export const respondToInvitation = async (req: AuthenticatedRequest, res: Respon
           userId: receiverId,
           projectId: invitation.projectId,
           action: `${invitation.receiver.fullName} joined the project as a ${cleanRoleName}.`,
+          type: 'INVITATION',
         },
       });
+
+      // Attempt email dispatch asynchronously
+      MailService.sendCollaborationResponseEmail(
+        invitation.sender.email,
+        invitation.sender.fullName,
+        invitation.receiver.fullName,
+        invitation.project.title,
+        'accepted'
+      ).catch((err) => console.warn('[COLLABORATION EMAIL WARNING]', err?.message || err));
     } else {
       // Notify the sender about rejection
       await prisma.notification.create({
         data: {
           userId: invitation.senderId,
-          title: 'Invitation Declined',
-          message: `${invitation.receiver.fullName} declined your invitation to join "${invitation.project.title}".`,
-          type: 'GENERAL',
+          title: 'Collaboration Declined',
+          message: `${invitation.receiver.fullName} declined your collaboration request for "${invitation.project.title}".`,
+          type: 'COLLABORATION_DECLINED',
           referenceId: invitation.projectId,
+          projectId: invitation.projectId,
+          metadata: {
+            projectId: invitation.projectId,
+            projectName: invitation.project.title,
+            receiverName: invitation.receiver.fullName,
+            role: invitation.role,
+          },
         },
       });
+
+      // Log activity
+      await prisma.activityLog.create({
+        data: {
+          userId: receiverId,
+          projectId: invitation.projectId,
+          action: `${invitation.receiver.fullName} declined the collaboration request for "${invitation.project.title}".`,
+          type: 'INVITATION',
+        },
+      });
+
+      // Attempt email dispatch asynchronously
+      MailService.sendCollaborationResponseEmail(
+        invitation.sender.email,
+        invitation.sender.fullName,
+        invitation.receiver.fullName,
+        invitation.project.title,
+        'declined'
+      ).catch((err) => console.warn('[COLLABORATION EMAIL WARNING]', err?.message || err));
     }
 
     res.status(200).json({

@@ -24,13 +24,27 @@ export class InvitationPolicy {
       throw new Error('Access denied. Only the project owner, guide, or administrators can invite users.');
     }
 
-    // 1. Fetch Invitee
-    const invitee = await prisma.user.findUnique({
-      where: { username: inviteeUsername },
+    // 1. Fetch Invitee by username or email
+    const trimmed = inviteeUsername.trim();
+    let invitee = await prisma.user.findUnique({
+      where: { username: trimmed },
       include: { role: true },
     });
+
     if (!invitee) {
-      throw new Error(`User with username '${inviteeUsername}' not found.`);
+      invitee = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: trimmed },
+            { email: trimmed.toLowerCase() },
+          ],
+        },
+        include: { role: true },
+      });
+    }
+
+    if (!invitee) {
+      throw new Error(`User with username or email '${inviteeUsername}' not found.`);
     }
 
     if (invitee.id === user.userId) {

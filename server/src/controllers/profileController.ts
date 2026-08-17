@@ -48,6 +48,16 @@ const createProfileSchema = z.object({
 
 const updateProfileSchema = createProfileSchema.partial();
 
+const mapRoleNameToDbRole = (roleString?: string): string => {
+  if (!roleString) return 'Inventor';
+  const clean = roleString.trim();
+  if (clean === 'Guide' || clean === 'Faculty Guide') return 'Guide';
+  if (clean === 'Patent Expert' || clean === 'PatentExpert') return 'PatentExpert';
+  if (clean === 'Co-Inventor' || clean === 'CoInventor') return 'CoInventor';
+  if (clean === 'Administrator' || clean === 'Admin') return 'Admin';
+  return 'Inventor';
+};
+
 export const createProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
@@ -100,12 +110,21 @@ export const createProfile = async (req: AuthenticatedRequest, res: Response): P
       });
     }
 
-    // Sync full name and institution in the User model if updated
+    // Look up and assign exact database role
+    const dbRoleName = mapRoleNameToDbRole(validatedData.role);
+    const roleRecord = await prisma.role.upsert({
+      where: { name: dbRoleName },
+      update: {},
+      create: { name: dbRoleName },
+    });
+
+    // Sync full name, institution, and roleId in User model
     await prisma.user.update({
       where: { id: userId },
       data: {
         fullName: validatedData.fullName,
         institution: validatedData.institution,
+        roleId: roleRecord.id,
       },
     });
 
@@ -141,6 +160,7 @@ export const getProfile = async (req: AuthenticatedRequest, res: Response): Prom
             email: true,
             fullName: true,
             username: true,
+            role: true,
           },
         },
       },
@@ -191,14 +211,24 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response): P
       },
     });
 
-    // Keep User table synced
-    if (validatedData.fullName || validatedData.institution) {
+    // Keep User table synced including role
+    const userUpdateData: any = {};
+    if (validatedData.fullName) userUpdateData.fullName = validatedData.fullName;
+    if (validatedData.institution) userUpdateData.institution = validatedData.institution;
+    if (validatedData.role) {
+      const dbRoleName = mapRoleNameToDbRole(validatedData.role);
+      const roleRecord = await prisma.role.upsert({
+        where: { name: dbRoleName },
+        update: {},
+        create: { name: dbRoleName },
+      });
+      userUpdateData.roleId = roleRecord.id;
+    }
+
+    if (Object.keys(userUpdateData).length > 0) {
       await prisma.user.update({
         where: { id: userId },
-        data: {
-          fullName: validatedData.fullName,
-          institution: validatedData.institution,
-        },
+        data: userUpdateData,
       });
     }
 

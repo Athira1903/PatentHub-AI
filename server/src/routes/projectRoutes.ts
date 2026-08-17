@@ -57,6 +57,7 @@ import {
 import {
   getProjectAnalytics,
   getDashboardAnalytics,
+  getCoInventorDashboard,
   generateComprehensiveReportPdf
 } from '../controllers/analyticsController';
 import { authenticateToken } from '../middleware/authMiddleware';
@@ -68,6 +69,7 @@ import { PatentReferencePolicy } from '../policies/project/patent-reference.poli
 import { PatentFormPolicy } from '../policies/forms/patent-form.policy';
 import { ReportPolicy } from '../policies/report/report.policy';
 import { DocumentPolicy } from '../policies/document/document.policy';
+import claimRoutes from './claimRoutes';
 
 const router = Router();
 
@@ -76,6 +78,7 @@ router.use(authenticateToken);
 router.post('/', authorize((user) => ProjectPolicy.canCreateProject(user)) as any, createProject);
 router.get('/', getProjects);
 router.get('/analytics/dashboard', getDashboardAnalytics as any);
+router.get('/analytics/coinventor', getCoInventorDashboard as any);
 router.get('/:id', projectGuard(ProjectPolicy.canViewProject) as any, getProjectById);
 router.put('/:id', projectGuard(ProjectPolicy.canEditProject) as any, updateProject);
 router.put('/:id/archive', projectGuard(ProjectPolicy.canArchiveProject) as any, archiveProject);
@@ -139,5 +142,8 @@ router.post('/:id/ai/innovation', projectGuard(ProjectPolicy.canViewProject) as 
 router.get('/:id/ai/similarity', projectGuard(ProjectPolicy.canViewProject) as any, getSimilarityAnalysis as any);
 router.get('/:id/ai/novelty', projectGuard(ProjectPolicy.canViewProject) as any, getNoveltyAssessment as any);
 router.post('/:id/ai/drawing', projectGuard(ProjectPolicy.canViewProject) as any, generatePatentDrawing as any);
+
+// Claims Engineering Endpoints (Task 9)
+router.use('/:id/claims', claimRoutes);
 
 export default router;

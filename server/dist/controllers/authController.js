@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.googleLogin = exports.verifyOtpReset = exports.sendOtp = exports.getProfile = exports.login = exports.activate = exports.register = void 0;
+exports.googleLogin = exports.verifyOtpReset = exports.sendOtp = exports.getProfile = exports.login = exports.resendActivation = exports.activate = exports.register = void 0;
 const zod_1 = require("zod");
 const authService_1 = require("../services/authService");
 const RESERVED_USERNAMES = [
@@ -37,7 +37,17 @@ const registerSchema = zod_1.z.object({
     institution: zod_1.z.string().trim().max(150, 'Institution name cannot exceed 150 characters').optional(),
     department: zod_1.z.string().trim().min(1, 'Department is required').max(100, 'Department cannot exceed 100 characters'),
     designation: zod_1.z.string().trim().min(1, 'Designation is required').max(100, 'Designation cannot exceed 100 characters'),
-    userType: zod_1.z.enum(['Student', 'Guide', 'PatentExpert', 'Admin']),
+    userType: zod_1.z.enum([
+        'Student',
+        'Guide',
+        'PatentExpert',
+        'Admin',
+        'Inventor',
+        'CoInventor',
+        'Co-Inventor',
+        'Patent Expert',
+        'Administrator',
+    ]),
     employeeOrStudentId: zod_1.z.string().trim().max(50).optional(),
 });
 const activateSchema = zod_1.z.object({
@@ -115,6 +125,23 @@ const activate = async (req, res) => {
     }
 };
 exports.activate = activate;
+const resendActivation = async (req, res) => {
+    try {
+        const { identifier } = req.body;
+        if (!identifier || typeof identifier !== 'string') {
+            res.status(400).json({ message: 'Please provide your generated username or registered email' });
+            return;
+        }
+        const result = await authService_1.AuthService.resendActivationOtp(identifier.trim());
+        res.status(200).json(result);
+    }
+    catch (error) {
+        res.status(400).json({
+            message: error.message || 'Failed to resend activation code',
+        });
+    }
+};
+exports.resendActivation = resendActivation;
 const login = async (req, res) => {
     try {
         const validatedData = loginSchema.parse(req.body);

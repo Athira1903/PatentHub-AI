@@ -2,20 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
-  FolderKanban,
+  Folder,
   CheckSquare,
-  Bell,
-  User,
-  LogOut,
+  Settings,
   Search,
-  Plus,
-  ShieldCheck,
   Command,
   HelpCircle,
   X,
   Calculator,
   BookOpen,
+  ChevronDown,
+  LogOut,
+  User,
+  Shield,
+  ChevronLeft,
+  ChevronRight,
+  Bell,
+  PenTool,
+  FileText,
   Layers,
+  Scale,
+  Users,
+  Activity,
+  Lightbulb,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -36,6 +45,12 @@ interface UserProfile {
 
 export const DashboardLayout: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [showNotifDropdown, setShowNotifDropdown] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loadingNotifs, setLoadingNotifs] = useState<boolean>(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -47,22 +62,58 @@ export const DashboardLayout: React.FC = () => {
   const [calcClaims, setCalcClaims] = useState<number>(10);
   const [calcResult, setCalcResult] = useState<number>(1600);
 
-  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await api.get('/notifications/unread-count');
+      setUnreadCount(res.data.count || 0);
+    } catch {
+      // silent
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      setLoadingNotifs(true);
+      const res = await api.get('/notifications');
+      setNotifications(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch header notifications', err);
+    } finally {
+      setLoadingNotifs(false);
+    }
+  };
 
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [location.pathname]);
 
-  const fetchUnreadCount = async () => {
+  const handleToggleNotifDropdown = () => {
+    if (!showNotifDropdown) {
+      fetchNotifications();
+      fetchUnreadCount();
+    }
+    setShowNotifDropdown(!showNotifDropdown);
+  };
+
+  const handleMarkAllRead = async () => {
     try {
-      const res = await api.get('/collaboration/notifications/unread-count');
-      if (res.data && typeof res.data.count === 'number') {
-        setUnreadCount(res.data.count);
-      }
-    } catch (e) {
-      // Ignore count fetch error
+      await api.put('/notifications/read-all');
+      setUnreadCount(0);
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      toast.success('All notifications marked as read');
+    } catch {
+      toast.error('Failed to mark notifications as read');
+    }
+  };
+
+  const handleRespondToInvite = async (invitationId: string, status: 'ACCEPTED' | 'REJECTED') => {
+    try {
+      const res = await api.post('/collaboration/respond', { invitationId, status });
+      toast.success(res.data.message || `Invitation ${status.toLowerCase()}!`);
+      fetchNotifications();
+      fetchUnreadCount();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to respond to invitation');
     }
   };
 
@@ -94,7 +145,7 @@ export const DashboardLayout: React.FC = () => {
       }
     };
     fetchProfile();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem('patenthub_token');
@@ -102,318 +153,499 @@ export const DashboardLayout: React.FC = () => {
     navigate('/login');
   };
 
-  const navItems = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'My Projects', path: '/dashboard/projects', icon: FolderKanban },
-    { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
-    { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
-    { label: 'Profile', path: '/dashboard/profile', icon: User },
-  ];
+  const isAdmin = user?.role === 'Admin' || user?.role === 'Administrator';
+  const isCoInventor = user?.role === 'CoInventor' || user?.role === 'CO_INVENTOR' || user?.role === 'Co-Inventor';
+
+  const navItems = isCoInventor
+    ? [
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
+        { label: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare, badge: '8' },
+        { label: 'Claims', path: '/dashboard/projects', icon: PenTool },
+        { label: 'Documents', path: '/dashboard/projects', icon: FileText },
+        { label: 'Drawings', path: '/dashboard/projects', icon: Layers },
+        { label: 'Reviews', path: '/dashboard/projects', icon: Scale },
+      ]
+    : [
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'My Inventions', path: '/dashboard/projects', icon: Folder },
+        { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+        { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
+        { label: 'Settings', path: '/dashboard/profile', icon: Settings },
+        ...(isAdmin ? [{ label: 'Admin Governance', path: '/admin', icon: Shield }] : []),
+      ];
+
+  const collaborationItems = isCoInventor
+    ? [
+        { label: 'Team', path: '/dashboard/projects', icon: Users },
+        { label: 'Activity', path: '/dashboard/notifications', icon: Activity },
+      ]
+    : [];
+
+  const settingsItems = isCoInventor
+    ? [
+        { label: 'Settings', path: '/dashboard/profile', icon: Settings },
+      ]
+    : [];
+
+  // Helper to determine breadcrumb from route
+  const getBreadcrumbs = () => {
+    const p = location.pathname;
+    if (p === '/admin') return { parent: 'Platform', current: 'Admin Dashboard' };
+    if (p === '/dashboard') return { parent: 'Workspace', current: isCoInventor ? 'Co-Inventor Workspace' : 'Inventor Dashboard' };
+    if (p.includes('/dashboard/projects/')) return { parent: 'Projects', current: 'Project Overview' };
+    if (p.includes('/dashboard/projects')) return { parent: 'Workspace', current: isCoInventor ? 'My Projects' : 'My Inventions' };
+    if (p.includes('/dashboard/tasks')) return { parent: 'Workspace', current: 'Tasks' };
+    if (p.includes('/dashboard/notifications')) return { parent: 'Workspace', current: 'Notifications' };
+    if (p.includes('/dashboard/create-project')) return { parent: 'Projects', current: 'Create Invention' };
+    if (p.includes('/dashboard/profile')) return { parent: 'Settings', current: 'Account Profile' };
+    return { parent: 'Workspace', current: 'Overview' };
+  };
+
+  const breadcrumbs = getBreadcrumbs();
 
   return (
-    <div className="h-screen bg-slate-50 text-slate-900 flex flex-col overflow-hidden font-sans">
-      {/* Dynamic Sleek Gradient Accent Header Border */}
-      <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-cyan-400 to-indigo-600 sticky top-0 z-50 animate-pulse-glow"></div>
-
+    <div className="h-screen bg-[#F8FAFC] text-slate-900 flex flex-col overflow-hidden font-sans antialiased">
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
+        {/* Left Sidebar */}
         <aside
-          className="w-64 bg-white/90 backdrop-blur-xl border-r border-slate-200/80 flex flex-col h-screen sticky top-0 shrink-0 z-40 shadow-sm hidden md:flex"
+          className={`${
+            collapsed ? 'w-20' : 'w-64'
+          } bg-white border-r border-slate-200/90 flex flex-col h-screen sticky top-0 shrink-0 z-40 transition-all duration-300 shadow-[1px_0_4px_rgba(0,0,0,0.02)] hidden md:flex`}
         >
-          {/* Sidebar Header */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100">
-            <Link to="/dashboard" className="flex items-center gap-3 overflow-hidden group">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-md shadow-blue-500/25 shrink-0 group-hover:scale-105 transition-transform">
-                <ShieldCheck className="w-5 h-5" />
+          {/* Logo Header */}
+          <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100">
+            <Link to={isAdmin ? "/admin" : "/dashboard"} className="flex items-center gap-3 overflow-hidden group">
+              <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
+                <Lightbulb className="w-4 h-4 fill-white" />
               </div>
-              <div className="flex flex-col">
-                <span className="font-extrabold text-base tracking-tight text-slate-900 leading-tight">
-                  PatentHub <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600">AI</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-slate-600">Workspace</span>
-              </div>
+              {!collapsed && (
+                <div>
+                  <span className="font-black text-sm tracking-tight text-slate-950 block leading-none">
+                    PatentHub-AI
+                  </span>
+                  <span className="text-[9px] text-emerald-700 font-bold uppercase tracking-wider block mt-0.5">
+                    {isCoInventor ? 'Co-Inventor Workspace' : `${user?.role || 'Inventor'} Workspace`}
+                  </span>
+                </div>
+              )}
             </Link>
           </div>
 
-          {/* New Project Action Button */}
-          <div className="p-3">
-            <Link
-              to="/dashboard/create-project"
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 transition-all font-bold text-xs uppercase tracking-wider px-4 py-2.5"
-            >
-              <Plus className="w-4 h-4 shrink-0" />
-              <span>New Project</span>
-            </Link>
-          </div>
-
-          {/* Sidebar Navigation Items */}
-          <nav className="flex-1 py-2 px-3 space-y-1 overflow-y-auto">
+          {/* Navigation Items */}
+          <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const isActive =
+                item.path === '/dashboard'
+                  ? location.pathname === '/dashboard'
+                  : location.pathname.startsWith(item.path);
+
               return (
                 <Link
-                  key={item.path}
+                  key={item.label}
                   to={item.path}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 ${
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                     isActive
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 font-bold'
-                      : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100/80'
+                      ? isCoInventor
+                        ? 'bg-[#E6F4EA] text-[#064E3B] font-extrabold shadow-3xs'
+                        : 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-450'}`} />
-                  <span className="truncate flex-1">{item.label}</span>
-                  {item.label === 'Notifications' && unreadCount > 0 && (
-                    <span className="ml-auto px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-rose-500 text-white animate-pulse">
-                      {unreadCount}
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-4 h-4 shrink-0 ${
+                      isActive ? (isCoInventor ? 'text-[#064E3B]' : 'text-white') : 'text-slate-400'
+                    }`} />
+                    {!collapsed && <span>{item.label}</span>}
+                  </div>
+                  {!collapsed && (item as any).badge && (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-extrabold">
+                      {(item as any).badge}
                     </span>
                   )}
                 </Link>
               );
             })}
-          </nav>
 
-          {/* User Profile Footer */}
-          <div className="p-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-            {user && (
-              <div className="overflow-hidden pr-2 flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-sm overflow-hidden">
-                  {user.profile?.profileImage ? (
-                    <img
-                      src={
-                        user.profile.profileImage.startsWith('/')
-                          ? 'http://localhost:5000' + user.profile.profileImage
-                          : user.profile.profileImage
-                      }
-                      alt={user.fullName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'
-                  )}
-                </div>
-                <div className="overflow-hidden">
-                  <p className="text-xs font-bold text-slate-900 truncate leading-tight">{user.fullName}</p>
-                  <p className="text-[10px] text-blue-600 truncate font-semibold uppercase tracking-wider">{user.role}</p>
-                </div>
+            {/* Collaboration Group for Co-Inventor */}
+            {collaborationItems.length > 0 && !collapsed && (
+              <div className="pt-4 pb-1">
+                <span className="px-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                  Collaboration
+                </span>
+                {collaborationItems.map((cItem) => {
+                  const Icon = cItem.icon;
+                  return (
+                    <Link
+                      key={cItem.label}
+                      to={cItem.path}
+                      className="flex items-center gap-3 px-3.5 py-2 rounded-2xl text-xs font-bold text-slate-600 hover:text-slate-950 hover:bg-slate-50 transition-all"
+                    >
+                      <Icon className="w-4 h-4 text-slate-400" />
+                      <span>{cItem.label}</span>
+                    </Link>
+                  );
+                })}
               </div>
             )}
+
+            {/* Settings Group for Co-Inventor */}
+            {settingsItems.length > 0 && !collapsed && (
+              <div className="pt-3 pb-1">
+                <span className="px-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                  Settings
+                </span>
+                {settingsItems.map((sItem) => {
+                  const Icon = sItem.icon;
+                  return (
+                    <Link
+                      key={sItem.label}
+                      to={sItem.path}
+                      className="flex items-center gap-3 px-3.5 py-2 rounded-2xl text-xs font-bold text-slate-600 hover:text-slate-950 hover:bg-slate-50 transition-all"
+                    >
+                      <Icon className="w-4 h-4 text-slate-400" />
+                      <span>{sItem.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </nav>
+
+          {/* Bottom User Info & Logout Card */}
+          {!collapsed && (
+            <div className="p-3 mx-3 mb-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                  {user?.fullName?.slice(0, 2).toUpperCase() || 'IN'}
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">
+                    {user?.fullName || 'Inventor'}
+                  </h4>
+                  <p className="text-[10px] text-blue-600 font-semibold truncate leading-tight">
+                    {user?.role || 'Inventor'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Collapse Sidebar Button */}
+          <div className="p-3 border-t border-slate-100">
             <button
-              onClick={handleLogout}
-              title="Log Out"
-              className="p-2 rounded-xl text-slate-450 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+              onClick={() => setCollapsed(!collapsed)}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition"
             >
-              <LogOut className="w-4 h-4" />
+              {collapsed ? (
+                <ChevronRight className="w-4 h-4" />
+              ) : (
+                <>
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Collapse</span>
+                </>
+              )}
             </button>
           </div>
         </aside>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Top Navbar */}
-          <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-            <div className="flex items-center gap-4 flex-1 max-w-xl">
-              <div className="relative w-full">
+        {/* Main Content Viewport */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Top Header Navbar */}
+          <header className="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+            {/* Breadcrumbs */}
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+              <span className="text-slate-400 font-normal">{breadcrumbs.parent}</span>
+              <span className="text-slate-300">/</span>
+              <span className="text-slate-800 font-bold">{breadcrumbs.current}</span>
+            </div>
+
+            {/* Center Universal Search Bar */}
+            <div className="flex-1 max-w-md mx-8 hidden sm:block">
+              <div className="relative">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search patents, claims, prioritize research..."
-                  className="w-full pl-10 pr-12 py-2 bg-slate-100/80 hover:bg-white border border-slate-200/60 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 rounded-full text-xs text-slate-900 placeholder:text-slate-400 transition-all font-medium"
+                  placeholder="Search projects, documents, tasks..."
+                  className="w-full pl-10 pr-12 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 transition-all font-medium"
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-200/70 text-[10px] text-slate-500 font-semibold">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-200/70 text-[10px] text-slate-500 font-semibold font-mono">
                   <Command className="w-2.5 h-2.5" /> K
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {user?.profile?.researchDomain && (
-                <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wider">
-                  <span>Domain: {user.profile.researchDomain}</span>
-                </div>
-              )}
-              {user?.institution && (
-                <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200/60 text-slate-700 text-[10px] font-bold uppercase tracking-wider">
-                  <span>{user.institution}</span>
-                </div>
-              )}
-              {user?.profileCompleted && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>100% Onboarded</span>
-                </div>
-              )}
+            {/* Right Profile, Notifications & Help Actions */}
+            <div className="flex items-center gap-2.5">
+              {/* Notification Bell Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={handleToggleNotifDropdown}
+                  className="relative p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition cursor-pointer"
+                  title="Notifications"
+                >
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-blue-600 text-white rounded-full text-[9px] font-black flex items-center justify-center ring-2 ring-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifDropdown && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 animate-fade-in overflow-hidden">
+                    <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-slate-900">Notifications</span>
+                        {unreadCount > 0 && (
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-extrabold rounded-md">
+                            {unreadCount} new
+                          </span>
+                        )}
+                      </div>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                      {loadingNotifs ? (
+                        <div className="p-6 text-center text-xs text-slate-400">Loading notifications...</div>
+                      ) : notifications.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-slate-400 space-y-1">
+                          <Bell className="w-5 h-5 mx-auto text-slate-300" />
+                          <p className="font-bold text-slate-600">No new notifications</p>
+                          <p className="text-[10px]">You're all caught up!</p>
+                        </div>
+                      ) : (
+                        notifications.slice(0, 5).map((n) => {
+                          const isInvite = n.type === 'INVITATION' && (n.metadata?.invitationId || n.referenceId);
+                          const inviteId = n.metadata?.invitationId || n.referenceId;
+                          return (
+                            <div
+                              key={n.id}
+                              className={`p-3 space-y-2 text-xs transition ${
+                                n.isRead ? 'bg-white text-slate-600' : 'bg-blue-50/40 text-slate-900 font-medium'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="font-bold text-slate-900 text-xs">{n.title}</span>
+                                <span className="text-[10px] text-slate-400 shrink-0">
+                                  {new Date(n.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 leading-snug">{n.message}</p>
+
+                              {/* Inline Accept / Decline for Collaboration Request */}
+                              {isInvite && !n.isRead && (
+                                <div className="pt-1 flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleRespondToInvite(inviteId, 'ACCEPTED')}
+                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold transition cursor-pointer shadow-3xs"
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    onClick={() => handleRespondToInvite(inviteId, 'REJECTED')}
+                                    className="px-3 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold transition cursor-pointer shadow-3xs"
+                                  >
+                                    Decline
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="p-2.5 border-t border-slate-100 bg-slate-50/50 text-center">
+                      <Link
+                        to="/dashboard/notifications"
+                        onClick={() => setShowNotifDropdown(false)}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        View all notifications →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => setShowHelpModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer mr-2 shadow-2xs hover:shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition"
               >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Help Hub</span>
+                <HelpCircle className="w-4 h-4 text-slate-400" />
+                <span className="hidden sm:inline">Help</span>
               </button>
 
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                <span className="text-[10px] font-bold uppercase tracking-wider">{user?.role || 'User'}</span>
+              {/* User Avatar & Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition"
+                >
+                  <div className="w-7 h-7 rounded-full bg-blue-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                    {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'A'}
+                  </div>
+                  <span className="text-xs font-bold text-slate-800 hidden sm:inline">
+                    {user?.fullName || 'User'}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
+                </button>
+
+                {showUserDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50 animate-fade-in text-xs">
+                    <div className="px-4 py-2 border-b border-slate-100">
+                      <p className="font-bold text-slate-900 truncate">{user?.fullName}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+                    </div>
+                    <Link
+                      to="/dashboard/profile"
+                      onClick={() => setShowUserDropdown(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-slate-50"
+                    >
+                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      Profile & Settings
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 text-left"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </header>
 
-          {/* Page Body */}
-          <main className="flex-1 p-6 overflow-y-auto animate-fade-in">
+          {/* Main Outlet Scroll Area */}
+          <main className="flex-1 overflow-y-auto p-6 md:p-8">
             <Outlet context={{ user }} />
           </main>
         </div>
       </div>
 
-      {/* Global Help Hub Modal Overlay */}
+      {/* Help Modal */}
       {showHelpModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-indigo-650" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-6 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="font-extrabold text-sm text-slate-900">PatentHub AI Help & Resources Hub</h3>
-                  <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Quick guide to Indian patent filing parameters</p>
+                  <h3 className="text-base font-extrabold text-slate-900">PatentHub-AI Knowledge Base</h3>
+                  <p className="text-xs text-slate-500 font-medium">Statutory guidance, fee estimations, and workflow assistance</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowHelpModal(false)}
-                className="p-1.5 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded-xl transition-all cursor-pointer"
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Navigation Tabs */}
-            <div className="flex border-b border-slate-200 px-5 pt-1.5 gap-2 bg-slate-50">
+            <div className="flex border-b border-slate-100 gap-6 shrink-0 text-xs font-bold">
               <button
                 onClick={() => setHelpTab('faq')}
-                className={`pb-2.5 px-3 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                className={`pb-3 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
                   helpTab === 'faq'
-                    ? 'border-indigo-600 text-indigo-600 font-extrabold'
-                    : 'border-transparent text-slate-400 hover:text-slate-650'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
-                Filing Guide & FAQs
+                <BookOpen className="w-4 h-4" />
+                <span>Statutory Patent FAQ</span>
               </button>
               <button
                 onClick={() => setHelpTab('fees')}
-                className={`pb-2.5 px-3 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                className={`pb-3 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
                   helpTab === 'fees'
-                    ? 'border-indigo-600 text-indigo-600 font-extrabold'
-                    : 'border-transparent text-slate-400 hover:text-slate-650'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
-                Indian IPO Fee Calculator
+                <Calculator className="w-4 h-4" />
+                <span>Official IPO Fee Calculator</span>
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 flex-1 overflow-y-auto space-y-5 text-xs text-slate-650">
+            <div className="flex-1 overflow-y-auto pr-1 space-y-4 text-xs">
               {helpTab === 'faq' ? (
-                <div className="space-y-4 font-semibold">
-                  <div className="space-y-1">
-                    <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1">
-                      <BookOpen className="w-4 h-4 text-indigo-600" /> What are the primary forms required?
-                    </h4>
-                    <p className="leading-relaxed pl-5">
-                      Filing in India requires:
-                      <ul className="list-disc pl-5 mt-1 space-y-1 text-[11px] font-medium text-slate-500">
-                        <li><strong>Form 1:</strong> Application details (applicant name, address, title, signature).</li>
-                        <li><strong>Form 2:</strong> Specifications detailing the drawing assembly, background, and independent claims.</li>
-                        <li><strong>Form 3:</strong> Statement/declaration declaring files registered outside India.</li>
-                        <li><strong>Form 5:</strong> Declaration of inventorship credentials.</li>
-                        <li><strong>Form 26:</strong> Power of attorney assigning filing privileges to registered Patent Agents.</li>
-                      </ul>
+                <div className="space-y-3">
+                  <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <h4 className="font-extrabold text-slate-900 mb-1">What are the mandatory Indian Patent Office (IPO) Forms?</h4>
+                    <p className="text-slate-600 leading-relaxed">
+                      Every standard complete patent application in India mandates <strong>Form 1</strong> (Application for Grant), <strong>Form 2</strong> (Provisional or Complete Specification), <strong>Form 3</strong> (Foreign Application Undertaking), <strong>Form 5</strong> (Declaration of Inventorship), and optionally <strong>Form 26</strong> (Power of Attorney/Authorisation).
                     </p>
                   </div>
-
-                  <div className="space-y-1">
-                    <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1">
-                      <ShieldCheck className="w-4 h-4 text-indigo-600" /> How is my Prior Art score calculated?
-                    </h4>
-                    <p className="leading-relaxed pl-5">
-                      The AI checks similarity indices by comparing your innovation problem statements and proposed solutions with registered USPTO and WIPO indexes. A score below 20% indicates low risk of claims infringement.
-                    </p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1">
-                      <Layers className="w-4 h-4 text-indigo-600" /> Can my Guide supervise and review my work?
-                    </h4>
-                    <p className="leading-relaxed pl-5">
-                      Yes! You can invite your Faculty Guide as a supervisor under the "Team & Tasks" tab. The Guide will have access to a dedicated review deck to leave claim comments and endorse workflow stage transitions.
+                  <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <h4 className="font-extrabold text-slate-900 mb-1">How does PatentHub-AI evaluate Claims and FTO?</h4>
+                    <p className="text-slate-600 leading-relaxed">
+                      PatentHub-AI parses claims into discrete technical limitations and performs preliminary technical comparison against prior-art citations. Note that AI-generated drafting assistance is preliminary research and does not constitute a formal legal opinion.
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="p-4 bg-indigo-50/20 border border-indigo-150 rounded-2xl space-y-3">
-                    <h4 className="font-extrabold text-indigo-950 text-xs flex items-center gap-1.5">
-                      <Calculator className="w-4.5 h-4.5" /> IPO Official Fees Estimation (Form 1)
-                    </h4>
-                    <p className="text-[11px] text-slate-500 font-semibold leading-normal">
-                      Select entity type and scope parameters to calculate the base official filing fees (e-filing rate):
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                      <div>
-                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Applicant Type</label>
-                        <select
-                          value={applicantType}
-                          onChange={(e) => setApplicantType(e.target.value as any)}
-                          className="w-full h-8.5 rounded-lg border border-slate-200 px-2 font-bold text-xs bg-white cursor-pointer"
-                        >
-                          <option value="individual">Natural Person / Startup / Small Entity</option>
-                          <option value="large">Large Entity (Others)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Total Page Count</label>
-                        <input
-                          type="number"
-                          value={calcPages}
-                          onChange={(e) => setCalcPages(Math.max(1, parseInt(e.target.value) || 0))}
-                          className="w-full h-8.5 rounded-lg border border-slate-200 px-3 font-semibold text-xs"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Claims Count</label>
-                        <input
-                          type="number"
-                          value={calcClaims}
-                          onChange={(e) => setCalcClaims(Math.max(1, parseInt(e.target.value) || 0))}
-                          className="w-full h-8.5 rounded-lg border border-slate-200 px-3 font-semibold text-xs"
-                        />
-                      </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Applicant Classification</label>
+                      <select
+                        value={applicantType}
+                        onChange={(e: any) => setApplicantType(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-medium text-slate-900"
+                      >
+                        <option value="individual">Natural Person / Startup / Small Entity</option>
+                        <option value="large">Other than Small Entity (Large Enterprise)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Specification Pages</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={calcPages}
+                        onChange={(e) => setCalcPages(parseInt(e.target.value) || 30)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-medium text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Number of Claims</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={calcClaims}
+                        onChange={(e) => setCalcClaims(parseInt(e.target.value) || 10)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-medium text-slate-900"
+                      />
                     </div>
                   </div>
-
-                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-450 uppercase">Calculated Total IPO Fee</p>
-                      <p className="text-xl font-extrabold text-indigo-650 font-mono mt-0.5">₹{calcResult.toLocaleString()}</p>
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-semibold text-right leading-relaxed max-w-[220px]">
-                      *Includes base filing up to 30 pages & 10 claims. Additional page/claim charges applied dynamically.
-                    </div>
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
+                    <span className="font-bold text-emerald-900">Total Statutory Filing Fee:</span>
+                    <span className="text-xl font-extrabold text-emerald-700">₹{calcResult.toLocaleString()}</span>
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
-              <button
-                onClick={() => setShowHelpModal(false)}
-                className="px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
-              >
-                Close Hub
-              </button>
             </div>
           </div>
         </div>

@@ -751,4 +751,230 @@ export class PdfService {
 
     return document;
   }
+
+  /**
+   * Generates a formal Claims Docket PDF with full claims schedule, element breakdown, drawing references, and FTO overview.
+   */
+  static async generateClaimsDocketPdf(projectId: string, userId?: string): Promise<any> {
+    const project = await prisma.patentProject.findUnique({
+      where: { id: projectId },
+      include: {
+        patentClaims: {
+          orderBy: [
+            { orderIndex: 'asc' },
+            { claimNumber: 'asc' }
+          ],
+          include: {
+            claimElements: {
+              include: {
+                component: {
+                  include: {
+                    figure: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        patentReferences: true,
+        claimCharts: {
+          include: {
+            reference: true,
+            elements: {
+              include: {
+                claimElement: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!project) {
+      throw new Error('Project not found for Claims Docket PDF export.');
+    }
+
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    // Header banner
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, pageWidth, 28, 'F');
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('PATENTHUB-AI | OFFICIAL CLAIMS ENGINEERING DOCKET', 15, 12);
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Project: ${project.title} | Domain: ${project.technicalDomain || 'General'} | Exported: ${new Date().toISOString().split('T')[0]}`, 15, 20);
+
+    // Disclaimer box
+    y = 35;
+    doc.setFillColor(254, 242, 242);
+    doc.setDrawColor(252, 165, 165);
+    doc.rect(15, y, pageWidth - 30, 14, 'FD');
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(153, 27, 27);
+    doc.text('LEGAL NOTICE & STATUTORY DISCLAIMER', 18, y + 4.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(185, 28, 28);
+    doc.text('AI-generated drafting assistance and preliminary technical analysis. Not legal advice, a patentability determination, or a definitive FTO opinion.', 18, y + 9.5);
+
+    // SECTION 1: Claims Schedule
+    y = 56;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('1. PATENT CLAIMS SCHEDULE & TECHNICAL SPECIFICATION', 15, y);
+
+    y += 8;
+    if (project.patentClaims.length === 0) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(148, 163, 184);
+      doc.text('No structured claims created in this project yet.', 15, y);
+      y += 10;
+    } else {
+      for (const claim of project.patentClaims) {
+        if (y > 260) {
+          doc.addPage();
+          y = 20;
+        }
+
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.rect(15, y, pageWidth - 30, 6, 'FD');
+
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59);
+        const depStr = claim.dependsOnNumber ? ` [Depends on Claim ${claim.dependsOnNumber}]` : ' [Independent]';
+        doc.text(`Claim ${claim.claimNumber} (${claim.claimType})${depStr} - Status: ${claim.status}`, 18, y + 4.2);
+
+        y += 9;
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85);
+
+        const fullText = `${claim.preamble ? claim.preamble + ' ' : ''}${claim.body}`;
+        const splitText = doc.splitTextToSize(fullText, pageWidth - 36);
+        doc.text(splitText, 18, y);
+        y += splitText.length * 4.2 + 2;
+
+        // Elements
+        if (claim.claimElements.length > 0) {
+          doc.setFontSize(7.5);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(71, 85, 105);
+          doc.text('Technical Elements & Drawing Callouts:', 22, y);
+          y += 4;
+
+          doc.setFont('helvetica', 'normal');
+          for (const el of claim.claimElements) {
+            let elStr = `• ${el.elementName}: ${el.elementText}`;
+            if (el.component) {
+              elStr += `  [Ref: ${el.component.referenceNumber} (${el.component.componentName}) in ${el.component.figure?.figureNumber || 'Drawing'}]`;
+            }
+            const splitEl = doc.splitTextToSize(elStr, pageWidth - 44);
+            doc.text(splitEl, 24, y);
+            y += splitEl.length * 3.8 + 1.5;
+          }
+        }
+        y += 4;
+      }
+    }
+
+    // SECTION 2: Preliminary FTO Overview
+    if (y > 230) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('2. PRELIMINARY FREEDOM-TO-OPERATE (FTO) MATRIX SUMMARY', 15, y);
+
+    y += 8;
+    if (!project.claimCharts || project.claimCharts.length === 0) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(148, 163, 184);
+      doc.text('No preliminary FTO claim charts generated yet.', 15, y);
+      y += 10;
+    } else {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setFillColor(241, 245, 249);
+      doc.rect(15, y, pageWidth - 30, 6, 'F');
+      doc.text('Prior-Art Patent', 18, y + 4.5);
+      doc.text('Assignee / Title', 60, y + 4.5);
+      doc.text('Preliminary Risk', 150, y + 4.5);
+
+      y += 7;
+      doc.setFont('helvetica', 'normal');
+      for (const chart of project.claimCharts) {
+        doc.text(chart.reference?.patentNumber || 'N/A', 18, y + 4);
+        const titleTrunc = chart.reference?.title ? (chart.reference.title.length > 50 ? chart.reference.title.substring(0, 50) + '...' : chart.reference.title) : 'N/A';
+        doc.text(titleTrunc, 60, y + 4);
+        doc.setFont('helvetica', 'bold');
+        if (chart.overallRisk === 'HIGH') doc.setTextColor(185, 28, 28);
+        else if (chart.overallRisk === 'MEDIUM') doc.setTextColor(180, 83, 9);
+        else doc.setTextColor(21, 128, 61);
+        doc.text(chart.overallRisk, 150, y + 4);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85);
+        y += 6;
+      }
+    }
+
+    // Disclaimer footer
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Note: PatentHub-AI Claims Engineering Docket. For research & drafting preparation. Not a formal legal document.', 15, 283);
+
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    const uploadDir = this.ensureUploadDirectory();
+    const sanitizedFileName = `Claims_Docket_${projectId.substring(0, 8)}_${Date.now()}.pdf`;
+    const filePath = path.join(uploadDir, sanitizedFileName);
+
+    fs.writeFileSync(filePath, pdfBuffer);
+
+    const fileUrl = `/uploads/documents/${sanitizedFileName}`;
+
+    const document = await prisma.document.create({
+      data: {
+        name: `Claims Docket - ${project.title}.pdf`,
+        fileUrl,
+        fileType: 'application/pdf',
+        fileSize: pdfBuffer.length,
+        version: 1,
+        category: 'PATENT_DRAFT',
+        projectId
+      }
+    });
+
+    if (userId) {
+      try {
+        await prisma.activityLog.create({
+          data: {
+            userId,
+            projectId,
+            action: `Generated Claims Docket PDF with ${project.patentClaims.length} claims.`
+          }
+        });
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    return document;
+  }
 }

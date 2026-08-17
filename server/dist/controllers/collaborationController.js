@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.markNotificationAsRead = exports.listMyNotifications = exports.listMyInvitations = exports.respondToInvitation = exports.inviteMember = void 0;
+exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getUnreadNotificationsCount = exports.listMyNotifications = exports.listMyInvitations = exports.respondToInvitation = exports.inviteMember = void 0;
 const db_1 = require("../config/db");
 const client_1 = require("@prisma/client");
+const mailService_1 = require("../services/mailService");
 const inviteMember = async (req, res) => {
     try {
         const senderId = req.user?.userId;
@@ -10,38 +11,40 @@ const inviteMember = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized.' });
             return;
         }
-        const { projectId, username, role } = req.body; // role: 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
-        if (!projectId || !username || !role) {
-            res.status(400).json({ message: 'Project ID, username, and role are required.' });
+        const { projectId, username, identifier, role } = req.body; // role: 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
+        const targetQuery = (identifier || username || '').trim();
+        if (!projectId || !targetQuery || !role) {
+            res.status(400).json({ message: 'Project ID, identifier (email or username), and role are required.' });
             return;
         }
-        // Verify role value is valid ProjectRole enum
         if (!Object.values(client_1.ProjectRole).includes(role)) {
             res.status(400).json({ message: `Invalid project role: ${role}` });
             return;
         }
-        // Check project exists
         const project = await db_1.prisma.patentProject.findUnique({
             where: { id: projectId },
-            include: { owner: true },
         });
-        if (!project) {
-            res.status(404).json({ message: 'Project not found.' });
-            return;
-        }
-        // Check receiver exists
-        const receiver = await db_1.prisma.user.findUnique({
-            where: { username },
+        let receiver = await db_1.prisma.user.findUnique({
+            where: { username: targetQuery },
         });
         if (!receiver) {
-            res.status(404).json({ message: `User with username '${username}' not found.` });
+            receiver = await db_1.prisma.user.findFirst({
+                where: {
+                    OR: [
+                        { username: targetQuery },
+                        { email: targetQuery.toLowerCase() },
+                    ],
+                },
+            });
+        }
+        if (!project || !receiver) {
+            res.status(404).json({ message: `User with identifier '${targetQuery}' or project was not found.` });
             return;
         }
         if (receiver.id === senderId) {
             res.status(400).json({ message: 'You cannot invite yourself to a project.' });
             return;
         }
-        // Check if receiver is already a member
         const existingMember = await db_1.prisma.projectMember.findUnique({
             where: {
                 projectId_userId: {
@@ -54,7 +57,6 @@ const inviteMember = async (req, res) => {
             res.status(400).json({ message: 'This user is already a member of the project.' });
             return;
         }
-        // Check if there is already a pending invitation
         const existingInvite = await db_1.prisma.invitation.findFirst({
             where: {
                 projectId,
@@ -80,15 +82,24 @@ const inviteMember = async (req, res) => {
                 status: 'PENDING',
             },
         });
-        // Create Notification for the receiver
+        // Create Persistent In-App Notification for the receiver
         const cleanRoleName = role.toLowerCase().replace('_', ' ');
         await db_1.prisma.notification.create({
             data: {
                 userId: receiver.id,
-                title: 'Project Invitation',
-                message: `${sender?.fullName || sender?.username} invited you to join "${project.title}" as a ${cleanRoleName}.`,
+                title: 'Collaboration Request',
+                message: `${sender?.fullName || sender?.username} invited you to collaborate on "${project.title}" as ${cleanRoleName}.`,
                 type: 'INVITATION',
                 referenceId: invitation.id,
+                projectId,
+                metadata: {
+                    invitationId: invitation.id,
+                    projectId: project.id,
+                    projectName: project.title,
+                    senderName: sender?.fullName || sender?.username,
+                    senderId: sender?.id,
+                    role: role,
+                },
             },
         });
         // Log Activity
@@ -96,11 +107,14 @@ const inviteMember = async (req, res) => {
             data: {
                 userId: senderId,
                 projectId,
-                action: `Sent invitation to ${receiver.fullName} to join as ${cleanRoleName}.`,
+                action: `Sent collaboration request to ${receiver.fullName} to join as ${cleanRoleName}.`,
+                type: 'INVITATION',
             },
         });
+        // Attempt email notification asynchronously (never blocks DB transaction)
+        mailService_1.MailService.sendCollaborationInviteEmail(receiver.email, receiver.fullName, sender?.fullName || sender?.username || 'Lead Inventor', project.title, cleanRoleName).catch((err) => console.warn('[COLLABORATION EMAIL WARNING]', err?.message || err));
         res.status(201).json({
-            message: `Invitation successfully sent to @${username}!`,
+            message: `Collaboration request successfully sent to @${receiver.username}!`,
             invitation,
         });
     }
@@ -133,37 +147,76 @@ const respondToInvitation = async (req, res) => {
             res.status(404).json({ message: 'Invitation not found.' });
             return;
         }
-        if (invitation.receiverId !== receiverId) {
-            res.status(403).json({ message: 'Access denied. You are not the recipient of this invitation.' });
-            return;
-        }
         if (invitation.status !== 'PENDING') {
             res.status(400).json({ message: `This invitation has already been ${invitation.status.toLowerCase()}.` });
             return;
         }
-        // Update invitation status
-        await db_1.prisma.invitation.update({
-            where: { id: invitationId },
-            data: { status },
+        if (invitation.receiverId !== receiverId) {
+            res.status(403).json({ message: 'Access denied. This invitation was sent to another user.' });
+            return;
+        }
+        if (!invitation.project) {
+            res.status(404).json({ message: 'The associated project no longer exists.' });
+            return;
+        }
+        if (status === 'ACCEPTED') {
+            const existingMember = await db_1.prisma.projectMember.findUnique({
+                where: {
+                    projectId_userId: {
+                        projectId: invitation.projectId,
+                        userId: receiverId,
+                    },
+                },
+            });
+            if (existingMember) {
+                res.status(400).json({ message: 'You are already a member of this project.' });
+                return;
+            }
+        }
+        // Atomically update invitation status and create membership
+        await db_1.prisma.$transaction(async (tx) => {
+            await tx.invitation.update({
+                where: { id: invitationId },
+                data: { status },
+            });
+            if (status === 'ACCEPTED') {
+                await tx.projectMember.create({
+                    data: {
+                        projectId: invitation.projectId,
+                        userId: receiverId,
+                        role: invitation.role,
+                    },
+                });
+            }
+            // Mark the original invitation notification as read
+            await tx.notification.updateMany({
+                where: {
+                    userId: receiverId,
+                    referenceId: invitationId,
+                },
+                data: {
+                    isRead: true,
+                    readAt: new Date(),
+                },
+            });
         });
         const cleanRoleName = invitation.role.toLowerCase().replace('_', ' ');
         if (status === 'ACCEPTED') {
-            // Add to Project Members
-            await db_1.prisma.projectMember.create({
-                data: {
-                    projectId: invitation.projectId,
-                    userId: receiverId,
-                    role: invitation.role,
-                },
-            });
-            // Notify the sender
+            // Notify the original sender/inventor
             await db_1.prisma.notification.create({
                 data: {
                     userId: invitation.senderId,
-                    title: 'Invitation Accepted',
-                    message: `${invitation.receiver.fullName} has accepted your invitation to join "${invitation.project.title}" as a ${cleanRoleName}.`,
-                    type: 'GENERAL',
+                    title: 'Collaboration Accepted',
+                    message: `${invitation.receiver.fullName} accepted your collaboration request for "${invitation.project.title}".`,
+                    type: 'COLLABORATION_ACCEPTED',
                     referenceId: invitation.projectId,
+                    projectId: invitation.projectId,
+                    metadata: {
+                        projectId: invitation.projectId,
+                        projectName: invitation.project.title,
+                        receiverName: invitation.receiver.fullName,
+                        role: invitation.role,
+                    },
                 },
             });
             // Log project activity
@@ -172,20 +225,41 @@ const respondToInvitation = async (req, res) => {
                     userId: receiverId,
                     projectId: invitation.projectId,
                     action: `${invitation.receiver.fullName} joined the project as a ${cleanRoleName}.`,
+                    type: 'INVITATION',
                 },
             });
+            // Attempt email dispatch asynchronously
+            mailService_1.MailService.sendCollaborationResponseEmail(invitation.sender.email, invitation.sender.fullName, invitation.receiver.fullName, invitation.project.title, 'accepted').catch((err) => console.warn('[COLLABORATION EMAIL WARNING]', err?.message || err));
         }
         else {
             // Notify the sender about rejection
             await db_1.prisma.notification.create({
                 data: {
                     userId: invitation.senderId,
-                    title: 'Invitation Declined',
-                    message: `${invitation.receiver.fullName} declined your invitation to join "${invitation.project.title}".`,
-                    type: 'GENERAL',
+                    title: 'Collaboration Declined',
+                    message: `${invitation.receiver.fullName} declined your collaboration request for "${invitation.project.title}".`,
+                    type: 'COLLABORATION_DECLINED',
                     referenceId: invitation.projectId,
+                    projectId: invitation.projectId,
+                    metadata: {
+                        projectId: invitation.projectId,
+                        projectName: invitation.project.title,
+                        receiverName: invitation.receiver.fullName,
+                        role: invitation.role,
+                    },
                 },
             });
+            // Log activity
+            await db_1.prisma.activityLog.create({
+                data: {
+                    userId: receiverId,
+                    projectId: invitation.projectId,
+                    action: `${invitation.receiver.fullName} declined the collaboration request for "${invitation.project.title}".`,
+                    type: 'INVITATION',
+                },
+            });
+            // Attempt email dispatch asynchronously
+            mailService_1.MailService.sendCollaborationResponseEmail(invitation.sender.email, invitation.sender.fullName, invitation.receiver.fullName, invitation.project.title, 'declined').catch((err) => console.warn('[COLLABORATION EMAIL WARNING]', err?.message || err));
         }
         res.status(200).json({
             message: `Invitation successfully ${status.toLowerCase()}!`,
@@ -233,6 +307,7 @@ const listMyInvitations = async (req, res) => {
     }
 };
 exports.listMyInvitations = listMyInvitations;
+const notificationService_1 = require("../services/notificationService");
 const listMyNotifications = async (req, res) => {
     try {
         const userId = req.user?.userId;
@@ -240,10 +315,7 @@ const listMyNotifications = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized.' });
             return;
         }
-        const notifications = await db_1.prisma.notification.findMany({
-            where: { userId },
-            orderBy: { createdAt: 'desc' },
-        });
+        const notifications = await notificationService_1.NotificationService.listUserNotifications(userId);
         res.status(200).json(notifications);
     }
     catch (error) {
@@ -251,6 +323,21 @@ const listMyNotifications = async (req, res) => {
     }
 };
 exports.listMyNotifications = listMyNotifications;
+const getUnreadNotificationsCount = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized.' });
+            return;
+        }
+        const count = await notificationService_1.NotificationService.getUnreadCount(userId);
+        res.status(200).json({ success: true, count });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch unread notification count.' });
+    }
+};
+exports.getUnreadNotificationsCount = getUnreadNotificationsCount;
 const markNotificationAsRead = async (req, res) => {
     try {
         const userId = req.user?.userId;
@@ -259,25 +346,26 @@ const markNotificationAsRead = async (req, res) => {
             return;
         }
         const id = req.params.id;
-        const notification = await db_1.prisma.notification.findUnique({
-            where: { id },
-        });
-        if (!notification) {
-            res.status(404).json({ message: 'Notification not found.' });
-            return;
-        }
-        if (notification.userId !== userId) {
-            res.status(403).json({ message: 'Access denied.' });
-            return;
-        }
-        await db_1.prisma.notification.update({
-            where: { id },
-            data: { isRead: true },
-        });
+        await notificationService_1.NotificationService.markNotificationRead(userId, id);
         res.status(200).json({ message: 'Notification marked as read.' });
     }
     catch (error) {
-        res.status(500).json({ message: error.message || 'Failed to update notification.' });
+        res.status(404).json({ message: error.message || 'Notification not found or access denied.' });
     }
 };
 exports.markNotificationAsRead = markNotificationAsRead;
+const markAllNotificationsAsRead = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized.' });
+            return;
+        }
+        const result = await notificationService_1.NotificationService.markAllNotificationsRead(userId);
+        res.status(200).json({ message: 'All notifications marked as read.', count: result.count });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to mark all notifications as read.' });
+    }
+};
+exports.markAllNotificationsAsRead = markAllNotificationsAsRead;

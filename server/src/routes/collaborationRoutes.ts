@@ -21,14 +21,15 @@ router.use(authenticateToken as any);
 router.post(
   '/invite',
   authorize(async (user, req) => {
-    const { projectId, username, role } = req.body;
-    if (!projectId || !username || !role) return false;
+    const { projectId, username, identifier, role } = req.body;
+    const targetQuery = (identifier || username || '').trim();
+    if (!projectId || !targetQuery || !role) return false;
     const project = await prisma.patentProject.findUnique({
       where: { id: projectId },
       include: { members: true },
     });
     if (!project) return false;
-    return InvitationPolicy.canInvite(user, project, username, role);
+    return InvitationPolicy.canInvite(user, project, targetQuery, role);
   }) as any,
   inviteMember as any
 );

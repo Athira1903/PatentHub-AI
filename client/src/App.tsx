@@ -16,6 +16,7 @@ import { NotificationsPage } from './pages/NotificationsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { ActivatePage } from './pages/ActivatePage';
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 
 export const App: React.FC = () => {
   return (
@@ -64,7 +65,11 @@ export const App: React.FC = () => {
           {/* Onboarding Profile Route */}
           <Route path="/complete-profile" element={<CompleteProfilePage />} />
 
-          {/* Protected Dashboard Routes */}
+          {/* Dedicated Central Admin Dashboard */}
+          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin/*" element={<AdminDashboardPage />} />
+
+          {/* Dedicated Inventor & Role-based Dashboard Workspace */}
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="projects" element={<ProjectsPage />} />
@@ -74,6 +79,13 @@ export const App: React.FC = () => {
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
+
+          {/* Direct Shortcuts */}
+          <Route path="/projects/:id" element={<ProjectDetailsPage />} />
+          <Route path="/create-project" element={<CreateProject />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/dashbord" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashbord/*" element={<Navigate to="/dashboard" replace />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

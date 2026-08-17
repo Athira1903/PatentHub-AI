@@ -7,6 +7,7 @@ const router = (0, express_1.Router)();
 router.post('/register', authController_1.register);
 router.post('/login', authController_1.login);
 router.post('/activate', authController_1.activate);
+router.post('/resend-activation', authController_1.resendActivation);
 router.post('/google-login', authController_1.googleLogin);
 router.get('/profile', authMiddleware_1.authenticateToken, authController_1.getProfile);
 router.post('/send-otp', authController_1.sendOtp);

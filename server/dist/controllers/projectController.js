@@ -1,8 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteTask = exports.updateTask = exports.createTask = exports.archiveProject = exports.inviteMember = exports.deleteProject = exports.updateProject = exports.getProjectById = exports.getProjects = exports.createProject = void 0;
+exports.createComment = exports.deleteTask = exports.updateTask = exports.createTask = exports.getProjectTasks = exports.getProjectActivity = exports.archiveProject = exports.inviteMember = exports.deleteProject = exports.updateProject = exports.getProjectById = exports.getProjects = exports.createProject = void 0;
 const zod_1 = require("zod");
 const projectService_1 = require("../services/projectService");
+const db_1 = require("../config/db");
+const workflow_policy_1 = require("../policies/workflow/workflow.policy");
 const createProjectSchema = zod_1.z.object({
     title: zod_1.z.string().trim().min(3, 'Title must be at least 3 characters'),
     innovationIdea: zod_1.z.string().trim().min(10, 'Innovation abstract must be at least 10 characters'),
@@ -53,10 +55,6 @@ const inviteMemberSchema = zod_1.z.object({
 });
 const createProject = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
         const validatedData = createProjectSchema.parse(req.body);
         const project = await projectService_1.ProjectService.createProject({
             ...validatedData,
@@ -75,10 +73,6 @@ const createProject = async (req, res) => {
 exports.createProject = createProject;
 const getProjects = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
         const includeArchived = req.query.archived === 'true';
         const projects = await projectService_1.ProjectService.getUserProjects(req.user.userId, req.user.role, includeArchived);
         res.status(200).json({ projects });
@@ -90,28 +84,26 @@ const getProjects = async (req, res) => {
 exports.getProjects = getProjects;
 const getProjectById = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const projectId = req.params.id;
-        const project = await projectService_1.ProjectService.getProjectById(projectId, req.user.userId, req.user.role);
-        res.status(200).json({ project });
+        const isOwner = req.project.ownerId === req.user.userId || req.user.role === 'Admin';
+        res.status(200).json({ project: { ...req.project, isOwner } });
     }
     catch (error) {
-        res.status(404).json({ message: error.message || 'Project not found' });
+        res.status(500).json({ message: error.message || 'Failed to fetch project' });
     }
 };
 exports.getProjectById = getProjectById;
 const updateProject = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const projectId = req.params.id;
         const validatedData = updateProjectSchema.parse(req.body);
-        const project = await projectService_1.ProjectService.updateProject(projectId, req.user.userId, validatedData);
+        // Validate workflow stage transition if requested
+        if (validatedData.stage) {
+            const isAllowed = await workflow_policy_1.WorkflowPolicy.canMoveToStage(req.user, req.project, validatedData.stage);
+            if (!isAllowed) {
+                res.status(403).json({ message: `Workflow stage transition to ${validatedData.stage} is not allowed.` });
+                return;
+            }
+        }
+        const project = await projectService_1.ProjectService.updateProject(req.project.id, req.user.userId, validatedData);
         res.status(200).json({ message: 'Project updated successfully', project });
     }
     catch (error) {
@@ -125,12 +117,7 @@ const updateProject = async (req, res) => {
 exports.updateProject = updateProject;
 const deleteProject = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const projectId = req.params.id;
-        await projectService_1.ProjectService.deleteProject(projectId, req.user.userId);
+        await projectService_1.ProjectService.deleteProject(req.project.id, req.user.userId);
         res.status(200).json({ message: 'Project deleted successfully' });
     }
     catch (error) {
@@ -140,13 +127,8 @@ const deleteProject = async (req, res) => {
 exports.deleteProject = deleteProject;
 const inviteMember = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const projectId = req.params.id;
         const validatedData = inviteMemberSchema.parse(req.body);
-        const member = await projectService_1.ProjectService.inviteMemberByUsername(projectId, req.user.userId, validatedData.username, validatedData.role);
+        const member = await projectService_1.ProjectService.inviteMemberByUsername(req.project.id, req.user.userId, validatedData.username, validatedData.role);
         res.status(201).json({ message: 'Team member added successfully', member });
     }
     catch (error) {
@@ -160,13 +142,8 @@ const inviteMember = async (req, res) => {
 exports.inviteMember = inviteMember;
 const archiveProject = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const projectId = req.params.id;
         const isArchived = req.body.isArchived !== false; // defaults to true
-        await projectService_1.ProjectService.archiveProject(projectId, req.user.userId, isArchived);
+        await projectService_1.ProjectService.archiveProject(req.project.id, req.user.userId, isArchived);
         res.status(200).json({ message: `Project ${isArchived ? 'archived' : 'unarchived'} successfully` });
     }
     catch (error) {
@@ -185,56 +162,77 @@ const updateTaskSchema = zod_1.z.object({
     status: zod_1.z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']).optional(),
     assignedToId: zod_1.z.string().trim().optional().nullable(),
 });
+const activityService_1 = require("../services/activityService");
+const taskService_1 = require("../services/taskService");
+const getProjectActivity = async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const filterType = req.query.type;
+        const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+        const skip = req.query.skip ? parseInt(req.query.skip, 10) : 0;
+        const activities = await activityService_1.ActivityService.listProjectActivities(projectId, filterType, limit, skip);
+        res.status(200).json({ success: true, activities });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch project activity timeline.' });
+    }
+};
+exports.getProjectActivity = getProjectActivity;
+const getProjectTasks = async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const statusFilter = req.query.status;
+        const tasks = await taskService_1.TaskService.getProjectTasks(projectId, statusFilter);
+        res.status(200).json({ success: true, tasks });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch project tasks.' });
+    }
+};
+exports.getProjectTasks = getProjectTasks;
 const createTask = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
         const projectId = req.params.id;
-        const validatedData = createTaskSchema.parse(req.body);
-        const task = await projectService_1.ProjectService.createTask(projectId, req.user.userId, validatedData.title, validatedData.description, validatedData.assignedToUsername);
+        const { title, description, assignedToId, priority, dueDate } = req.body;
+        const task = await taskService_1.TaskService.createTask(projectId, req.user.userId, {
+            title,
+            description,
+            assignedToId,
+            priority,
+            dueDate
+        });
         res.status(201).json({ message: 'Task created successfully', task });
     }
     catch (error) {
-        if (error instanceof zod_1.z.ZodError) {
-            res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
-            return;
-        }
         res.status(400).json({ message: error.message || 'Failed to create task' });
     }
 };
 exports.createTask = createTask;
 const updateTask = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
         const projectId = req.params.id;
         const taskId = req.params.taskId;
-        const validatedData = updateTaskSchema.parse(req.body);
-        const task = await projectService_1.ProjectService.updateTask(projectId, taskId, req.user.userId, validatedData);
+        const { title, description, status, priority, assignedToId, dueDate } = req.body;
+        const task = await taskService_1.TaskService.updateTask(projectId, taskId, req.user.userId, {
+            title,
+            description,
+            status,
+            priority,
+            assignedToId,
+            dueDate
+        });
         res.status(200).json({ message: 'Task updated successfully', task });
     }
     catch (error) {
-        if (error instanceof zod_1.z.ZodError) {
-            res.status(400).json({ message: error.errors[0]?.message || 'Validation failed' });
-            return;
-        }
         res.status(400).json({ message: error.message || 'Failed to update task' });
     }
 };
 exports.updateTask = updateTask;
 const deleteTask = async (req, res) => {
     try {
-        if (!req.user?.userId) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
         const projectId = req.params.id;
         const taskId = req.params.taskId;
-        await projectService_1.ProjectService.deleteTask(projectId, taskId, req.user.userId);
+        await taskService_1.TaskService.deleteTask(projectId, taskId, req.user.userId);
         res.status(200).json({ message: 'Task deleted successfully' });
     }
     catch (error) {
@@ -242,3 +240,35 @@ const deleteTask = async (req, res) => {
     }
 };
 exports.deleteTask = deleteTask;
+const createComment = async (req, res) => {
+    try {
+        const { content } = req.body;
+        if (!content || !content.trim()) {
+            res.status(400).json({ message: 'Comment content is required.' });
+            return;
+        }
+        const comment = await db_1.prisma.comment.create({
+            data: {
+                content: content.trim(),
+                projectId: req.project.id,
+                userId: req.user.userId,
+            },
+            include: {
+                user: { select: { id: true, fullName: true, username: true, role: true } },
+            },
+        });
+        // Log Activity
+        await db_1.prisma.activityLog.create({
+            data: {
+                userId: req.user.userId,
+                projectId: req.project.id,
+                action: `Added review comment: "${content.trim().substring(0, 60)}${content.trim().length > 60 ? '...' : ''}"`,
+            },
+        });
+        res.status(201).json({ message: 'Comment added successfully.', comment });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to add comment.' });
+    }
+};
+exports.createComment = createComment;

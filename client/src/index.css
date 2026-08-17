@@ -1,48 +1,51 @@
 @import "tailwindcss";
 
 @theme {
-  --color-slate-50: #f8fafb;       /* soft tinted white background */
-  --color-slate-100: #f1f5f9;      /* cool gray-blue for pills */
-  --color-slate-200: #e2e8f0;      /* soft light border */
-  --color-slate-300: #cbd5e1;      /* medium-light border */
-  --color-slate-400: #94a3b8;      /* placeholder/icon color */
-  --color-slate-500: #64748b;      /* secondary text label color */
-  --color-slate-600: #475569;      /* secondary text content color */
-  --color-slate-700: #334155;      /* dark muted text */
-  --color-slate-800: #1e293b;      /* very dark slate */
-  --color-slate-900: #0f172a;      /* primary text / dark headings */
-  --color-slate-950: #020617;      /* main titles / logos */
+  --color-slate-50: #f8fafc;       /* page canvas background */
+  --color-slate-100: #f1f5f9;      /* subtle surface & pill tint */
+  --color-slate-200: #e2e8f0;      /* clean card border */
+  --color-slate-300: #cbd5e1;      /* medium divider */
+  --color-slate-400: #94a3b8;      /* placeholder & subdued icons */
+  --color-slate-500: #64748b;      /* secondary text & metadata */
+  --color-slate-600: #475569;      /* body secondary text */
+  --color-slate-700: #334155;      /* body primary text */
+  --color-slate-800: #1e293b;      /* dark text & headings */
+  --color-slate-900: #0f172a;      /* primary dark titles */
+  --color-slate-950: #020617;      /* main titles & high contrast */
 
-  --color-blue-50: #f0fdfa;
-  --color-blue-100: #ccfbf1;
-  --color-blue-200: #99f6e4;
-  --color-blue-300: #5eead4;
-  --color-blue-400: #2dd4bf;
-  --color-blue-500: #14b8a6;
-  --color-blue-600: #0d9488;        /* core brand teal */
-  --color-blue-700: #0f766e;        /* teal hover */
-  --color-blue-800: #115e59;
-  --color-blue-900: #134e4a;
+  --color-blue-50: #eff6ff;        /* soft blue tint background */
+  --color-blue-100: #dbeafe;       /* light blue badge border */
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;       /* core brand royal blue */
+  --color-blue-700: #1d4ed8;       /* hover & active primary blue */
+  --color-blue-800: #1e40af;       /* deep royal blue */
+  --color-blue-900: #1e3a8a;       /* dark navy accent */
+  --color-blue-950: #172554;
 
-  --color-indigo-50: #ecfdf5;
-  --color-indigo-100: #d1fae5;
-  --color-indigo-200: #a7f3d0;
-  --color-indigo-300: #6ee7b7;
-  --color-indigo-400: #34d399;
-  --color-indigo-500: #10b981;
-  --color-indigo-600: #059669;      /* premium emerald accent */
-  --color-indigo-700: #047857;      /* emerald hover */
-  --color-indigo-800: #065f46;
-  --color-indigo-900: #064e3b;
+  --color-emerald-50: #ecfdf5;     /* success & readiness tint */
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;    /* core success emerald */
+  --color-emerald-600: #059669;    /* deep emerald for text */
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
 
-  --color-cyan-50: #ecfeff;
-  --color-cyan-100: #cffafe;
-  --color-cyan-200: #a5f3fc;
-  --color-cyan-300: #67e8f9;
-  --color-cyan-400: #22d3ee;
-  --color-cyan-500: #06b6d4;        /* cyan accent */
-  --color-cyan-600: #0891b2;
-  --color-cyan-700: #0e7490;
+  --color-amber-50: #fffbeb;       /* alert & risk tint */
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;      /* core warning amber */
+  --color-amber-600: #d97706;      /* deep amber for text */
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
 }
 
 @layer base {
@@ -61,94 +64,54 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
-    letter-spacing: -0.025em;
+    letter-spacing: -0.02em;
   }
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-slate-100);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-slate-300);
+  background: var(--color-slate-200);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-slate-400);
+  background: var(--color-slate-300);
 }
 
-/* Glassmorphism & Utility FX */
+/* Standardized Design Utilities */
+.app-card {
+  background-color: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+}
+
 .glass-card {
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(220, 228, 226, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
 .glass-nav {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(220, 228, 226, 0.7);
-}
-
-.gradient-border-top {
-  position: relative;
-}
-.gradient-border-top::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--color-blue-600), var(--color-cyan-500), var(--color-indigo-700));
-  border-top-left-radius: inherit;
-  border-top-right-radius: inherit;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
 }
 
 /* Custom Keyframe Animations */
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
-}
-
-@keyframes pulseGlow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.05); }
-}
-
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-float {
-  animation: float 4s ease-in-out infinite;
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 6s ease-in-out infinite;
-}
-
 .animate-fade-in {
-  animation: fadeIn 0.35s ease-out forwards;
-}
-
-@keyframes shine {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-
-@keyframes border-beam {
-  0% { offset-distance: 0%; }
-  100% { offset-distance: 100%; }
-}
-
-.animate-shine {
-  animation: shine 5s linear infinite;
+  animation: fadeIn 0.25s ease-out forwards;
 }
