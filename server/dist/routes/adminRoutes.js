@@ -12,14 +12,20 @@ router.use((0, authorize_1.authorize)((user) => authentication_policy_1.Authenti
 router.get('/dashboard', adminController_1.getDashboardMetrics);
 // Users
 router.get('/users', adminController_1.getUsers);
+router.get('/users/:id', adminController_1.getUserProfile);
 router.put('/users/:id/status', adminController_1.updateUserStatus);
 router.put('/users/:id/role', adminController_1.updateUserRole);
 router.delete('/users/:id', adminController_1.deleteUser);
+// Roles & Permissions
+router.get('/roles-stats', adminController_1.getRolesStats);
+router.get('/roles-permissions', adminController_1.getRolePermissions);
+router.put('/roles/:roleName/permissions', adminController_1.updateRolePermissions);
 // Verification Trust Layer
 router.get('/verifications', adminController_1.getVerifications);
 router.post('/verifications/:id/decision', adminController_1.processVerification);
 // Organizations
 router.get('/organizations', adminController_1.getOrganizations);
+router.get('/organizations/:id', adminController_1.getOrganizationDetails);
 router.post('/organizations', adminController_1.createOrganization);
 // Projects Ecosystem
 router.get('/projects', adminController_1.getProjects);
@@ -28,6 +34,11 @@ router.put('/projects/:id/assign', adminController_1.assignProjectReviewer);
 router.get('/reviews', adminController_1.getReviewsOversight);
 router.get('/claims-fto-oversight', adminController_1.getClaimsFtoOversight);
 router.get('/ai-operations', adminController_1.getAiOperations);
+// Activity Logs & Audit Trail
+router.get('/activity-logs', adminController_1.getActivityLogs);
+// Notifications & Broadcasts
+router.get('/notifications', adminController_1.getNotifications);
+router.post('/notifications/broadcast', adminController_1.broadcastNotification);
 // Announcements & Settings
 router.get('/announcements', adminController_1.getAnnouncements);
 router.post('/announcements', adminController_1.createAnnouncement);

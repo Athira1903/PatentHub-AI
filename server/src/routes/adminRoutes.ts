@@ -21,6 +21,14 @@ import {
   createAnnouncement,
   getSettings,
   updateSettings,
+  getActivityLogs,
+  getNotifications,
+  broadcastNotification,
+  getRolesStats,
+  getUserProfile,
+  getOrganizationDetails,
+  getRolePermissions,
+  updateRolePermissions,
 } from '../controllers/adminController';
 
 const router = Router();
@@ -33,9 +41,15 @@ router.get('/dashboard', getDashboardMetrics as any);
 
 // Users
 router.get('/users', getUsers as any);
+router.get('/users/:id', getUserProfile as any);
 router.put('/users/:id/status', updateUserStatus as any);
 router.put('/users/:id/role', updateUserRole as any);
 router.delete('/users/:id', deleteUser as any);
+
+// Roles & Permissions
+router.get('/roles-stats', getRolesStats as any);
+router.get('/roles-permissions', getRolePermissions as any);
+router.put('/roles/:roleName/permissions', updateRolePermissions as any);
 
 // Verification Trust Layer
 router.get('/verifications', getVerifications as any);
@@ -43,6 +57,7 @@ router.post('/verifications/:id/decision', processVerification as any);
 
 // Organizations
 router.get('/organizations', getOrganizations as any);
+router.get('/organizations/:id', getOrganizationDetails as any);
 router.post('/organizations', createOrganization as any);
 
 // Projects Ecosystem
@@ -53,6 +68,13 @@ router.put('/projects/:id/assign', assignProjectReviewer as any);
 router.get('/reviews', getReviewsOversight as any);
 router.get('/claims-fto-oversight', getClaimsFtoOversight as any);
 router.get('/ai-operations', getAiOperations as any);
+
+// Activity Logs & Audit Trail
+router.get('/activity-logs', getActivityLogs as any);
+
+// Notifications & Broadcasts
+router.get('/notifications', getNotifications as any);
+router.post('/notifications/broadcast', broadcastNotification as any);
 
 // Announcements & Settings
 router.get('/announcements', getAnnouncements as any);

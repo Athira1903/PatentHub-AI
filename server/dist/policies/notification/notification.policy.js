@@ -19,25 +19,25 @@ class NotificationPolicy {
         return notification.userId === user.userId;
     }
     static shouldNotifyInvitation(senderId, receiverId) {
-        return this.shouldNotifyUser(senderId, receiverId);
+        return NotificationPolicy.shouldNotifyUser(senderId, receiverId);
     }
     static shouldNotifyTaskAssignment(assignerId, assigneeId) {
-        return !!assigneeId && this.shouldNotifyUser(assignerId, assigneeId);
+        return !!assigneeId && NotificationPolicy.shouldNotifyUser(assignerId, assigneeId);
     }
     static shouldNotifyReviewRequest(actorId, targetUserId) {
-        return this.shouldNotifyUser(actorId, targetUserId);
+        return NotificationPolicy.shouldNotifyUser(actorId, targetUserId);
     }
     static shouldNotifyReviewCompleted(actorId, targetUserId) {
-        return this.shouldNotifyUser(actorId, targetUserId);
+        return NotificationPolicy.shouldNotifyUser(actorId, targetUserId);
     }
     static shouldNotifyDocumentUploaded(uploaderId, targetUserId) {
-        return this.shouldNotifyUser(uploaderId, targetUserId);
+        return NotificationPolicy.shouldNotifyUser(uploaderId, targetUserId);
     }
     static shouldNotifyStageChanged(actorId, targetUserId) {
-        return this.shouldNotifyUser(actorId, targetUserId);
+        return NotificationPolicy.shouldNotifyUser(actorId, targetUserId);
     }
     static shouldNotifyFilingApproved(actorId, targetUserId) {
-        return this.shouldNotifyUser(actorId, targetUserId);
+        return NotificationPolicy.shouldNotifyUser(actorId, targetUserId);
     }
 }
 exports.NotificationPolicy = NotificationPolicy;

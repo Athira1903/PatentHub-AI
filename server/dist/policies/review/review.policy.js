@@ -73,7 +73,7 @@ class ReviewPolicy {
      * Determine if the user can request changes.
      */
     static canRequestChanges(user, project) {
-        return this.canReject(user, project);
+        return ReviewPolicy.canReject(user, project);
     }
     /**
      * Determine if the user can comment.

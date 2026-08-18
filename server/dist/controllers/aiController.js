@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generatePatentDrawing = exports.getNoveltyAssessment = exports.getSimilarityAnalysis = exports.generateInnovationAi = void 0;
+exports.chatProjectAssistant = exports.generatePatentDrawing = exports.getNoveltyAssessment = exports.getSimilarityAnalysis = exports.generateInnovationAi = void 0;
 const db_1 = require("../config/db");
 const aiService_1 = require("../services/aiService");
 const generateInnovationAi = async (req, res) => {
@@ -127,3 +127,89 @@ const generatePatentDrawing = async (req, res) => {
     }
 };
 exports.generatePatentDrawing = generatePatentDrawing;
+const chatProjectAssistant = async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const { message, history } = req.body;
+        if (!message || !message.trim()) {
+            res.status(400).json({ message: 'Message is required.' });
+            return;
+        }
+        const project = await db_1.prisma.patentProject.findUnique({
+            where: { id: projectId },
+            include: {
+                patentClaims: {
+                    orderBy: { orderIndex: 'asc' }
+                },
+                patentReferences: true,
+                documents: {
+                    select: { name: true, category: true }
+                },
+                projectReviews: {
+                    select: { decision: true, comments: true, reviewer: { select: { fullName: true } } }
+                }
+            }
+        });
+        if (!project) {
+            res.status(404).json({ message: 'Project not found.' });
+            return;
+        }
+        // Compute filing readiness
+        const stageIndexMap = {
+            IDEA: 0,
+            LITERATURE_REVIEW: 1,
+            DOCUMENTATION: 2,
+            GUIDE_REVIEW: 3,
+            PATENT_EXPERT_REVIEW: 3,
+            PROTOTYPE: 4,
+            FORMS_PREPARATION: 4,
+            FILING_READY: 5,
+            FILED: 5
+        };
+        const currentStageIdx = stageIndexMap[project.stage] ?? 0;
+        const filingReadiness = Math.round(((currentStageIdx + 1) / 6) * 100);
+        const projectContext = {
+            title: project.title,
+            category: project.category || undefined,
+            technicalDomain: project.technicalDomain || undefined,
+            stage: project.stage,
+            innovationIdea: project.innovationIdea,
+            proposedSolution: project.proposedSolution,
+            novelFeatures: project.novelFeatures || undefined,
+            claims: (project.patentClaims || []).map((c) => ({
+                claimNumber: c.claimNumber,
+                claimType: c.claimType,
+                preamble: c.preamble || undefined,
+                body: c.body
+            })),
+            priorArtReferences: (project.patentReferences || []).map((r) => ({
+                patentNumber: r.patentNumber,
+                title: r.title,
+                abstract: r.abstract || undefined
+            })),
+            filingReadiness,
+            reviews: (project.projectReviews || []).map((r) => ({
+                reviewerName: r.reviewer?.fullName,
+                comments: r.comments || undefined,
+                status: r.decision
+            })),
+            documents: (project.documents || []).map((d) => ({
+                name: d.name,
+                category: d.category || undefined
+            }))
+        };
+        const aiResult = await aiService_1.AiService.chatWithProjectAssistant(projectContext, message.trim(), history || []);
+        res.status(200).json({
+            success: true,
+            ...aiResult
+        });
+    }
+    catch (error) {
+        console.error('chatProjectAssistant Error:', error);
+        const userMessage = error.message?.includes('API Key')
+            ? 'AI service is temporarily unavailable: Gemini API key not configured.'
+            : error.message || 'Google Gemini AI assistant is currently unavailable.';
+        res.status(502).json({ message: userMessage });
+    }
+};
+exports.chatProjectAssistant = chatProjectAssistant;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useOutletContext } from 'react-router-dom';
+import { useParams, useOutletContext, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Users,
@@ -50,11 +50,12 @@ export interface ProjectDetail {
   expectedFilingDate?: string;
   patentType?: string;
   visibility?: string;
+  ownerId?: string;
   isOwner: boolean;
   isArchived: boolean;
   createdAt: string;
   owner: { id: string; fullName: string; username: string; email: string; institution?: string | null };
-  members: Array<{ id: string; role: string; user: { id: string; fullName: string; username: string; email: string } }>;
+  members: Array<{ id: string; role: string; permissionLevel?: 'VIEW' | 'EDIT' | 'SUBMIT'; user: { id: string; fullName: string; username: string; email: string } }>;
   documents: Array<{ id: string; name: string; fileUrl: string; fileType?: string; fileSize?: number; version?: number; category: string; createdAt: string }>;
   tasks: Array<{
     id: string;
@@ -98,6 +99,7 @@ export const getStageProgress = (stage: string) => {
 
 export const ProjectDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const outletCtx = useOutletContext<{ user: any }>() || {};
   const [currentUser, setCurrentUser] = useState<any>(outletCtx.user || null);
 
@@ -111,11 +113,33 @@ export const ProjectDetailsPage: React.FC = () => {
 
   const user = currentUser;
   const [project, setProject] = useState<ProjectDetail | null>(null);
-  const projectMemberRecord = project?.members?.find((m: any) => m.user.id === user?.id || m.user.id === user?.userId);
+  const projectMemberRecord = project?.members?.find((m: any) => m.user?.id === user?.id || m.user?.id === user?.userId || m.userId === user?.id || m.userId === user?.userId);
   const userProjectRole = projectMemberRecord?.role; // 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
+  const isOwner = !!(project?.isOwner || (project?.owner && (project.owner.id === user?.id || project.owner.id === user?.userId)) || (project?.ownerId && (project.ownerId === user?.id || project.ownerId === user?.userId)) || user?.role === 'Admin');
+  const permissionLevel: 'VIEW' | 'EDIT' | 'SUBMIT' = isOwner ? 'SUBMIT' : (projectMemberRecord as any)?.permissionLevel || 'EDIT';
+  const canEdit = isOwner || permissionLevel === 'EDIT' || permissionLevel === 'SUBMIT';
+  const canSubmit = isOwner || permissionLevel === 'SUBMIT';
   const isProjectReviewer = userProjectRole === 'GUIDE' || userProjectRole === 'PATENT_EXPERT' || user?.role === 'Admin';
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('Overview');
+
+  const urlTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<string>(urlTab || 'Overview');
+
+  useEffect(() => {
+    if (urlTab) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab]);
+
+  const handleSelectTab = (tabName: string) => {
+    setActiveTab(tabName);
+    setSearchParams({ tab: tabName });
+  };
+
+  // AI Assistant Interactive State
+  const [assistantInput, setAssistantInput] = useState('');
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantHistory, setAssistantHistory] = useState<Array<{ role: 'user' | 'assistant'; text: string; timestamp?: string }>>([]);
 
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
 
@@ -338,6 +362,63 @@ export const ProjectDetailsPage: React.FC = () => {
   const [showTips, setShowTips] = useState(true);
   const [expandedMatchIndex, setExpandedMatchIndex] = useState<number | null>(null);
 
+  // Initialize AI assistant welcome message when project loads
+  useEffect(() => {
+    if (project && assistantHistory.length === 0) {
+      setAssistantHistory([
+        {
+          role: 'assistant',
+          text: `Hello! I am your **PatentHub-AI Project Assistant** for **"${project.title}"**.\n\nI have real-time access to your technical domain, claims, prior-art citations, and filing readiness checklist. How can I assist you with your patent journey today?`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+    }
+  }, [project]);
+
+  const handleSendAssistant = async (textToSend?: string) => {
+    const msg = (textToSend || assistantInput).trim();
+    if (!msg || !project) return;
+
+    const userEntry = {
+      role: 'user' as const,
+      text: msg,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const updatedHistory = [...assistantHistory, userEntry];
+    setAssistantHistory(updatedHistory);
+    setAssistantInput('');
+    setAssistantLoading(true);
+
+    try {
+      const res = await api.post(`/projects/${project.id}/ai/assistant`, {
+        message: msg,
+        history: updatedHistory.map(h => ({ role: h.role, text: h.text }))
+      });
+
+      setAssistantHistory(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: res.data.reply || 'Analysis completed.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || 'Google Gemini AI assistant is currently unavailable.';
+      setAssistantHistory(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: `⚠️ **${errMsg}**`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+    } finally {
+      setAssistantLoading(false);
+    }
+  };
+
   // Load project detail
   const fetchProject = async () => {
     try {
@@ -484,13 +565,13 @@ export const ProjectDetailsPage: React.FC = () => {
   };
 
   const handleToggleTaskStatus = async (taskId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
+    const nextStatus = currentStatus === 'COMPLETED' ? 'TODO' : 'COMPLETED';
     try {
       await api.put(`/projects/${id}/tasks/${taskId}`, { status: nextStatus });
-      toast.success(`Task marked as ${nextStatus.toLowerCase()}`);
+      toast.success(nextStatus === 'COMPLETED' ? 'Task marked completed' : 'Task marked to-do');
       fetchProject();
-    } catch (e) {
-      toast.error('Failed to update task status');
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to update task status');
     }
   };
 
@@ -885,19 +966,28 @@ export const ProjectDetailsPage: React.FC = () => {
 
   const sidebarLinks = [
     { label: 'Overview', tab: 'Overview', icon: Lightbulb },
+    { label: 'AI Assistant', tab: 'AI Assistant', icon: Sparkles },
     { label: 'Innovation Details', tab: 'Innovation Details', icon: FileText },
     { label: 'Prior Art Search', tab: 'Prior Art Search', icon: Search },
-    { label: 'AI Analysis', tab: 'AI Analysis', icon: Sparkles },
     { label: 'Claims Studio', tab: 'Claims Studio', icon: FileCode },
+    { label: 'Tasks', tab: 'Tasks', icon: CheckIcon },
+    { label: 'Forms & Filing', tab: 'Forms & Filing', icon: FileCheck2 },
+    { label: 'Documents', tab: 'Documents', icon: Folder },
     { label: 'Drawings', tab: 'Drawings', icon: Cpu },
     { label: 'FTO Analysis', tab: 'FTO Analysis', icon: Shield },
-    { label: 'Documents', tab: 'Documents', icon: Folder },
-    { label: 'Forms & Filing', tab: 'Forms & Filing', icon: FileCheck2 },
     { label: 'Reviews', tab: 'Reviews', icon: Users },
     { label: 'Activity Timeline', tab: 'Activity Timeline', icon: Activity },
   ] as const;
 
-  const filingScore = analyticsSummary?.scores?.filingReadinessScore || 78;
+  const filingScore = analyticsSummary?.scores?.filingReadinessScore ?? (
+    project?.stage === 'FILED' ? 100 :
+    project?.stage === 'FILING_READY' ? 95 :
+    project?.stage === 'PATENT_EXPERT_REVIEW' ? 80 :
+    project?.stage === 'GUIDE_REVIEW' ? 65 :
+    project?.stage === 'FORMS_PREPARATION' ? 50 :
+    project?.stage === 'DOCUMENTATION' ? 35 :
+    project?.stage === 'LITERATURE_REVIEW' ? 20 : 10
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
@@ -921,7 +1011,7 @@ export const ProjectDetailsPage: React.FC = () => {
                 return (
                   <button
                     key={link.label}
-                    onClick={() => setActiveTab(link.tab as any)}
+                    onClick={() => handleSelectTab(link.tab)}
                     className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all text-left cursor-pointer ${
                       isActive
                         ? 'bg-blue-900 text-white shadow-xs'
@@ -992,13 +1082,128 @@ export const ProjectDetailsPage: React.FC = () => {
             <ProjectCommandCenter
               project={project}
               analyticsSummary={analyticsSummary}
-              onNavigateTab={(tab) => setActiveTab(tab as any)}
+              onNavigateTab={(tab) => handleSelectTab(tab as any)}
               onShare={() => {
                 navigator.clipboard.writeText(window.location.href);
                 toast.success('Project workspace link copied to clipboard!');
               }}
               onRefreshProject={fetchProject}
             />
+          )}
+
+          {/* T_AI_ASSISTANT: INTERACTIVE CONTEXT-AWARE GEMINI COPILOT */}
+          {activeTab === 'AI Assistant' && (
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">PatentHub-AI Project Assistant</h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      AI copilot initialized with full context of <strong>"{project.title}"</strong>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-full flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Gemini Connected
+                  </span>
+                </div>
+              </div>
+
+              {/* Messages Box */}
+              <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-5 h-[420px] overflow-y-auto space-y-4">
+                {assistantHistory.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`max-w-2xl p-4 rounded-2xl text-xs leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-indigo-600 text-white rounded-br-none shadow-xs font-semibold'
+                          : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-3xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-4 mb-1.5 opacity-75 text-[10px] font-mono">
+                        <span className="font-bold uppercase">{msg.role === 'user' ? 'You' : 'PatentHub-AI'}</span>
+                        {msg.timestamp && <span>{msg.timestamp}</span>}
+                      </div>
+                      <div className="space-y-2 whitespace-pre-wrap">
+                        {msg.text}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {assistantLoading && (
+                  <div className="flex justify-start">
+                    <div className="p-4 bg-white border border-slate-200 rounded-2xl rounded-bl-none shadow-3xs text-xs font-semibold flex items-center gap-2 text-slate-500">
+                      <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                      <span>Analyzing project claims, prior art, and readiness context...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Prompt Suggestion Chips */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Quick Suggestions:</span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'What is the current filing readiness score and what is missing?',
+                    'Summarize my invention and technical novelty.',
+                    'What are the weak areas or risks in my patent?',
+                    'Explain Claim 1 in clear, simple terms.',
+                    'What prior-art references have been added?',
+                    'What documents and forms should I complete before filing?'
+                  ].map((promptText, pIdx) => (
+                    <button
+                      key={pIdx}
+                      type="button"
+                      disabled={assistantLoading}
+                      onClick={() => handleSendAssistant(promptText)}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 border border-slate-200 rounded-full text-xs font-semibold text-slate-700 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {promptText}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Input Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendAssistant();
+                }}
+                className="flex gap-3"
+              >
+                <input
+                  type="text"
+                  value={assistantInput}
+                  onChange={(e) => setAssistantInput(e.target.value)}
+                  disabled={assistantLoading}
+                  placeholder="Ask the AI Assistant about claims, prior art, IPO procedures, or drafting..."
+                  className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:border-indigo-600 shadow-xs"
+                />
+                <button
+                  type="submit"
+                  disabled={assistantLoading || !assistantInput.trim()}
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-extrabold shadow-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {assistantLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  <span>Send</span>
+                </button>
+              </form>
+
+              {/* Statutory Disclaimer */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] text-slate-500 leading-normal flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Statutory Notice:</strong> AI-generated guidance is preliminary and does not constitute legal advice, a formal patentability determination, or a definitive FTO opinion.
+                </span>
+              </div>
+            </div>
           )}
 
           {/* T_FILING_READINESS: 6-POINT READINESS CHECKLIST & FINAL PACKAGE */}
@@ -1025,7 +1230,10 @@ export const ProjectDetailsPage: React.FC = () => {
           {(activeTab === 'Claims Studio' || activeTab === 'Claims Engineering') && (
             <ClaimsEngineeringStudio
               projectId={project.id}
-              isOwnerOrMember={project.isOwner}
+              isOwnerOrMember={isOwner || !!projectMemberRecord}
+              canEdit={canEdit}
+              canSubmit={canSubmit}
+              permissionLevel={permissionLevel}
               onRefreshDocuments={fetchProject}
             />
           )}
@@ -1483,35 +1691,95 @@ export const ProjectDetailsPage: React.FC = () => {
         {(activeTab === 'Documents' || activeTab === 'Document Manager') && (
           <div className="space-y-6">
             {!activeFolder ? (
-              <div className="space-y-4">
-                <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                  Select a category directory to view, upload, and organize reference documents, drafts, and compliance audits:
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/70">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">Project Document Repository</h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      Select a category directory to view or upload reference documents, drafts, and compliance files.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <label className="px-4 py-2 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/15 flex items-center gap-1.5 cursor-pointer transition">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{uploadingDoc ? 'Uploading...' : 'Quick Upload File'}</span>
+                      <input
+                        type="file"
+                        disabled={uploadingDoc}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleUploadDocument(e.target.files[0], 'SUPPORTING');
+                          }
+                        }}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {[
-                    { key: 'RESEARCH_PAPER', label: 'Research Papers', desc: 'Reference publications' },
-                    { key: 'LITERATURE_REVIEW', label: 'Literature Review', desc: 'Prior-art reference summaries' },
+                    { key: 'RESEARCH_PAPER', label: 'Research Papers', desc: 'Reference publications & academic papers' },
+                    { key: 'LITERATURE_REVIEW', label: 'Literature Review', desc: 'Prior-art reference summaries & audits' },
                     { key: 'PATENT_DRAFT', label: 'Patent Drafts', desc: 'Complete specifications draft sheets' },
-                    { key: 'PROTOTYPE_DOCS', label: 'Prototype Documents', desc: 'Engineering designs and blueprints' },
-                    { key: 'TESTING', label: 'Testing Logs', desc: 'Lab validation & safety reports' },
-                    { key: 'SUPPORTING', label: 'Supporting Documents', desc: 'Forms drafts & legal briefs' },
+                    { key: 'PROTOTYPE_DOCS', label: 'Prototype Documents', desc: 'Engineering designs, schematics & blueprints' },
+                    { key: 'TESTING', label: 'Testing Logs', desc: 'Lab validation, benchmarking & safety reports' },
+                    { key: 'SUPPORTING', label: 'Supporting Documents', desc: 'Forms drafts, disclosures & legal briefs' },
                   ].map((folder) => {
-                    const count = project.documents.filter((d) => d.category === folder.key).length;
+                    const count = (project.documents || []).filter((d: any) => d.category === folder.key).length;
                     return (
-                      <button
+                      <div
                         key={folder.key}
-                        onClick={() => setActiveFolder(folder.key)}
-                        className="p-6 bg-slate-50 hover:bg-indigo-50/40 border border-slate-200 hover:border-indigo-400 rounded-3xl text-left transition-all space-y-3 cursor-pointer group shadow-3xs"
+                        className="p-5 bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-blue-400 rounded-3xl text-left transition-all space-y-3 shadow-3xs flex flex-col justify-between group"
                       >
-                        <Folder className="w-8 h-8 text-indigo-650 group-hover:scale-105 transition-transform" />
-                        <div>
-                          <h4 className="font-extrabold text-xs text-slate-900">{folder.label}</h4>
-                          <p className="text-[10px] text-slate-400 font-semibold">{folder.desc}</p>
-                          <span className="inline-block mt-2 text-[9px] font-bold bg-indigo-50 border border-indigo-150 text-indigo-700 px-2 py-0.5 rounded">
-                            {count} {count === 1 ? 'file' : 'files'}
-                          </span>
+                        <div
+                          onClick={() => setActiveFolder(folder.key)}
+                          className="cursor-pointer space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="p-3 bg-blue-50 text-blue-900 rounded-2xl group-hover:scale-105 transition-transform">
+                              <Folder className="w-6 h-6" />
+                            </div>
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full border border-slate-200/60">
+                              {count} {count === 1 ? 'file' : 'files'}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-xs text-slate-900 group-hover:text-blue-900 transition-colors">
+                              {folder.label}
+                            </h4>
+                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">{folder.desc}</p>
+                          </div>
                         </div>
-                      </button>
+
+                        <div className="pt-2 border-t border-slate-150 flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setActiveFolder(folder.key)}
+                            className="text-xs font-bold text-blue-900 hover:text-blue-950 cursor-pointer"
+                          >
+                            Open folder →
+                          </button>
+
+                          <label className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-900 rounded-lg text-xs font-bold cursor-pointer transition flex items-center gap-1" title="Upload directly to this folder">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span className="text-[10px]">Add File</span>
+                            <input
+                              type="file"
+                              disabled={uploadingDoc}
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleUploadDocument(e.target.files[0], folder.key);
+                                }
+                              }}
+                              className="hidden"
+                              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                            />
+                          </label>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -1522,18 +1790,18 @@ export const ProjectDetailsPage: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setActiveFolder(null)}
-                      className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1.5"
+                      className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1.5 transition shadow-3xs"
                     >
-                      ← Back to Folders
+                      ← Back to Directories
                     </button>
                     <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wider ml-2">
                       📁 {activeFolder.replace('_', ' ')}
                     </span>
                   </div>
 
-                  <label className="px-4 py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                  <label className="px-4 py-2 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/15 flex items-center gap-1.5 cursor-pointer transition">
                     <Upload className="w-3.5 h-3.5" />
-                    <span>Upload to Folder</span>
+                    <span>{uploadingDoc ? 'Uploading...' : 'Upload to Folder'}</span>
                     <input
                       type="file"
                       disabled={uploadingDoc}
@@ -1548,23 +1816,41 @@ export const ProjectDetailsPage: React.FC = () => {
                   </label>
                 </div>
 
+                {/* Drag and Drop Box */}
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      handleUploadDocument(e.dataTransfer.files[0], activeFolder);
+                    }
+                  }}
+                  className="p-8 border-2 border-dashed border-slate-250 hover:border-blue-400 rounded-3xl bg-slate-50/50 flex flex-col items-center justify-center text-center space-y-2 transition cursor-pointer"
+                >
+                  <FolderOpen className="w-8 h-8 text-blue-900/60" />
+                  <p className="text-xs font-bold text-slate-700">Drag and drop files here to upload</p>
+                  <p className="text-[10px] text-slate-400 font-medium">Supports PDF, DOCX, TXT, PNG, JPG (up to 25MB)</p>
+                </div>
+
                 <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-150 bg-white shadow-3xs">
-                  {project.documents.filter((d) => d.category === activeFolder).length === 0 ? (
+                  {(project.documents || []).filter((d: any) => d.category === activeFolder).length === 0 ? (
                     <div className="p-12 text-center text-slate-400 text-xs font-medium space-y-2">
                       <FolderOpen className="w-10 h-10 mx-auto text-slate-300" />
-                      <p>No documents uploaded in this directory category.</p>
+                      <p>No documents uploaded in this directory category yet.</p>
                     </div>
                   ) : (
-                    project.documents
-                      .filter((d) => d.category === activeFolder)
-                      .map((doc) => (
+                    (project.documents || [])
+                      .filter((d: any) => d.category === activeFolder)
+                      .map((doc: any) => (
                         <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 bg-white">
                           <div className="flex items-center gap-3">
-                            <FileText className="w-6 h-6 text-indigo-650 shrink-0" />
+                            <div className="p-2.5 bg-blue-50 text-blue-900 rounded-xl">
+                              <FileText className="w-5 h-5" />
+                            </div>
                             <div>
                               <p className="font-bold text-xs text-slate-800">{doc.name}</p>
-                              <p className="text-[10px] text-slate-400 font-semibold">
-                                Uploaded on: {new Date(doc.createdAt).toLocaleDateString()}
+                              <p className="text-[10px] text-slate-400 font-medium">
+                                Uploaded on: {new Date(doc.createdAt).toLocaleDateString()} {doc.fileSize ? `• ${(doc.fileSize / 1024).toFixed(1)} KB` : ''}
                               </p>
                             </div>
                           </div>
@@ -1573,11 +1859,11 @@ export const ProjectDetailsPage: React.FC = () => {
                               href={doc.fileUrl.startsWith('http') ? doc.fileUrl : `http://localhost:5000${doc.fileUrl}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-655"
+                              className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 transition"
                             >
                               Download
                             </a>
-                            <label className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1">
+                            <label className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1 transition">
                               <span>Replace</span>
                               <input
                                 type="file"
@@ -1589,6 +1875,7 @@ export const ProjectDetailsPage: React.FC = () => {
                                   }
                                 }}
                                 className="hidden"
+                                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
                               />
                             </label>
                             <button
@@ -2583,6 +2870,113 @@ export const ProjectDetailsPage: React.FC = () => {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* T_TASKS: PROJECT ACTION ITEMS & TASKS */}
+        {activeTab === 'Tasks' && (
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900">Project Action Items & Tasks</h3>
+                <p className="text-xs text-slate-500 font-medium">Manage project milestones and assign tasks to collaborators</p>
+              </div>
+            </div>
+
+            {/* Task Creation Form */}
+            <form onSubmit={handleCreateTask} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Create New Project Task</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="Task title (e.g. Draft dependent claims 2-5)..."
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  required
+                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+                />
+                <select
+                  value={taskAssignee}
+                  onChange={(e) => setTaskAssignee(e.target.value)}
+                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+                >
+                  <option value="">Assign to (Optional)...</option>
+                  {project.members && project.members.map(m => (
+                    <option key={m.user.id} value={m.user.id}>
+                      {m.user.fullName} ({m.role.replace(/_/g, ' ')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <input
+                type="text"
+                placeholder="Task details or description (optional)..."
+                value={taskDesc}
+                onChange={(e) => setTaskDesc(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={creatingTask || !taskTitle.trim()}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {creatingTask ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  <span>Add Task</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Task List */}
+            <div className="space-y-3">
+              {project.tasks && project.tasks.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                  No tasks created for this project yet. Use the form above to add one.
+                </div>
+              ) : (
+                project.tasks && project.tasks.map((t) => {
+                  const isDone = t.status === 'COMPLETED';
+                  return (
+                    <div
+                      key={t.id}
+                      className={`p-4 rounded-2xl border flex items-center justify-between gap-4 transition ${
+                        isDone ? 'bg-slate-50/70 border-slate-200 opacity-75' : 'bg-white border-slate-200 hover:border-slate-300 shadow-3xs'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTaskStatus(t.id, t.status)}
+                          className={`w-5 h-5 rounded-lg border flex items-center justify-center cursor-pointer transition ${
+                            isDone ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 hover:border-indigo-600 bg-white'
+                          }`}
+                        >
+                          {isDone && <CheckIcon className="w-3.5 h-3.5 stroke-[3]" />}
+                        </button>
+                        <div className="min-w-0">
+                          <h5 className={`text-xs font-bold truncate ${isDone ? 'line-through text-slate-500' : 'text-slate-900'}`}>
+                            {t.title}
+                          </h5>
+                          {t.description && (
+                            <p className="text-[11px] text-slate-500 truncate">{t.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-0.5">
+                            {t.assignedTo && <span>👤 {t.assignedTo.fullName}</span>}
+                            <span>Created {new Date(t.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                        isDone ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        {t.status}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}

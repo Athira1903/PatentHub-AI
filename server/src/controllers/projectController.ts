@@ -171,7 +171,7 @@ const createTaskSchema = z.object({
 const updateTaskSchema = z.object({
   title: z.string().trim().optional(),
   description: z.string().trim().optional(),
-  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']).optional(),
+  status: z.enum(['TODO', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
   assignedToId: z.string().trim().optional().nullable(),
 });
 
@@ -197,7 +197,7 @@ export const getProjectTasks = async (req: any, res: Response): Promise<void> =>
     const projectId = req.params.id as string;
     const statusFilter = req.query.status as string | undefined;
 
-    const tasks = await TaskService.getProjectTasks(projectId, statusFilter);
+    const tasks = await TaskService.getProjectTasks(projectId, req.user?.userId, req.user?.role, statusFilter);
     res.status(200).json({ success: true, tasks });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to fetch project tasks.' });
@@ -207,15 +207,16 @@ export const getProjectTasks = async (req: any, res: Response): Promise<void> =>
 export const createTask = async (req: any, res: Response): Promise<void> => {
   try {
     const projectId = req.params.id as string;
-    const { title, description, assignedToId, priority, dueDate } = req.body;
+    const { title, description, assignedToId, assignedToUsername, priority, dueDate } = req.body;
 
     const task = await TaskService.createTask(projectId, req.user.userId, {
       title,
       description,
       assignedToId,
       priority,
-      dueDate
-    });
+      dueDate,
+      ...(assignedToUsername ? { assignedToUsername } : {})
+    } as any);
 
     res.status(201).json({ message: 'Task created successfully', task });
   } catch (error: any) {

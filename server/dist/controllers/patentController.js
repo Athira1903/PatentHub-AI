@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteReference = exports.saveReference = exports.getSavedReferences = exports.searchPatents = void 0;
 const patentSearchService_1 = require("../services/patentSearchService");
 const patentReferenceService_1 = require("../services/patentReferenceService");
+const activityService_1 = require("../services/activityService");
 /**
  * Searches patents using the query string in the request.
  */
@@ -60,6 +61,10 @@ const saveReference = async (req, res) => {
             publishDate,
             source
         });
+        // Record activity log
+        if (req.user?.userId) {
+            await activityService_1.ActivityService.createActivity(projectId, req.user.userId, 'SAVED_PRIOR_ART', `Saved prior-art reference: ${saved.patentNumber} - ${saved.title}`);
+        }
         res.status(201).json({ success: true, reference: saved });
     }
     catch (error) {
@@ -79,7 +84,11 @@ const deleteReference = async (req, res) => {
             res.status(400).json({ message: 'Reference ID is required.' });
             return;
         }
-        await patentReferenceService_1.PatentReferenceService.deleteReference(projectId, referenceId);
+        const deleted = await patentReferenceService_1.PatentReferenceService.deleteReference(projectId, referenceId);
+        // Record activity log
+        if (req.user?.userId) {
+            await activityService_1.ActivityService.createActivity(projectId, req.user.userId, 'REMOVED_PRIOR_ART', `Removed prior-art reference: ${deleted.patentNumber}`);
+        }
         res.status(200).json({ success: true, message: 'Patent reference deleted successfully.' });
     }
     catch (error) {

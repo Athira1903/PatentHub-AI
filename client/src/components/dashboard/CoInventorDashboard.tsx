@@ -1,30 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
-  Folder,
-  Rocket,
+  FolderKanban,
+  AlertCircle,
   CheckSquare,
-  MessageSquare,
-  ChevronRight,
-  ExternalLink,
   Plus,
-  Upload,
-  FileText,
-  Layers,
-  Eye,
-  Scale,
-  Users,
-  Lightbulb,
+  RefreshCw,
   Search,
-  PenTool,
-  Send,
-  Info,
-  Check,
-  ChevronDown,
-  Loader2,
-  FolderPlus,
-  Clock,
+  ChevronRight,
+  FileText,
+  Users,
   Sparkles,
+  Layers,
+  ArrowRight,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  Upload,
+  UserCheck,
+  Scale,
+  Check,
+  TrendingUp,
+  FolderPlus
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -35,27 +32,32 @@ interface CoInventorDashboardProps {
   onRefresh?: () => void;
 }
 
-export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({
-  user,
-}) => {
+export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, onRefresh }) => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [stageFilter, setStageFilter] = useState<string>('ALL');
+  const [expandedReadinessProjectId, setExpandedReadinessProjectId] = useState<string | null>(null);
 
-  const firstName = user?.fullName ? user.fullName.split(' ')[0] : 'Inventor';
+  // Time-aware greeting
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   const fetchCoInventorData = async () => {
     try {
       setLoading(true);
       const res = await api.get('/projects/analytics/coinventor');
       setDashboardData(res.data);
-      if (res.data.projects && res.data.projects.length > 0 && selectedProjectId === 'ALL') {
-        // Keep ALL as filter default, or select first project for details
-      }
-    } catch (err: any) {
-      console.error('Failed to load co-inventor dashboard data', err);
-      toast.error('Failed to load live workspace data.');
+      if (onRefresh) onRefresh();
+    } catch (e: any) {
+      console.error('Failed to load co-inventor dashboard data:', e);
+      toast.error('Could not sync latest co-inventor workspace data.');
     } finally {
       setLoading(false);
     }
@@ -65,722 +67,1086 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({
     fetchCoInventorData();
   }, []);
 
-  const projects = dashboardData?.projects || [];
+  // Task Status Toggle
+  const handleToggleTaskStatus = async (projectId: string, taskId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'COMPLETED' ? 'TODO' : 'COMPLETED';
+    try {
+      await api.put(`/projects/${projectId}/tasks/${taskId}/status`, { status: newStatus });
+      toast.success(`Task marked as ${newStatus === 'COMPLETED' ? 'Completed' : 'To-Do'}`);
+      fetchCoInventorData();
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to update task status');
+    }
+  };
+
+  // Respond to Collaboration Invitation
+  const handleRespondInvitation = async (invitationId: string, decision: 'ACCEPT' | 'REJECT') => {
+    try {
+      await api.post(`/collaboration/respond`, {
+        invitationId,
+        status: decision === 'ACCEPT' ? 'ACCEPTED' : 'REJECTED'
+      });
+      toast.success(`Invitation ${decision === 'ACCEPT' ? 'accepted' : 'declined'} successfully`);
+      fetchCoInventorData();
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || `Failed to ${decision.toLowerCase()} invitation`);
+    }
+  };
+
+  const projects: any[] = dashboardData?.projects || [];
   const kpis = dashboardData?.kpis || {
     myProjects: 0,
     activeProjects: 0,
-    myTasks: 0,
-    tasksDueThisWeek: 0,
+    filingReadiness: 0,
+    pendingActions: 0,
     pendingReviews: 0,
+    myTasks: 0,
+    openTasks: 0
   };
-  const needsAttentionList = dashboardData?.needsAttention || [];
-  const teamActivities = dashboardData?.recentActivities || [];
-  const recentDocuments = dashboardData?.recentDocuments || [];
+  const contribution = dashboardData?.contribution || {
+    tasksAssigned: 0,
+    tasksCompleted: 0,
+    completionRate: 0,
+    myRecentContributions: []
+  };
 
-  const filteredProjects = selectedProjectId === 'ALL'
-    ? projects
-    : projects.filter((p: any) => p.id === selectedProjectId);
+  // Filter projects by search and stage
+  const filteredProjects = projects.filter((p) => {
+    const matchesSearch =
+      !searchTerm.trim() ||
+      p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.technicalDomain.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const activeProject = selectedProjectId !== 'ALL'
-    ? projects.find((p: any) => p.id === selectedProjectId)
-    : projects[0] || null;
+    const matchesStage =
+      stageFilter === 'ALL' ||
+      (stageFilter === 'IDEA' && p.stage === 'IDEA') ||
+      (stageFilter === 'SEARCH' && p.stage === 'LITERATURE_REVIEW') ||
+      (stageFilter === 'CLAIMS' && p.stage === 'DOCUMENTATION') ||
+      (stageFilter === 'REVIEW' && (p.stage === 'GUIDE_REVIEW' || p.stage === 'PATENT_EXPERT_REVIEW')) ||
+      (stageFilter === 'PROTOTYPE' && (p.stage === 'PROTOTYPE' || p.stage === 'FORMS_PREPARATION')) ||
+      (stageFilter === 'FILING' && (p.stage === 'FILING_READY' || p.stage === 'FILED'));
 
-  const journeyStages = [
-    { name: 'Idea', icon: Lightbulb },
-    { name: 'Search', icon: Search },
-    { name: 'Claims', icon: PenTool },
-    { name: 'Review', icon: Users },
-    { name: 'Prototype', icon: Layers },
-    { name: 'Filing', icon: Send },
+    const matchesProjectSelect = selectedProjectId === 'ALL' || p.id === selectedProjectId;
+
+    return matchesSearch && matchesStage && matchesProjectSelect;
+  });
+
+  const activeFocusProject =
+    selectedProjectId !== 'ALL'
+      ? projects.find((p) => p.id === selectedProjectId) || projects[0]
+      : projects[0];
+
+  const stageSteps = [
+    { num: '01', key: 'IDEA', label: 'Idea', tab: 'Overview' },
+    { num: '02', key: 'SEARCH', label: 'Search', tab: 'Prior Art Search' },
+    { num: '03', key: 'CLAIMS', label: 'Claims', tab: 'Claims Studio' },
+    { num: '04', key: 'REVIEW', label: 'Review', tab: 'Reviews' },
+    { num: '05', key: 'PROTOTYPE', label: 'Prototype', tab: 'Drawings' },
+    { num: '06', key: 'FILING', label: 'Filing', tab: 'Forms & Filing' },
   ];
 
-  const formatRelativeTime = (dateStr: string) => {
-    if (!dateStr) return '';
-    const now = new Date();
-    const date = new Date(dateStr);
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.round(diffMs / 1000);
-    const diffMin = Math.round(diffSec / 60);
-    const diffHour = Math.round(diffMin / 60);
-    const diffDay = Math.round(diffHour / 24);
-
-    if (diffMin < 1) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    if (diffHour < 24) return `${diffHour}h ago`;
-    if (diffDay === 1) return 'Yesterday';
-    if (diffDay < 7) return `${diffDay}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .substring(0, 2)
-      .toUpperCase();
-  };
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-700" />
-        <p className="text-xs font-semibold text-slate-500">Loading Co-Inventor Workspace...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans">
-      {/* 1. TOP GREETING CARD */}
-      <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-blue-50/90 border border-blue-100/80 flex items-center justify-center text-2xl shadow-3xs shrink-0">
-            🤝
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 font-sans antialiased text-[#253330]">
+      {/* ==================================================== */}
+      {/* 1. HEADER (SOFT, ENTERPRISE, REAL CO-INVENTOR GREETING) */}
+      {/* ==================================================== */}
+      <div className="bg-white border border-[#E5EBE8] rounded-3xl p-6 sm:p-8 shadow-3xs flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+        <div className="space-y-2 relative z-10 max-w-2xl">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#E4F0EC] text-[#315C55] border border-[#A8C8BD]/50 shadow-3xs">
+              CO-INVENTOR WORKSPACE
+            </span>
+            {user?.institution && (
+              <span className="text-xs text-[#71807C] font-semibold">• {user.institution}</span>
+            )}
           </div>
-          <div>
-            <h1 className="text-2xl sm:text-[26px] font-black text-slate-950 tracking-tight flex items-center gap-2">
-              <span>Good morning, {firstName}</span>
-              <span>👋</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-              You have <strong className="text-slate-800">{kpis.activeProjects} active {kpis.activeProjects === 1 ? 'project' : 'projects'}</strong> in progress and <strong className="text-slate-800">{kpis.myTasks} {kpis.myTasks === 1 ? 'task' : 'tasks'}</strong> in your workspace.
-            </p>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-[#253330] tracking-tight leading-tight">
+            {getGreeting()}, {user?.fullName || user?.username || 'Co-Inventor'}
+          </h1>
+          <p className="text-xs sm:text-sm text-[#5C6B67] font-medium leading-relaxed">
+            Continue contributing to your patent projects and drafting tasks.
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {projects.length > 0 && (
-            <div className="relative">
-              <select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="appearance-none px-4 py-2.5 pr-9 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer shadow-3xs transition focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="ALL">All Projects ({projects.length})</option>
-                {projects.map((p: any) => (
-                  <option key={p.id} value={p.id}>{p.title}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          )}
+        <div className="flex flex-wrap items-center gap-3 relative z-10">
+          <button
+            onClick={fetchCoInventorData}
+            className="p-3 bg-[#F7FAF9] hover:bg-[#E4F0EC] border border-[#E5EBE8] rounded-2xl text-[#5C6B67] text-xs font-bold transition shadow-3xs cursor-pointer flex items-center gap-1.5"
+            title="Refresh Co-Inventor Workspace"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#315C55]' : ''}`} />
+          </button>
+
+          <Link
+            to="/dashboard/claims"
+            className="px-4 py-3 bg-[#E4F0EC] hover:bg-[#DDEBE6] text-[#315C55] border border-[#A8C8BD]/40 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-3xs"
+          >
+            <Sparkles className="w-4 h-4 text-[#315C55]" />
+            <span>Claims Studio</span>
+          </Link>
 
           <Link
             to="/dashboard/create-project"
-            className="px-4 py-2.5 bg-[#064E3B] hover:bg-[#043E2F] text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+            className="px-5 py-3 bg-[#315C55] hover:bg-[#254640] text-white rounded-2xl text-xs font-extrabold shadow-3xs hover:shadow-2xs transition flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" />
-            <span>New Invention</span>
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>New Patent Project</span>
           </Link>
         </div>
       </div>
 
-      {/* 2. 4-COLUMN KPI METRIC CARDS (REAL DATA) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: My Projects */}
-        <Link
-          to="/dashboard/projects"
-          className="p-5 rounded-2xl bg-[#EEF2FF] border border-[#E0E7FF] hover:border-indigo-300 transition-all shadow-3xs group flex flex-col justify-between space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-indigo-100/90 text-indigo-700 flex items-center justify-center">
-              <Folder className="w-4 h-4" />
-            </div>
-            <ChevronRight className="w-4 h-4 text-indigo-400 group-hover:translate-x-1 transition" />
+      {/* ==================================================== */}
+      {/* 2. TOP 4 REAL DATABASE-DRIVEN KPI CARDS */}
+      {/* ==================================================== */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Inventions / My Projects */}
+        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
+          <div className="flex items-center justify-between text-[#71807C]">
+            <span className="text-[10px] font-black uppercase tracking-wider">My Projects</span>
+            <FolderKanban className="w-4 h-4 text-[#315C55]" />
           </div>
-          <div>
-            <span className="text-xs font-bold text-indigo-950">My Projects</span>
-            <div className="text-3xl font-black text-indigo-950 font-sans tracking-tight">
-              {String(kpis.myProjects).padStart(2, '0')}
-            </div>
-            <p className="text-[11px] text-indigo-700/80 font-medium mt-0.5">Projects you're collaborating on →</p>
+          <div className="text-2xl sm:text-3xl font-black text-[#253330] font-mono">
+            {kpis.myProjects < 10 ? `0${kpis.myProjects}` : kpis.myProjects}
           </div>
-        </Link>
+          <span className="inline-block text-[10px] font-bold text-[#6F8F88]">
+            Collaborating & accessible files
+          </span>
+        </div>
 
-        {/* Card 2: Active Projects */}
-        <Link
-          to="/dashboard/projects"
-          className="p-5 rounded-2xl bg-[#ECFDF5] border border-[#D1FAE5] hover:border-emerald-300 transition-all shadow-3xs group flex flex-col justify-between space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-emerald-100/90 text-emerald-700 flex items-center justify-center">
-              <Rocket className="w-4 h-4" />
-            </div>
-            <ChevronRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition" />
+        {/* Active Projects */}
+        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
+          <div className="flex items-center justify-between text-[#71807C]">
+            <span className="text-[10px] font-black uppercase tracking-wider">Active Projects</span>
+            <Layers className="w-4 h-4 text-[#6F8F88]" />
           </div>
-          <div>
-            <span className="text-xs font-bold text-emerald-950">Active Projects</span>
-            <div className="text-3xl font-black text-emerald-950 font-sans tracking-tight">
-              {String(kpis.activeProjects).padStart(2, '0')}
-            </div>
-            <p className="text-[11px] text-emerald-700/80 font-medium mt-0.5">Currently in development →</p>
+          <div className="text-2xl sm:text-3xl font-black text-[#253330] font-mono">
+            {kpis.activeProjects < 10 ? `0${kpis.activeProjects}` : kpis.activeProjects}
           </div>
-        </Link>
+          <span className="inline-block text-[10px] font-bold text-[#6F8F88]">
+            In development pipeline
+          </span>
+        </div>
 
-        {/* Card 3: My Tasks */}
-        <Link
-          to="/dashboard/tasks"
-          className="p-5 rounded-2xl bg-[#FFFBEB] border border-[#FEF3C7] hover:border-amber-300 transition-all shadow-3xs group flex flex-col justify-between space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center">
-              <CheckSquare className="w-4 h-4" />
-            </div>
-            <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition" />
+        {/* My Tasks */}
+        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
+          <div className="flex items-center justify-between text-[#71807C]">
+            <span className="text-[10px] font-black uppercase tracking-wider">My Tasks</span>
+            <CheckSquare className="w-4 h-4 text-[#315C55]" />
           </div>
-          <div>
-            <span className="text-xs font-bold text-amber-950">My Tasks</span>
-            <div className="text-3xl font-black text-amber-950 font-sans tracking-tight">
-              {String(kpis.myTasks).padStart(2, '0')}
-            </div>
-            <p className="text-[11px] text-amber-800/80 font-medium mt-0.5">
-              {kpis.tasksDueThisWeek > 0 ? `${kpis.tasksDueThisWeek} due this week →` : 'All tasks up to date →'}
-            </p>
+          <div className="text-2xl sm:text-3xl font-black text-[#315C55] font-mono">
+            {kpis.myTasks < 10 ? `0${kpis.myTasks}` : kpis.myTasks}
           </div>
-        </Link>
+          <span className="inline-block text-[10px] font-bold text-[#315C55] bg-[#E4F0EC] px-2 py-0.5 rounded-md">
+            Assigned to you
+          </span>
+        </div>
 
-        {/* Card 4: Pending Reviews */}
-        <Link
-          to="/dashboard/projects"
-          className="p-5 rounded-2xl bg-[#F0F9FF] border border-[#E0F2FE] hover:border-sky-300 transition-all shadow-3xs group flex flex-col justify-between space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-sky-100/90 text-sky-700 flex items-center justify-center">
-              <MessageSquare className="w-4 h-4" />
-            </div>
-            <ChevronRight className="w-4 h-4 text-sky-400 group-hover:translate-x-1 transition" />
+        {/* Pending Reviews / Actions */}
+        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
+          <div className="flex items-center justify-between text-[#71807C]">
+            <span className="text-[10px] font-black uppercase tracking-wider">Pending Reviews</span>
+            <AlertCircle className="w-4 h-4 text-amber-600" />
           </div>
-          <div>
-            <span className="text-xs font-bold text-sky-950">Pending Reviews</span>
-            <div className="text-3xl font-black text-sky-950 font-sans tracking-tight">
-              {String(kpis.pendingReviews).padStart(2, '0')}
-            </div>
-            <p className="text-[11px] text-sky-800/80 font-medium mt-0.5">
-              {kpis.pendingReviews > 0 ? 'Awaiting your response →' : 'No pending reviews →'}
-            </p>
+          <div className="text-2xl sm:text-3xl font-black text-amber-700 font-mono">
+            {kpis.pendingReviews < 10 ? `0${kpis.pendingReviews}` : kpis.pendingReviews}
           </div>
-        </Link>
+          <span className="inline-block text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
+            Supervisor reviews pending
+          </span>
+        </div>
       </div>
 
-      {/* 3. MAIN DASHBOARD CONTENT GRID (8 cols Left / 4 cols Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT COLUMN (8 cols) */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* A. My Patent Projects Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-black text-slate-900 tracking-tight">My Patent Projects</h2>
-              <Link to="/dashboard/projects" className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline">
-                View All ({projects.length})
-              </Link>
+      {/* ==================================================== */}
+      {/* 3. MAIN DASHBOARD CONTENT OR EMPTY STATE */}
+      {/* ==================================================== */}
+      {projects.length === 0 ? (
+        /* PREMIUM EMPTY STATE */
+        <div className="bg-white border border-[#E5EBE8] rounded-3xl p-12 text-center shadow-3xs space-y-6 max-w-2xl mx-auto my-8">
+          <div className="w-16 h-16 bg-[#E4F0EC] text-[#315C55] rounded-3xl flex items-center justify-center mx-auto shadow-3xs">
+            <FolderPlus className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-[#253330] tracking-tight">
+              No Projects Yet
+            </h2>
+            <p className="text-xs sm:text-sm text-[#5C6B67] leading-relaxed">
+              You are not currently assigned to any patent project. You can start a new invention project or request the project owner to invite you to collaborate.
+            </p>
+          </div>
+          <div className="flex justify-center gap-3 pt-2">
+            <Link
+              to="/dashboard/create-project"
+              className="px-6 py-3 bg-[#315C55] hover:bg-[#254640] text-white rounded-2xl text-xs font-black shadow-3xs flex items-center gap-2 transition"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>Create Patent Project</span>
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* ==================================================== */}
+          {/* SEARCH & STAGE FILTER BAR */}
+          {/* ==================================================== */}
+          <div className="bg-white border border-[#E5EBE8] rounded-2xl p-4 shadow-3xs flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Search Input */}
+            <div className="relative w-full sm:w-80">
+              <Search className="w-3.5 h-3.5 text-[#8A9B96] absolute left-3 top-3" />
+              <input
+                type="text"
+                placeholder="Search projects by title, domain..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3.5 py-2 bg-[#F7FAF9] border border-[#E5EBE8] rounded-xl text-xs text-[#253330] placeholder-[#8A9B96] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#315C55]"
+              />
             </div>
 
-            {/* Empty State when no projects exist */}
-            {projects.length === 0 ? (
-              <div className="bg-white border border-slate-200/90 rounded-3xl p-8 shadow-xs text-center space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center mx-auto text-2xl shadow-3xs">
-                  <FolderPlus className="w-7 h-7" />
-                </div>
-                <div className="space-y-1 max-w-md mx-auto">
-                  <h3 className="text-base font-black text-slate-900">No projects yet</h3>
-                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                    You're not assigned to any patent project yet. Create your first invention or ask a lead inventor to invite you to their workspace.
+            <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap justify-end">
+              {/* Project Filter Select */}
+              {projects.length > 1 && (
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  className="px-3 py-2 bg-[#F7FAF9] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer focus:bg-white focus:outline-none"
+                >
+                  <option value="ALL">All Projects ({projects.length})</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title.length > 25 ? `${p.title.substring(0, 25)}...` : p.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {/* Stage Filter */}
+              <div className="flex rounded-xl bg-[#F7FAF9] p-1 border border-[#E5EBE8] text-xs font-bold text-[#5C6B67] overflow-x-auto max-w-full">
+                {(['ALL', 'IDEA', 'SEARCH', 'CLAIMS', 'REVIEW', 'PROTOTYPE', 'FILING'] as const).map((stage) => (
+                  <button
+                    key={stage}
+                    onClick={() => setStageFilter(stage)}
+                    className={`px-3 py-1 rounded-lg transition cursor-pointer text-[11px] whitespace-nowrap ${
+                      stageFilter === stage ? 'bg-[#315C55] text-white shadow-3xs' : 'hover:text-[#253330]'
+                    }`}
+                  >
+                    {stage === 'ALL' ? 'All Stages' : stage.charAt(0) + stage.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ==================================================== */}
+          {/* TWO COLUMN GRID: PROJECTS LIST (LEFT) & ATTENTION/TASKS (RIGHT) */}
+          {/* ==================================================== */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* -------------------------------------------------- */}
+            {/* LEFT COLUMN: MY PATENT PROJECTS (2 SPANS) */}
+            {/* -------------------------------------------------- */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Section Title */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-black text-[#253330] tracking-tight">
+                    My Patent Projects
+                  </h2>
+                  <p className="text-xs text-[#71807C]">
+                    Active workspaces, filing readiness & prior-art risk indices
                   </p>
                 </div>
-                <div className="pt-2">
-                  <Link
-                    to="/dashboard/create-project"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#064E3B] hover:bg-[#043E2F] text-white rounded-xl text-xs font-bold shadow-xs transition"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Create New Invention</span>
-                  </Link>
-                </div>
+                <span className="text-xs font-mono font-bold text-[#6F8F88]">
+                  Showing {filteredProjects.length} of {projects.length}
+                </span>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredProjects.map((project: any) => {
-                  const readiness = project.filingReadiness || 0;
-                  const stageIndex = project.currentStageIndex !== undefined ? project.currentStageIndex : 0;
 
-                  return (
-                    <div
-                      key={project.id}
-                      className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs hover:shadow-md transition-all space-y-5"
-                    >
-                      {/* Project Header */}
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3.5">
-                          <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shrink-0 font-black text-sm shadow-3xs">
-                            {getInitials(project.title)}
-                          </div>
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3
-                                className="text-sm sm:text-base font-black text-slate-950 hover:text-blue-600 transition cursor-pointer"
-                                onClick={() => navigate(`/projects/${project.id}`)}
-                              >
-                                {project.title}
-                              </h3>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                                project.status === 'ACTIVE'
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
-                              }`}>
-                                {project.status || 'ACTIVE'}
-                              </span>
-                              {project.category && (
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">
-                                  {project.category}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-500 font-medium line-clamp-1">
-                              {project.summary || 'Patent drafting workspace & statutory compliance docket.'}
-                            </p>
-
-                            {/* Collaborator Avatars (REAL) */}
-                            <div className="flex items-center gap-2 pt-1">
-                              <div className="flex -space-x-1.5 overflow-hidden">
-                                {project.owner && (
-                                  <span
-                                    title={`Owner: ${project.owner.fullName}`}
-                                    className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold ring-2 ring-white"
-                                  >
-                                    {getInitials(project.owner.fullName)}
-                                  </span>
-                                )}
-                                {project.members && project.members.slice(0, 3).map((m: any) => (
-                                  <span
-                                    key={m.id || m.userId}
-                                    title={`${m.role}: ${m.user?.fullName || m.user?.username}`}
-                                    className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-white text-[10px] font-bold ring-2 ring-white"
-                                  >
-                                    {getInitials(m.user?.fullName || m.user?.username)}
-                                  </span>
-                                ))}
-                              </div>
-                              <span className="text-[11px] text-slate-500 font-medium">
-                                {project.collaboratorCount > 1
-                                  ? `Team of ${project.collaboratorCount} collaborators`
-                                  : 'Individual project'}
-                              </span>
-                            </div>
-                          </div>
+              {filteredProjects.length === 0 ? (
+                <div className="bg-white border border-[#E5EBE8] rounded-3xl p-8 text-center shadow-3xs space-y-2">
+                  <p className="text-xs font-bold text-[#5C6B67]">No patent projects match your filter criteria.</p>
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setStageFilter('ALL');
+                      setSelectedProjectId('ALL');
+                    }}
+                    className="text-xs font-bold text-[#315C55] hover:underline"
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              ) : (
+                filteredProjects.map((proj) => (
+                  <div
+                    key={proj.id}
+                    className="bg-white border border-[#E5EBE8] hover:border-[#315C55]/60 transition-all rounded-3xl p-6 shadow-3xs space-y-5"
+                  >
+                    {/* Project Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#E4F0EC] text-[#315C55] border border-[#A8C8BD]/40">
+                            {proj.category}
+                          </span>
+                          <span className="text-[11px] font-bold text-[#71807C]">
+                            {proj.technicalDomain}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-[#315C55] bg-[#F7FAF9] border border-[#E5EBE8] px-2 py-0.5 rounded-full">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#315C55] animate-pulse" />
+                            {proj.stage?.replace('_', ' ')}
+                          </span>
                         </div>
+                        <h3 className="text-lg font-black text-[#253330] tracking-tight">
+                          {proj.title}
+                        </h3>
+                      </div>
 
+                      <button
+                        onClick={() => navigate(`/dashboard/projects/${proj.id}`)}
+                        className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-xl text-xs font-bold shadow-3xs flex items-center gap-1.5 shrink-0 transition cursor-pointer self-start"
+                      >
+                        <span>Open Workspace</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* 6-Stage Patent Journey Stepper */}
+                    <div className="pt-2">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-[#71807C] mb-2 flex justify-between">
+                        <span>Patent Journey Pipeline</span>
+                        <span className="text-[#315C55]">Stage {proj.currentStageIndex + 1} of 6</span>
+                      </div>
+                      <div className="grid grid-cols-6 gap-1 bg-[#F7FAF9] p-1.5 rounded-2xl border border-[#E5EBE8]">
+                        {stageSteps.map((step, sIdx) => {
+                          const isCompleted = sIdx < proj.currentStageIndex;
+                          const isActive = sIdx === proj.currentStageIndex;
+                          return (
+                            <div
+                              key={step.key}
+                              onClick={() => navigate(`/dashboard/projects/${proj.id}?tab=${encodeURIComponent(step.tab)}`)}
+                              className={`p-2 rounded-xl text-center transition cursor-pointer ${
+                                isActive
+                                  ? 'bg-[#315C55] text-white shadow-3xs'
+                                  : isCompleted
+                                  ? 'bg-[#E4F0EC] text-[#315C55] font-bold'
+                                  : 'text-[#8A9B96] hover:bg-white'
+                              }`}
+                              title={`Jump to ${step.label}`}
+                            >
+                              <div className="text-[9px] font-mono font-bold leading-none">{step.num}</div>
+                              <div className="text-[10px] font-black truncate mt-0.5">{step.label}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Readiness, Risk & Novelty Indicators */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[#F0F4F2]">
+                      {/* Filing Readiness */}
+                      <div className="p-3 bg-[#F7FAF9] rounded-2xl border border-[#E5EBE8] space-y-1.5">
+                        <div className="flex justify-between items-center text-[10px] font-black uppercase text-[#71807C]">
+                          <span>Filing Readiness</span>
+                          <span className="text-[#315C55] font-mono">{proj.filingReadiness}%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#315C55] rounded-full transition-all duration-500"
+                            style={{ width: `${Math.max(6, proj.filingReadiness)}%` }}
+                          />
+                        </div>
                         <button
-                          onClick={() => navigate(`/projects/${project.id}`)}
-                          className="text-slate-400 hover:text-slate-800 p-1 cursor-pointer"
-                          title="Open Project Command Center"
+                          onClick={() =>
+                            setExpandedReadinessProjectId(
+                              expandedReadinessProjectId === proj.id ? null : proj.id
+                            )
+                          }
+                          className="text-[10px] font-bold text-[#315C55] hover:underline block pt-0.5"
                         >
-                          <ChevronRight className="w-5 h-5" />
+                          {expandedReadinessProjectId === proj.id ? 'Hide Criteria ▴' : 'View Criteria ▾'}
                         </button>
                       </div>
 
-                      {/* Patent Journey Stepper Line & Filing Readiness */}
-                      <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        {/* 6-Stage Progress Line */}
-                        <div className="flex-1 max-w-md">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Patent Journey</span>
-                          <div className="relative flex items-center justify-between">
-                            {/* Background Connector Bar */}
-                            <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 z-0" />
-                            <div
-                              className="absolute left-2 top-1/2 -translate-y-1/2 h-0.5 bg-emerald-500 z-0 transition-all duration-500"
-                              style={{ width: `${(stageIndex / (journeyStages.length - 1)) * 100}%` }}
-                            />
-
-                            {journeyStages.map((stage, sIdx) => {
-                              const isPast = sIdx < stageIndex;
-                              const isCurrent = sIdx === stageIndex;
-
-                              return (
-                                <div key={stage.name} className="relative z-10 flex flex-col items-center group">
-                                  <div
-                                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
-                                      isPast
-                                        ? 'bg-emerald-500 text-white shadow-3xs'
-                                        : isCurrent
-                                        ? 'bg-blue-600 text-white ring-4 ring-blue-100 scale-110 shadow-xs'
-                                        : 'bg-white border-2 border-slate-300 text-slate-400'
-                                    }`}
-                                  >
-                                    {isPast ? <Check className="w-3 h-3 stroke-[3]" /> : (isCurrent ? '•' : '')}
-                                  </div>
-                                  <span className={`text-[10px] mt-1.5 transition ${
-                                    isCurrent ? 'font-bold text-slate-900' : 'font-medium text-slate-400'
-                                  }`}>
-                                    {stage.name}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
+                      {/* Prior Art Risk */}
+                      <div className="p-3 bg-[#F7FAF9] rounded-2xl border border-[#E5EBE8] space-y-1">
+                        <div className="text-[10px] font-black uppercase text-[#71807C]">
+                          Prior-Art Risk
                         </div>
-
-                        {/* Filing Readiness & Open Workspace */}
-                        <div className="flex items-center gap-4 shrink-0 pl-2 md:border-l md:border-slate-100">
-                          <div className="space-y-1 text-right">
-                            <div className="flex items-center justify-end gap-1.5 text-xs font-bold text-slate-700">
-                              <span className="text-[10px] text-slate-400 uppercase">Filing Readiness</span>
-                              <span className="font-extrabold text-slate-900">{readiness}%</span>
-                            </div>
-                            <div className="w-28 h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${readiness}%` }} />
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => navigate(`/projects/${project.id}`)}
-                            className="px-4 py-2.5 bg-[#064E3B] hover:bg-[#043E2F] text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                              proj.priorArtRisk === 'HIGH'
+                                ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                                : proj.priorArtRisk === 'MEDIUM'
+                                ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                            }`}
                           >
-                            <span>Open Workspace</span>
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </button>
+                            {proj.priorArtRisk} RISK
+                          </span>
                         </div>
+                        <p className="text-[10px] text-[#71807C] truncate">{proj.priorArtNote}</p>
+                      </div>
+
+                      {/* Patent Evidence / Novelty */}
+                      <div className="p-3 bg-[#F7FAF9] rounded-2xl border border-[#E5EBE8] space-y-1">
+                        <div className="text-[10px] font-black uppercase text-[#71807C]">
+                          Patent Evidence
+                        </div>
+                        <div className="text-sm font-black text-[#253330] font-mono">
+                          {proj.noveltyScore}%
+                        </div>
+                        <p className="text-[10px] text-[#315C55] font-bold truncate">
+                          {proj.noveltyRating}
+                        </p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
 
-          {/* B. Bottom Split Row: Patent Development Journey & Your Patent Team (REAL ACTIVE PROJECT DATA) */}
-          {activeProject && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Sub-Card 1: Patent Development Journey */}
-              <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                      <Rocket className="w-4 h-4" />
+                    {/* Expandable 6-Point Filing Readiness Criteria Checklist */}
+                    {expandedReadinessProjectId === proj.id && (
+                      <div className="p-4 bg-[#E4F0EC]/60 rounded-2xl border border-[#A8C8BD]/50 space-y-2 text-xs animate-fade-in">
+                        <div className="font-black text-[#253330] text-[11px] uppercase tracking-wider mb-1">
+                          IPO Statutory Compliance Checklist:
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {(proj.readinessChecklist || [
+                            { label: 'Core Innovation Metadata', completed: true },
+                            { label: 'Form 2 Specification & Claims', completed: proj.claimsCount > 0 },
+                            { label: 'Statutory Forms (1, 3, 5, 26)', completed: proj.stage === 'FILING_READY' },
+                            { label: 'Research Documents & Specifications', completed: proj.documentsCount > 0 },
+                            { label: 'Prior-Art Search & FTO Analysis', completed: proj.priorArtRisk !== 'HIGH' },
+                            { label: 'Supervisor Review Decisions', completed: proj.reviewStatus !== 'Review Pending' },
+                          ]).map((crit: any, cIdx: number) => (
+                            <div key={cIdx} className="flex items-center gap-2">
+                              {crit.completed ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-[#315C55] shrink-0" />
+                              ) : (
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              )}
+                              <span
+                                className={`text-[11px] ${
+                                  crit.completed ? 'text-[#253330] font-bold' : 'text-[#71807C]'
+                                }`}
+                              >
+                                {crit.label || crit.item}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer Stats: Tasks, Team & Last Activity */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-[11px] text-[#71807C] border-t border-[#F0F4F2]">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        {/* Tasks Progress */}
+                        <div className="flex items-center gap-1.5">
+                          <CheckSquare className="w-3.5 h-3.5 text-[#6F8F88]" />
+                          <span>
+                            Tasks:{' '}
+                            <strong className="text-[#253330]">
+                              {proj.tasksCompleted}/{proj.tasksTotal}
+                            </strong>{' '}
+                            ({proj.taskVelocity}%)
+                          </span>
+                        </div>
+
+                        {/* Claims count */}
+                        <div className="flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-[#315C55]" />
+                          <span>
+                            Claims: <strong className="text-[#253330]">{proj.claimsCount}</strong> (
+                            {proj.independentClaimsCount} Indep / {proj.dependentClaimsCount} Dep)
+                          </span>
+                        </div>
+
+                        {/* Team count */}
+                        <div className="flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-[#6F8F88]" />
+                          <span>
+                            Team: <strong className="text-[#253330]">{proj.collaboratorsCount}</strong> members
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 text-[#8A9B96] text-[10px] font-mono">
+                        <Clock className="w-3 h-3" />
+                        <span>Updated {new Date(proj.lastUpdated).toLocaleDateString()}</span>
+                      </div>
                     </div>
-                    <h3 className="text-xs font-extrabold text-slate-900">Patent Development Journey</h3>
                   </div>
-                  <span className="text-[10px] font-bold text-slate-400 truncate max-w-[120px]">
-                    {activeProject.title}
+                ))
+              )}
+
+              {/* -------------------------------------------------- */}
+              {/* CO-INVENTOR CONTRIBUTION SUMMARY SECTION */}
+              {/* -------------------------------------------------- */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl p-6 shadow-3xs space-y-4">
+                <div className="flex items-center justify-between border-b border-[#F0F4F2] pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-[#E4F0EC] text-[#315C55]">
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-wider text-[#253330]">
+                        Your Contribution
+                      </h3>
+                      <p className="text-[11px] text-[#71807C]">
+                        Your personal drafting, task execution, and milestone milestones
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-[#315C55] bg-[#E4F0EC] px-2.5 py-1 rounded-xl">
+                    {contribution.completionRate}% Completion Rate
                   </span>
                 </div>
 
-                {/* 6 Icons Flow */}
-                <div className="grid grid-cols-6 gap-1 text-center py-1">
-                  {journeyStages.map((stg, i) => {
-                    const currentIdx = activeProject.currentStageIndex !== undefined ? activeProject.currentStageIndex : 0;
-                    const Icon = stg.icon;
-                    const isPast = i < currentIdx;
-                    const isCurrent = i === currentIdx;
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
+                  <div className="p-3.5 bg-[#F7FAF9] rounded-2xl border border-[#E5EBE8] text-center space-y-1">
+                    <span className="text-[10px] font-black uppercase text-[#71807C] block">Tasks Assigned</span>
+                    <span className="text-2xl font-black text-[#253330] font-mono">
+                      {contribution.tasksAssigned}
+                    </span>
+                  </div>
 
-                    return (
-                      <div key={stg.name} className="flex flex-col items-center space-y-1">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
-                          isPast
-                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                            : isCurrent
-                            ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-100'
-                            : 'bg-slate-50 text-slate-400 border border-slate-200'
-                        }`}>
-                          <Icon className="w-4 h-4" />
+                  <div className="p-3.5 bg-[#F7FAF9] rounded-2xl border border-[#E5EBE8] text-center space-y-1">
+                    <span className="text-[10px] font-black uppercase text-[#71807C] block">Tasks Completed</span>
+                    <span className="text-2xl font-black text-[#315C55] font-mono">
+                      {contribution.tasksCompleted}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-[#F7FAF9] rounded-2xl border border-[#E5EBE8] text-center space-y-1 col-span-2 sm:col-span-1">
+                    <span className="text-[10px] font-black uppercase text-[#71807C] block">Pending Reviews</span>
+                    <span className="text-2xl font-black text-amber-700 font-mono">
+                      {kpis.pendingReviews}
+                    </span>
+                  </div>
+                </div>
+
+                {contribution.myRecentContributions && contribution.myRecentContributions.length > 0 && (
+                  <div className="pt-2 border-t border-[#F0F4F2] space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#71807C] block">
+                      Your Recent Actions
+                    </span>
+                    <div className="space-y-1.5">
+                      {contribution.myRecentContributions.map((c: any) => (
+                        <div key={c.id} className="flex items-center justify-between text-xs py-1 px-2 rounded-xl bg-[#F7FAF9]">
+                          <span className="text-[#253330] font-medium truncate pr-2">
+                            • {c.action} ({c.project})
+                          </span>
+                          <span className="text-[10px] font-mono text-[#8A9B96] shrink-0">
+                            {new Date(c.timestamp).toLocaleDateString()}
+                          </span>
                         </div>
-                        <span className={`text-[9px] ${isCurrent ? 'font-black text-blue-600' : 'font-semibold text-slate-500'}`}>
-                          {stg.name}
-                        </span>
-                        {isCurrent && (
-                          <span className="px-1 py-0.2 bg-blue-100 text-blue-700 text-[8px] font-extrabold rounded">Current</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="p-3 bg-blue-50/70 border border-blue-150 rounded-2xl flex items-start gap-2.5 text-[11px] text-blue-900 leading-relaxed">
-                  <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <p>
-                    Currently active at <strong>{activeProject.stage}</strong> stage ({journeyStages[activeProject.currentStageIndex]?.name || 'Development'}). Review specifications and claims to progress toward IPO filing.
-                  </p>
-                </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Sub-Card 2: Your Patent Team (REAL TEAM MEMBERS) */}
-              <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
-                      <Users className="w-4 h-4" />
+              {/* -------------------------------------------------- */}
+              {/* CLAIMS & DRAWINGS DUAL SUMMARY WIDGETS */}
+              {/* -------------------------------------------------- */}
+              {activeFocusProject && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Claims Engineering Studio Widget */}
+                  <div className="bg-white border border-[#E5EBE8] rounded-3xl p-5 shadow-3xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-xl bg-[#E4F0EC] text-[#315C55]">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-[#253330] uppercase tracking-wider">
+                            Claims Engineering
+                          </h4>
+                          <p className="text-[10px] text-[#71807C]">Patent Claims & FTO Matrix</p>
+                        </div>
+                      </div>
+                      <Link
+                        to="/dashboard/claims"
+                        className="text-xs font-bold text-[#315C55] hover:underline flex items-center gap-0.5"
+                      >
+                        <span>Studio</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </Link>
                     </div>
-                    <h3 className="text-xs font-extrabold text-slate-900">Your Patent Team</h3>
+
+                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                      <div className="p-2 bg-[#F7FAF9] rounded-xl border border-[#E5EBE8]">
+                        <span className="text-[10px] font-black uppercase text-[#71807C] block">Total</span>
+                        <span className="text-lg font-black text-[#253330] font-mono">
+                          {activeFocusProject.claimsCount}
+                        </span>
+                      </div>
+                      <div className="p-2 bg-[#F7FAF9] rounded-xl border border-[#E5EBE8]">
+                        <span className="text-[10px] font-black uppercase text-[#71807C] block">Indep</span>
+                        <span className="text-lg font-black text-[#315C55] font-mono">
+                          {activeFocusProject.independentClaimsCount}
+                        </span>
+                      </div>
+                      <div className="p-2 bg-[#F7FAF9] rounded-xl border border-[#E5EBE8]">
+                        <span className="text-[10px] font-black uppercase text-[#71807C] block">Dep</span>
+                        <span className="text-lg font-black text-[#6F8F88] font-mono">
+                          {activeFocusProject.dependentClaimsCount}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-1 text-[11px]">
+                      <span className="text-[#71807C]">FTO Overlap Risk:</span>
+                      <span className="font-bold text-[#253330]">{activeFocusProject.priorArtRisk}</span>
+                    </div>
                   </div>
-                  <Link to={`/projects/${activeProject.id}`} className="text-[11px] font-bold text-blue-600 hover:underline">
-                    Manage Team
+
+                  {/* Drawings & Prototypes Widget */}
+                  <div className="bg-white border border-[#E5EBE8] rounded-3xl p-5 shadow-3xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-xl bg-[#E4F0EC] text-[#315C55]">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-[#253330] uppercase tracking-wider">
+                            Technical Drawings
+                          </h4>
+                          <p className="text-[10px] text-[#71807C]">2D Figure Sheets & Schematics</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/dashboard/projects/${activeFocusProject.id}?tab=Drawings`)}
+                        className="text-xs font-bold text-[#315C55] hover:underline flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <span>Workspace</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-center pt-1">
+                      <div className="p-2 bg-[#F7FAF9] rounded-xl border border-[#E5EBE8]">
+                        <span className="text-[10px] font-black uppercase text-[#71807C] block">Figures</span>
+                        <span className="text-lg font-black text-[#253330] font-mono">
+                          {activeFocusProject.drawingsCount}
+                        </span>
+                      </div>
+                      <div className="p-2 bg-[#F7FAF9] rounded-xl border border-[#E5EBE8]">
+                        <span className="text-[10px] font-black uppercase text-[#71807C] block">Components</span>
+                        <span className="text-lg font-black text-[#315C55] font-mono">
+                          {activeFocusProject.annotatedComponentsCount}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-1 text-[11px]">
+                      <span className="text-[#71807C]">Figure Legend:</span>
+                      <span className="font-bold text-[#253330]">
+                        {activeFocusProject.annotatedComponentsCount > 0 ? 'Annotated' : 'Pending Tags'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* -------------------------------------------------- */}
+            {/* RIGHT COLUMN: NEEDS ATTENTION, TASKS & REVIEWS (1 SPAN) */}
+            {/* -------------------------------------------------- */}
+            <div className="space-y-6">
+              {/* 1. NEEDS YOUR ATTENTION PANEL */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl p-5 shadow-3xs space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-[#F0F4F2]">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                      Needs Your Attention
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                    {dashboardData?.needsAttention?.length || 0} Priority
+                  </span>
+                </div>
+
+                {dashboardData?.needsAttention && dashboardData.needsAttention.length > 0 ? (
+                  <div className="space-y-3">
+                    {dashboardData.needsAttention.map((item: any) => (
+                      <div
+                        key={item.id}
+                        className="p-3.5 rounded-2xl bg-[#F7FAF9] border border-[#E5EBE8] hover:border-[#315C55]/40 transition space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              item.priority === 'HIGH'
+                                ? 'bg-rose-100 text-rose-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {item.priority}
+                          </span>
+                          <span className="text-[10px] font-bold text-[#71807C] truncate max-w-[120px]">
+                            {item.projectTitle}
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-[#253330]">{item.title}</h4>
+                          <p className="text-[11px] text-[#5C6B67] mt-0.5 leading-tight">{item.reason}</p>
+                        </div>
+                        <button
+                          onClick={() => navigate(item.link || `/dashboard/projects/${item.projectId}`)}
+                          className="text-[11px] font-bold text-[#315C55] hover:underline flex items-center gap-1 cursor-pointer pt-1"
+                        >
+                          <span>{item.actionText}</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-[#71807C] text-xs">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+                    <p className="font-bold text-[#253330]">You're all caught up!</p>
+                    <p className="text-[11px] mt-0.5">No critical blocking items across your projects.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. MY TASKS WIDGET */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl p-5 shadow-3xs space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-[#F0F4F2]">
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="w-4 h-4 text-[#315C55]" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                      My Tasks
+                    </h3>
+                  </div>
+                  <Link
+                    to="/dashboard/tasks"
+                    className="text-xs font-bold text-[#315C55] hover:underline"
+                  >
+                    View All &gt;
                   </Link>
                 </div>
 
-                {/* Team Avatars Row */}
-                <div className="grid grid-cols-4 gap-2 text-center py-1">
-                  {/* Lead Inventor */}
-                  {activeProject.owner && (
-                    <div className="flex flex-col items-center space-y-1">
-                      <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-3xs">
-                        {getInitials(activeProject.owner.fullName)}
-                      </div>
-                      <span className="text-[11px] font-bold text-slate-900 leading-tight truncate max-w-[70px]">
-                        {activeProject.owner.fullName.split(' ')[0]}
-                      </span>
-                      <span className="text-[9px] text-blue-600 font-bold">Owner</span>
-                    </div>
-                  )}
+                {dashboardData?.tasks && dashboardData.tasks.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {dashboardData.tasks.map((task: any) => (
+                      <div
+                        key={task.id}
+                        className="p-3 rounded-2xl bg-[#F7FAF9] border border-[#E5EBE8] flex items-start justify-between gap-3 hover:bg-[#F0F4F2] transition"
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${
+                                task.status === 'COMPLETED'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-slate-200 text-slate-700'
+                              }`}
+                            >
+                              {task.status}
+                            </span>
+                            <span className="text-[10px] text-[#71807C] truncate">
+                              {task.projectTitle}
+                            </span>
+                          </div>
+                          <p
+                            className={`text-xs font-bold truncate ${
+                              task.status === 'COMPLETED'
+                                ? 'line-through text-[#8A9B96]'
+                                : 'text-[#253330]'
+                            }`}
+                          >
+                            {task.title}
+                          </p>
+                          {task.dueDate && (
+                            <span className="text-[10px] text-[#8A9B96] font-mono block">
+                              Due {new Date(task.dueDate).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
 
-                  {/* Co-Inventors & Collaborators */}
-                  {activeProject.members && activeProject.members.slice(0, 3).map((m: any) => (
-                    <div key={m.id || m.userId} className="flex flex-col items-center space-y-1">
-                      <div className="w-9 h-9 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-3xs">
-                        {getInitials(m.user?.fullName || m.user?.username)}
+                        <button
+                          onClick={() => handleToggleTaskStatus(task.projectId, task.id, task.status)}
+                          className={`p-1.5 rounded-xl border transition cursor-pointer shrink-0 ${
+                            task.status === 'COMPLETED'
+                              ? 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'bg-white border-[#E5EBE8] text-[#71807C] hover:border-[#315C55]'
+                          }`}
+                          title={task.status === 'COMPLETED' ? 'Mark as To-Do' : 'Mark as Completed'}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <span className="text-[11px] font-bold text-slate-900 leading-tight truncate max-w-[70px]">
-                        {(m.user?.fullName || m.user?.username || 'Member').split(' ')[0]}
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#71807C] p-4 text-center">No tasks assigned yet.</p>
+                )}
+              </div>
+
+              {/* 3. PENDING REVIEWS WIDGET */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl p-5 shadow-3xs space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-[#F0F4F2]">
+                  <div className="flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-[#6F8F88]" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                      Pending Reviews
+                    </h3>
+                  </div>
+                  <Link
+                    to="/dashboard/reviews"
+                    className="text-xs font-bold text-[#315C55] hover:underline"
+                  >
+                    All Reviews &gt;
+                  </Link>
+                </div>
+
+                {dashboardData?.pendingReviews && dashboardData.pendingReviews.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {dashboardData.pendingReviews.map((rev: any) => (
+                      <div
+                        key={rev.id}
+                        className="p-3 rounded-2xl bg-[#F7FAF9] border border-[#E5EBE8] space-y-1.5"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-[#315C55] uppercase">
+                            {rev.reviewType}
+                          </span>
+                          <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                            {rev.status}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-black text-[#253330] truncate">
+                          {rev.projectTitle}
+                        </h4>
+                        <div className="flex justify-between items-center text-[10px] text-[#71807C]">
+                          <span>
+                            Reviewer: <strong>{rev.reviewer}</strong> ({rev.role})
+                          </span>
+                          <button
+                            onClick={() => navigate(`/dashboard/projects/${rev.projectId}?tab=Reviews`)}
+                            className="text-[#315C55] font-bold hover:underline cursor-pointer"
+                          >
+                            Open →
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#71807C] p-4 text-center">No pending supervisor reviews.</p>
+                )}
+              </div>
+
+              {/* 4. COLLABORATION INVITATIONS */}
+              {dashboardData?.invitations && dashboardData.invitations.length > 0 && (
+                <div className="bg-white border border-[#E5EBE8] rounded-3xl p-5 shadow-3xs space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#F0F4F2]">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-[#315C55]" />
+                      <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                        Collaboration Requests
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {dashboardData.invitations.map((inv: any) => (
+                      <div
+                        key={inv.id}
+                        className="p-3 rounded-2xl bg-[#F7FAF9] border border-[#E5EBE8] space-y-2"
+                      >
+                        <div className="flex justify-between items-center text-[10px]">
+                          <span className="font-bold text-[#71807C]">{inv.projectTitle}</span>
+                          <span className="font-mono text-[#8A9B96]">
+                            {new Date(inv.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-[#253330]">
+                          {inv.isReceived
+                            ? `${inv.senderName} invited you as ${inv.role}`
+                            : `Invited ${inv.receiverName} as ${inv.role}`}
+                        </p>
+
+                        {inv.isReceived && inv.status === 'PENDING' && (
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              onClick={() => handleRespondInvitation(inv.id, 'REJECT')}
+                              className="px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold cursor-pointer transition"
+                            >
+                              Decline
+                            </button>
+                            <button
+                              onClick={() => handleRespondInvitation(inv.id, 'ACCEPT')}
+                              className="px-2.5 py-1 bg-[#315C55] hover:bg-[#254640] text-white rounded-lg text-[10px] font-bold cursor-pointer transition shadow-3xs"
+                            >
+                              Accept
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ==================================================== */}
+          {/* 4. RECENT ACTIVITY & RECENT DOCUMENTS BOTTOM GRIDS */}
+          {/* ==================================================== */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Recent Activity Stream */}
+            <div className="bg-white border border-[#E5EBE8] rounded-3xl p-6 shadow-3xs space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-[#F0F4F2]">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-[#315C55]" />
+                  <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                    Recent Project Activity
+                  </h3>
+                </div>
+                <span className="text-[10px] text-[#71807C] font-mono">Live PostgreSQL Audit</span>
+              </div>
+
+              {dashboardData?.recentActivities && dashboardData.recentActivities.length > 0 ? (
+                <div className="space-y-3">
+                  {dashboardData.recentActivities.map((act: any) => (
+                    <div
+                      key={act.id}
+                      className="flex items-start justify-between gap-3 text-xs p-2.5 rounded-xl hover:bg-[#F7FAF9] transition"
+                    >
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="font-bold text-[#253330]">
+                          <strong className="text-[#315C55]">{act.user}</strong> {act.action}
+                        </p>
+                        <span className="text-[10px] text-[#71807C] block truncate">
+                          Project: {act.project}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-[#8A9B96] shrink-0">
+                        {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      <span className="text-[9px] text-emerald-700 font-bold truncate max-w-[70px]">{m.role}</span>
                     </div>
                   ))}
                 </div>
+              ) : (
+                <p className="text-xs text-[#71807C] p-6 text-center">No recent project activity recorded.</p>
+              )}
+            </div>
 
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-2 text-[11px] text-slate-600">
-                  <Users className="w-4 h-4 text-slate-400 shrink-0" />
-                  <p className="leading-tight">
-                    {activeProject.collaboratorCount} active members collaborating on this patent application.
-                  </p>
+            {/* Recent Uploaded Documents */}
+            <div className="bg-white border border-[#E5EBE8] rounded-3xl p-6 shadow-3xs space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-[#F0F4F2]">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#6F8F88]" />
+                  <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                    Recent Documents & Specifications
+                  </h3>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* C. Quick Actions Bottom Bar (CONNECTED DIRECTLY TO ACTIVE PROJECT WORKSPACE TABS) */}
-          {activeProject && (
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>⚡</span>
-                  <span>Quick Actions • {activeProject.title}</span>
-                </span>
+                <Link
+                  to="/dashboard/documents"
+                  className="text-xs font-bold text-[#315C55] hover:underline"
+                >
+                  View All &gt;
+                </Link>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                  onClick={() => navigate(`/projects/${activeProject.id}?tab=Claims%20Studio`)}
-                  className="px-4 py-2.5 bg-[#064E3B] hover:bg-[#043E2F] text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Contribution</span>
-                </button>
-
-                <button
-                  onClick={() => navigate(`/projects/${activeProject.id}?tab=Documents`)}
-                  className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold shadow-3xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Upload Document</span>
-                </button>
-
-                <button
-                  onClick={() => navigate(`/projects/${activeProject.id}?tab=Claims%20Studio`)}
-                  className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold shadow-3xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <PenTool className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Open Claims</span>
-                </button>
-
-                <button
-                  onClick={() => navigate(`/projects/${activeProject.id}?tab=Drawings`)}
-                  className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold shadow-3xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Layers className="w-3.5 h-3.5 text-slate-500" />
-                  <span>View Drawings</span>
-                </button>
-
-                <button
-                  onClick={() => navigate(`/projects/${activeProject.id}`)}
-                  className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold shadow-3xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5 text-slate-500" />
-                  <span>View Project</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT COLUMN (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* A. Needs Your Attention Card (REAL DB DATA) */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>🔔</span>
-                  <span>Needs Your Attention</span>
-                </span>
-              </div>
-              <Link to="/dashboard/tasks" className="text-[11px] font-bold text-blue-600 hover:underline">
-                View All
-              </Link>
-            </div>
-
-            {needsAttentionList.length === 0 ? (
-              <div className="p-4 text-center space-y-1 bg-slate-50 rounded-2xl">
-                <Sparkles className="w-5 h-5 text-emerald-600 mx-auto" />
-                <p className="text-xs font-bold text-slate-800">All caught up!</p>
-                <p className="text-[10px] text-slate-400">No urgent reviews or tasks require your attention.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {needsAttentionList.map((item: any) => (
-                  <div
-                    key={item.id}
-                    className="p-3.5 bg-slate-50/70 border border-slate-150 rounded-2xl space-y-2.5 hover:bg-slate-50 transition"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                          {item.type.includes('CLAIM') ? (
-                            <Scale className="w-3.5 h-3.5" />
-                          ) : item.type.includes('DOC') ? (
-                            <FileText className="w-3.5 h-3.5" />
-                          ) : (
-                            <CheckSquare className="w-3.5 h-3.5" />
-                          )}
+              {dashboardData?.recentDocuments && dashboardData.recentDocuments.length > 0 ? (
+                <div className="space-y-2.5">
+                  {dashboardData.recentDocuments.map((doc: any) => (
+                    <div
+                      key={doc.id}
+                      className="p-3 rounded-2xl bg-[#F7FAF9] border border-[#E5EBE8] flex items-center justify-between gap-3 hover:bg-[#F0F4F2] transition"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 bg-white rounded-xl border border-[#E5EBE8] text-[#315C55] shrink-0">
+                          <FileText className="w-4 h-4" />
                         </div>
-                        <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">
-                          {item.type}
-                        </span>
+                        <div className="space-y-0.5 min-w-0">
+                          <h4 className="text-xs font-extrabold text-[#253330] truncate">{doc.name}</h4>
+                          <span className="text-[10px] text-[#71807C] block truncate">
+                            {doc.projectTitle} • {doc.category}
+                          </span>
+                        </div>
                       </div>
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${item.tagBg}`}>
-                        {item.tag}
-                      </span>
-                    </div>
 
-                    <div>
-                      <h4 className="text-xs font-extrabold text-slate-900 leading-snug">{item.title}</h4>
-                      <p className="text-[10px] text-slate-500 font-medium">{item.project}</p>
-                    </div>
-
-                    <div className="pt-1 flex justify-end">
                       <button
-                        onClick={() => {
-                          if (item.projectId) {
-                            navigate(`/projects/${item.projectId}?tab=${item.tabTarget || 'Overview'}`);
-                          } else {
-                            navigate('/dashboard/projects');
-                          }
-                        }}
-                        className="px-3 py-1 rounded-lg text-xs font-bold bg-[#064E3B] hover:bg-[#043E2F] text-white transition shadow-3xs cursor-pointer"
+                        onClick={() => navigate(`/dashboard/projects/${doc.projectId}?tab=Documents`)}
+                        className="px-3 py-1 bg-white hover:bg-[#E4F0EC] text-[#315C55] border border-[#E5EBE8] rounded-xl text-[11px] font-bold transition shadow-3xs cursor-pointer shrink-0"
                       >
-                        {item.actionText}
+                        Open
                       </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[#71807C] p-6 text-center">No documents uploaded yet.</p>
+              )}
+            </div>
           </div>
 
-          {/* B. Recent Team Activity (REAL ACTIVITY LOGS) */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>👥</span>
-                  <span>Recent Team Activity</span>
-                </span>
-              </div>
-              <Link to="/dashboard/notifications" className="text-[11px] font-bold text-blue-600 hover:underline">
-                View All
-              </Link>
+          {/* ==================================================== */}
+          {/* 5. QUICK ACTIONS BOTTOM BAR */}
+          {/* ==================================================== */}
+          <div className="bg-white border border-[#E5EBE8] rounded-3xl p-6 shadow-3xs space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#315C55]" />
+              <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                Quick Innovation Actions
+              </h3>
             </div>
 
-            {teamActivities.length === 0 ? (
-              <div className="p-4 text-center space-y-1 bg-slate-50 rounded-2xl">
-                <Clock className="w-5 h-5 text-slate-400 mx-auto" />
-                <p className="text-xs font-bold text-slate-700">No activity yet</p>
-                <p className="text-[10px] text-slate-400">Team contributions will appear here in real-time.</p>
-              </div>
-            ) : (
-              <div className="space-y-3.5 relative pl-2">
-                <div className="absolute left-3.5 top-2 bottom-2 w-0.5 bg-slate-200" />
-                {teamActivities.map((act: any) => (
-                  <div key={act.id} className="relative pl-6 space-y-0.5 text-xs">
-                    <div className="absolute left-2.5 top-1.5 -translate-x-1/2 w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-white" />
-                    <p className="font-bold text-slate-900 leading-tight">
-                      <span>{act.isCurrentUser ? 'You' : act.actor} </span>
-                      <span className="font-normal text-slate-600">{act.action}</span>
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1.5">
-                      <span>{formatRelativeTime(act.time)}</span>
-                      {act.projectTitle && <span>• {act.projectTitle}</span>}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-1">
+              <Link
+                to="/dashboard/create-project"
+                className="p-3.5 rounded-2xl bg-[#F7FAF9] hover:bg-[#E4F0EC] border border-[#E5EBE8] text-center space-y-1.5 transition group cursor-pointer"
+              >
+                <Plus className="w-4 h-4 mx-auto text-[#315C55] group-hover:scale-110 transition" />
+                <span className="text-[11px] font-bold text-[#253330] block">New Project</span>
+              </Link>
 
-          {/* C. Recent Documents (REAL POSTGRESQL DOCUMENTS) */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>📄</span>
-                  <span>Recent Documents</span>
-                </span>
-              </div>
-              <Link to="/dashboard/projects" className="text-[11px] font-bold text-blue-600 hover:underline">
-                View All
+              <Link
+                to="/dashboard/claims"
+                className="p-3.5 rounded-2xl bg-[#F7FAF9] hover:bg-[#E4F0EC] border border-[#E5EBE8] text-center space-y-1.5 transition group cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 mx-auto text-[#315C55] group-hover:scale-110 transition" />
+                <span className="text-[11px] font-bold text-[#253330] block">Claims Studio</span>
+              </Link>
+
+              <Link
+                to="/dashboard/prior-art"
+                className="p-3.5 rounded-2xl bg-[#F7FAF9] hover:bg-[#E4F0EC] border border-[#E5EBE8] text-center space-y-1.5 transition group cursor-pointer"
+              >
+                <Search className="w-4 h-4 mx-auto text-[#315C55] group-hover:scale-110 transition" />
+                <span className="text-[11px] font-bold text-[#253330] block">Prior-Art Search</span>
+              </Link>
+
+              <Link
+                to="/dashboard/documents"
+                className="p-3.5 rounded-2xl bg-[#F7FAF9] hover:bg-[#E4F0EC] border border-[#E5EBE8] text-center space-y-1.5 transition group cursor-pointer"
+              >
+                <Upload className="w-4 h-4 mx-auto text-[#315C55] group-hover:scale-110 transition" />
+                <span className="text-[11px] font-bold text-[#253330] block">Upload Docs</span>
+              </Link>
+
+              <Link
+                to="/dashboard/reviews"
+                className="p-3.5 rounded-2xl bg-[#F7FAF9] hover:bg-[#E4F0EC] border border-[#E5EBE8] text-center space-y-1.5 transition group cursor-pointer"
+              >
+                <Scale className="w-4 h-4 mx-auto text-[#315C55] group-hover:scale-110 transition" />
+                <span className="text-[11px] font-bold text-[#253330] block">Reviews</span>
+              </Link>
+
+              <Link
+                to="/dashboard/tasks"
+                className="p-3.5 rounded-2xl bg-[#F7FAF9] hover:bg-[#E4F0EC] border border-[#E5EBE8] text-center space-y-1.5 transition group cursor-pointer"
+              >
+                <CheckSquare className="w-4 h-4 mx-auto text-[#315C55] group-hover:scale-110 transition" />
+                <span className="text-[11px] font-bold text-[#253330] block">My Tasks</span>
               </Link>
             </div>
-
-            {recentDocuments.length === 0 ? (
-              <div className="p-4 text-center space-y-1 bg-slate-50 rounded-2xl">
-                <FileText className="w-5 h-5 text-slate-400 mx-auto" />
-                <p className="text-xs font-bold text-slate-700">No documents yet</p>
-                <p className="text-[10px] text-slate-400">Uploaded patent drafts and forms will appear here.</p>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {recentDocuments.map((doc: any) => (
-                  <div
-                    key={doc.id}
-                    onClick={() => {
-                      if (doc.projectId) {
-                        navigate(`/projects/${doc.projectId}?tab=Documents`);
-                      } else {
-                        navigate('/dashboard/projects');
-                      }
-                    }}
-                    className="p-3 bg-slate-50/70 hover:bg-slate-100/70 border border-slate-150 rounded-2xl flex items-center justify-between transition cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                        <FileText className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-xs font-bold text-slate-900 truncate block">{doc.title}</span>
-                        {doc.projectTitle && (
-                          <span className="text-[10px] text-slate-400 truncate block">{doc.projectTitle}</span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-medium shrink-0 ml-2">
-                      {formatRelativeTime(doc.updated)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

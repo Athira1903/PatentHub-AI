@@ -159,7 +159,7 @@ const createTaskSchema = zod_1.z.object({
 const updateTaskSchema = zod_1.z.object({
     title: zod_1.z.string().trim().optional(),
     description: zod_1.z.string().trim().optional(),
-    status: zod_1.z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']).optional(),
+    status: zod_1.z.enum(['TODO', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
     assignedToId: zod_1.z.string().trim().optional().nullable(),
 });
 const activityService_1 = require("../services/activityService");
@@ -182,7 +182,7 @@ const getProjectTasks = async (req, res) => {
     try {
         const projectId = req.params.id;
         const statusFilter = req.query.status;
-        const tasks = await taskService_1.TaskService.getProjectTasks(projectId, statusFilter);
+        const tasks = await taskService_1.TaskService.getProjectTasks(projectId, req.user?.userId, req.user?.role, statusFilter);
         res.status(200).json({ success: true, tasks });
     }
     catch (error) {
@@ -193,13 +193,14 @@ exports.getProjectTasks = getProjectTasks;
 const createTask = async (req, res) => {
     try {
         const projectId = req.params.id;
-        const { title, description, assignedToId, priority, dueDate } = req.body;
+        const { title, description, assignedToId, assignedToUsername, priority, dueDate } = req.body;
         const task = await taskService_1.TaskService.createTask(projectId, req.user.userId, {
             title,
             description,
             assignedToId,
             priority,
-            dueDate
+            dueDate,
+            ...(assignedToUsername ? { assignedToUsername } : {})
         });
         res.status(201).json({ message: 'Task created successfully', task });
     }

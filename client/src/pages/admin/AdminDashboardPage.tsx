@@ -1,53 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  Shield,
   LayoutDashboard,
-  BarChart2,
   Users,
   Building2,
-  CheckCircle2,
-  Folder,
-  Eye,
-  Brain,
-  Sparkles,
-  ShieldCheck,
-  FileCode,
-  FileText,
-  FileSpreadsheet,
-  Lock,
+  FolderKanban,
+  ShieldAlert,
+  UserCheck,
   Bell,
-  Clock,
+  Scale,
+  Activity,
   Settings,
   Search,
   Plus,
-  Download,
   Check,
   X,
   RefreshCw,
   LogOut,
   Trash2,
+  Eye,
+  AlertTriangle,
+  Send,
+  Sliders,
+  Calendar,
+  Lock,
+  Loader2,
+  Edit3,
+  Save,
+  RotateCcw,
+  Shield
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
-
-interface NavItem {
-  id: string;
-  label: string;
-  icon: any;
-  badge?: string | number;
-}
-
-interface NavGroup {
-  group: string;
-  items: NavItem[];
-}
 
 export const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState<string>('dashboard');
   const [searchGlobal, setSearchGlobal] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('patenthub_token');
@@ -55,58 +46,121 @@ export const AdminDashboardPage: React.FC = () => {
     navigate('/login');
   };
 
-  // Platform Data States
+  // ----------------------------------------------------
+  // PLATFORM DATA STATES (FROM REAL BACKEND POSTGRESQL)
+  // ----------------------------------------------------
   const [metrics, setMetrics] = useState<any>(null);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [verificationsList, setVerificationsList] = useState<any[]>([]);
   const [organizationsList, setOrganizationsList] = useState<any[]>([]);
   const [projectsList, setProjectsList] = useState<any[]>([]);
   const [reviewsData, setReviewsData] = useState<any>(null);
-  const [claimsFtoData, setClaimsFtoData] = useState<any>(null);
-  const [aiOperationsData, setAiOperationsData] = useState<any>(null);
-  const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
+  const [rolesStats, setRolesStats] = useState<any[]>([]);
+  const [activityLogsData, setActivityLogsData] = useState<{ total: number; logs: any[]; totalPages: number }>({
+    total: 0,
+    logs: [],
+    totalPages: 1
+  });
+  const [notificationsData, setNotificationsData] = useState<{ total: number; notifications: any[] }>({
+    total: 0,
+    notifications: []
+  });
   const [systemSettings, setSystemSettings] = useState<any>(null);
 
-  // Modals & Drawers
+  // ----------------------------------------------------
+  // COMPLETE USER PROFILE DRAWER STATE
+  // ----------------------------------------------------
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [selectedUserProfile, setSelectedUserProfile] = useState<any | null>(null);
+  const [selectedUserProfileLoading, setSelectedUserProfileLoading] = useState(false);
+  const [userProfileTab, setUserProfileTab] = useState<
+    'PERSONAL' | 'ROLE' | 'PROFESSIONAL' | 'PROJECTS' | 'ACTIVITY' | 'SECURITY'
+  >('PERSONAL');
   const [userToDelete, setUserToDelete] = useState<any | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [editingUserRole, setEditingUserRole] = useState<string>('');
+
+  // ----------------------------------------------------
+  // ORGANIZATION DETAILS DRAWER STATE
+  // ----------------------------------------------------
+  const [selectedOrgDetails, setSelectedOrgDetails] = useState<any | null>(null);
+  const [orgDetailsTab, setOrgDetailsTab] = useState<
+    'OVERVIEW' | 'MEMBERS' | 'PROJECTS' | 'GUIDES' | 'EXPERTS' | 'ACTIVITY'
+  >('OVERVIEW');
+  const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
+  const [newOrgData, setNewOrgData] = useState({ name: '', domain: '', contactEmail: '' });
+
+  // ----------------------------------------------------
+  // ROLES & PERMISSIONS MATRIX STATE
+  // ----------------------------------------------------
+  const [allPermissionsList, setAllPermissionsList] = useState<any[]>([]);
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
+  const [pendingPermissionChanges, setPendingPermissionChanges] = useState<Record<string, string[]>>({});
+  const [isEditingPermissions, setIsEditingPermissions] = useState(false);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+  const [showConfirmSavePermissions, setShowConfirmSavePermissions] = useState(false);
+
+  // ----------------------------------------------------
+  // VERIFICATION REQUESTS STATE
+  // ----------------------------------------------------
   const [selectedVerification, setSelectedVerification] = useState<any | null>(null);
   const [verificationDecisionModal, setVerificationDecisionModal] = useState(false);
   const [decisionNotes, setDecisionNotes] = useState('');
-  const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
-  const [newOrgData, setNewOrgData] = useState({ name: '', domain: '', contactEmail: '' });
+
+  // ----------------------------------------------------
+  // PROJECT & NOTIFICATION MODALS
+  // ----------------------------------------------------
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [assignReviewerData, setAssignReviewerData] = useState({ username: '', role: 'GUIDE' });
-  const [showCreateAnnModal, setShowCreateAnnModal] = useState(false);
-  const [newAnnData, setNewAnnData] = useState({
+
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastData, setBroadcastData] = useState({
     title: '',
     message: '',
-    targetRole: 'ALL',
-    priority: 'NORMAL',
+    type: 'SYSTEM',
+    targetRole: 'ALL'
   });
 
-  // User filters
+  const [selectedReviewDetails, setSelectedReviewDetails] = useState<any | null>(null);
+
+  // ----------------------------------------------------
+  // FILTER & PAGINATION STATES
+  // ----------------------------------------------------
   const [userRoleFilter, setUserRoleFilter] = useState('ALL');
   const [userStatusFilter, setUserStatusFilter] = useState('ALL');
   const [userSearchTerm, setUserSearchTerm] = useState('');
 
-  // Initial Fetch
+  const [projectStageFilter, setProjectStageFilter] = useState('ALL');
+  const [projectSearchTerm, setProjectSearchTerm] = useState('');
+
+  const [activityTypeFilter, setActivityTypeFilter] = useState('ALL');
+  const [activitySearchTerm, setActivitySearchTerm] = useState('');
+  const [activityPage, setActivityPage] = useState(1);
+
+  const [notifFilter, setNotifFilter] = useState<'ALL' | 'UNREAD' | 'READ'>('ALL');
+  const [notifTypeFilter, setNotifTypeFilter] = useState('ALL');
+
+  const [reviewFilter, setReviewFilter] = useState('ALL');
+
+  // ----------------------------------------------------
+  // INITIAL FETCH & REFRESH
+  // ----------------------------------------------------
   const fetchAllAdminData = async () => {
     setLoading(true);
     try {
       const [
         dashRes,
         usersRes,
-        verRes,
+        verifRes,
         orgsRes,
         projRes,
-        revRes,
-        claimsRes,
-        aiRes,
-        annRes,
-        settRes,
+        reviewsRes,
+        rolesRes,
+        permsRes,
+        activityRes,
+        notifRes,
+        settingsRes
       ] = await Promise.allSettled([
         api.get('/admin/dashboard'),
         api.get('/admin/users'),
@@ -114,24 +168,32 @@ export const AdminDashboardPage: React.FC = () => {
         api.get('/admin/organizations'),
         api.get('/admin/projects'),
         api.get('/admin/reviews'),
-        api.get('/admin/claims-fto-oversight'),
-        api.get('/admin/ai-operations'),
-        api.get('/admin/announcements'),
-        api.get('/admin/settings'),
+        api.get('/admin/roles-stats'),
+        api.get('/admin/roles-permissions'),
+        api.get('/admin/activity-logs?page=1&limit=25'),
+        api.get('/admin/notifications?limit=50'),
+        api.get('/admin/settings')
       ]);
 
       if (dashRes.status === 'fulfilled') setMetrics(dashRes.value.data);
       if (usersRes.status === 'fulfilled') setUsersList(usersRes.value.data.users || []);
-      if (verRes.status === 'fulfilled') setVerificationsList(verRes.value.data.applications || []);
+      if (verifRes.status === 'fulfilled') setVerificationsList(verifRes.value.data.applications || []);
       if (orgsRes.status === 'fulfilled') setOrganizationsList(orgsRes.value.data.organizations || []);
       if (projRes.status === 'fulfilled') setProjectsList(projRes.value.data.projects || []);
-      if (revRes.status === 'fulfilled') setReviewsData(revRes.value.data);
-      if (claimsRes.status === 'fulfilled') setClaimsFtoData(claimsRes.value.data);
-      if (aiRes.status === 'fulfilled') setAiOperationsData(aiRes.value.data);
-      if (annRes.status === 'fulfilled') setAnnouncementsList(annRes.value.data.announcements || []);
-      if (settRes.status === 'fulfilled') setSystemSettings(settRes.value.data.settings);
-    } catch (e: any) {
-      toast.error('Failed to load some admin data.');
+      if (reviewsRes.status === 'fulfilled') setReviewsData(reviewsRes.value.data);
+      if (rolesRes.status === 'fulfilled') setRolesStats(rolesRes.value.data.roles || []);
+      if (permsRes.status === 'fulfilled') {
+        const pData = permsRes.value.data;
+        setAllPermissionsList(pData.allPermissions || []);
+        setRolePermissions(pData.rolePermissions || {});
+        setPendingPermissionChanges(pData.rolePermissions || {});
+      }
+      if (activityRes.status === 'fulfilled') setActivityLogsData(activityRes.value.data);
+      if (notifRes.status === 'fulfilled') setNotificationsData(notifRes.value.data);
+      if (settingsRes.status === 'fulfilled') setSystemSettings(settingsRes.value.data.settings);
+    } catch (err) {
+      console.error('Failed to load admin data', err);
+      toast.error('Failed to connect to admin services');
     } finally {
       setLoading(false);
     }
@@ -141,201 +203,393 @@ export const AdminDashboardPage: React.FC = () => {
     fetchAllAdminData();
   }, []);
 
-  // Action Handlers
+  // Fetch Activity Logs on Filter/Page Change
+  const fetchActivityLogs = async (page: number = 1) => {
+    try {
+      const params = new URLSearchParams();
+      params.append('page', String(page));
+      params.append('limit', '25');
+      if (activityTypeFilter !== 'ALL') params.append('type', activityTypeFilter);
+      if (activitySearchTerm.trim()) params.append('search', activitySearchTerm.trim());
+
+      const res = await api.get(`/admin/activity-logs?${params.toString()}`);
+      setActivityLogsData(res.data);
+      setActivityPage(page);
+    } catch (e) {
+      console.error('Error fetching activity logs', e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeNav === 'activity') {
+      fetchActivityLogs(1);
+    }
+  }, [activityTypeFilter, activitySearchTerm, activeNav]);
+
+  // ----------------------------------------------------
+  // COMPLETE USER PROFILE HANDLER
+  // ----------------------------------------------------
+  const handleOpenUserProfile = async (user: any) => {
+    setSelectedUser(user);
+    setEditingUserRole(user.role);
+    setUserProfileTab('PERSONAL');
+    setSelectedUserProfileLoading(true);
+    try {
+      const res = await api.get(`/admin/users/${user.id}`);
+      setSelectedUserProfile(res.data);
+    } catch (e) {
+      console.error('Failed to fetch full user profile', e);
+      toast.error('Failed to load full user profile details');
+    } finally {
+      setSelectedUserProfileLoading(false);
+    }
+  };
+
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
       await api.put(`/admin/users/${userId}/status`, { isActive: !currentStatus });
-      toast.success(`User account ${!currentStatus ? 'activated' : 'suspended'}!`);
-      setUsersList((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, isActive: !currentStatus } : u))
-      );
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to update user status.');
+      toast.success(!currentStatus ? 'User account activated' : 'User account suspended');
+      const updated = await api.get('/admin/users');
+      setUsersList(updated.data.users || []);
+      if (selectedUserProfile && selectedUserProfile.personalDetails.id === userId) {
+        setSelectedUserProfile((prev: any) => ({
+          ...prev,
+          personalDetails: { ...prev.personalDetails, isActive: !currentStatus },
+          roleAndAccess: { ...prev.roleAndAccess, activationStatus: !currentStatus ? 'ACTIVE' : 'SUSPENDED' },
+          security: { ...prev.security, accountStatus: !currentStatus ? 'Active' : 'Suspended' }
+        }));
+      }
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to update user status');
     }
   };
 
   const handleUpdateUserRole = async (userId: string, roleName: string) => {
     try {
       await api.put(`/admin/users/${userId}/role`, { roleName });
-      toast.success(`User role updated to ${roleName}!`);
-      setUsersList((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, role: roleName } : u))
-      );
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to update user role.');
+      toast.success(`Role updated to ${roleName}`);
+      const updated = await api.get('/admin/users');
+      setUsersList(updated.data.users || []);
+      if (selectedUserProfile) {
+        const profileRes = await api.get(`/admin/users/${userId}`);
+        setSelectedUserProfile(profileRes.data);
+      }
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to update user role');
     }
   };
 
-  const handleConfirmDeleteUser = async () => {
+  const handleDeleteUserConfirm = async () => {
     if (!userToDelete) return;
     setIsDeletingUser(true);
     try {
       await api.delete(`/admin/users/${userToDelete.id}`);
-      toast.success(`User ${userToDelete.fullName} (${userToDelete.username}) deleted permanently from database.`);
-      setUsersList((prev) => prev.filter((u) => u.id !== userToDelete.id));
+      toast.success(`User ${userToDelete.fullName} deleted permanently.`);
       setUserToDelete(null);
-      fetchAllAdminData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete user.');
+      if (selectedUser?.id === userToDelete.id) {
+        setSelectedUser(null);
+        setSelectedUserProfile(null);
+      }
+      const updated = await api.get('/admin/users');
+      setUsersList(updated.data.users || []);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to delete user');
     } finally {
       setIsDeletingUser(false);
     }
   };
 
-  const handleProcessVerification = async (decision: 'APPROVE' | 'REJECT' | 'REQUEST_INFO' | 'SUSPEND') => {
+  // ----------------------------------------------------
+  // ORGANIZATION DETAILS HANDLER
+  // ----------------------------------------------------
+  const handleOpenOrgDetails = async (org: any) => {
+    setOrgDetailsTab('OVERVIEW');
+    try {
+      const res = await api.get(`/admin/organizations/${encodeURIComponent(org.name)}`);
+      setSelectedOrgDetails(res.data);
+    } catch (e) {
+      console.error('Failed to fetch organization details', e);
+      toast.error('Failed to load organization details');
+    }
+  };
+
+  const handleCreateOrganization = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOrgData.name.trim() || !newOrgData.domain.trim()) {
+      toast.error('Organization Name and Domain are required.');
+      return;
+    }
+    try {
+      await api.post('/admin/organizations', newOrgData);
+      toast.success('Organization registered successfully');
+      setShowCreateOrgModal(false);
+      setNewOrgData({ name: '', domain: '', contactEmail: '' });
+      const updated = await api.get('/admin/organizations');
+      setOrganizationsList(updated.data.organizations || []);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to create organization');
+    }
+  };
+
+  // ----------------------------------------------------
+  // ROLES & PERMISSIONS ACTIONS
+  // ----------------------------------------------------
+  const handleToggleRolePermission = (roleName: string, permId: string) => {
+    if (!isEditingPermissions) return;
+    setPendingPermissionChanges((prev) => {
+      const current = prev[roleName] || [];
+      const updated = current.includes(permId)
+        ? current.filter((p) => p !== permId)
+        : [...current, permId];
+      return { ...prev, [roleName]: updated };
+    });
+  };
+
+  const handleSaveRolePermissions = async () => {
+    setSavingPermissions(true);
+    try {
+      const rolesToUpdate = Object.keys(pendingPermissionChanges);
+      for (const roleName of rolesToUpdate) {
+        await api.put(`/admin/roles/${roleName}/permissions`, {
+          permissions: pendingPermissionChanges[roleName]
+        });
+      }
+      toast.success('Roles and permissions matrix saved successfully!');
+      setIsEditingPermissions(false);
+      setShowConfirmSavePermissions(false);
+      const updatedPerms = await api.get('/admin/roles-permissions');
+      setRolePermissions(updatedPerms.data.rolePermissions || {});
+      setPendingPermissionChanges(updatedPerms.data.rolePermissions || {});
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to save permissions');
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  const handleCancelPermissionEdits = () => {
+    setPendingPermissionChanges(rolePermissions);
+    setIsEditingPermissions(false);
+  };
+
+  // ----------------------------------------------------
+  // VERIFICATION ACTIONS
+  // ----------------------------------------------------
+  const handleProcessVerification = async (decision: 'APPROVE' | 'REJECT') => {
     if (!selectedVerification) return;
     try {
       await api.post(`/admin/verifications/${selectedVerification.id}/decision`, {
         decision,
-        notes: decisionNotes,
+        notes: decisionNotes || (decision === 'APPROVE' ? 'Approved by Platform Administrator' : 'Application Rejected')
       });
-      toast.success(`Verification ${decision.toLowerCase()} processed!`);
+      toast.success(decision === 'APPROVE' ? 'Application approved successfully' : 'Application rejected');
       setVerificationDecisionModal(false);
       setSelectedVerification(null);
       setDecisionNotes('');
-      fetchAllAdminData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to process verification.');
+      const updated = await api.get('/admin/verifications');
+      setVerificationsList(updated.data.applications || []);
+      const dash = await api.get('/admin/dashboard');
+      setMetrics(dash.data);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to process verification');
     }
   };
 
-  const handleCreateOrg = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await api.post('/admin/organizations', newOrgData);
-      toast.success('Organization registered successfully!');
-      setOrganizationsList((prev) => [res.data.organization, ...prev]);
-      setShowCreateOrgModal(false);
-      setNewOrgData({ name: '', domain: '', contactEmail: '' });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to register organization.');
-    }
-  };
-
+  // ----------------------------------------------------
+  // ASSIGN REVIEWER & BROADCAST ACTIONS
+  // ----------------------------------------------------
   const handleAssignReviewer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProject || !assignReviewerData.username.trim()) return;
+    if (!selectedProject || !assignReviewerData.username.trim()) {
+      toast.error('Please enter a valid supervisor username.');
+      return;
+    }
     try {
-      await api.put(`/admin/projects/${selectedProject.id}/assign`, {
-        reviewerUsername: assignReviewerData.username.trim(),
-        role: assignReviewerData.role,
-      });
-      toast.success('Reviewer assigned to project successfully!');
+      await api.put(`/admin/projects/${selectedProject.id}/assign`, assignReviewerData);
+      toast.success(`Assigned ${assignReviewerData.username} to project.`);
       setShowAssignModal(false);
-      setSelectedProject(null);
       setAssignReviewerData({ username: '', role: 'GUIDE' });
-      fetchAllAdminData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to assign reviewer.');
+      setSelectedProject(null);
+      const updated = await api.get('/admin/projects');
+      setProjectsList(updated.data.projects || []);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to assign reviewer');
     }
   };
 
-  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+  const handleBroadcastNotification = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAnnData.title.trim() || !newAnnData.message.trim()) return;
+    if (!broadcastData.title.trim() || !broadcastData.message.trim()) {
+      toast.error('Title and message are required.');
+      return;
+    }
     try {
-      const res = await api.post('/admin/announcements', newAnnData);
-      toast.success('System broadcast published!');
-      setAnnouncementsList((prev) => [res.data.announcement, ...prev]);
-      setShowCreateAnnModal(false);
-      setNewAnnData({ title: '', message: '', targetRole: 'ALL', priority: 'NORMAL' });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to publish broadcast.');
+      const res = await api.post('/admin/notifications/broadcast', broadcastData);
+      toast.success(res.data.message || 'Notification broadcasted successfully.');
+      setShowBroadcastModal(false);
+      setBroadcastData({ title: '', message: '', type: 'SYSTEM', targetRole: 'ALL' });
+      const updatedNotifs = await api.get('/admin/notifications?limit=50');
+      setNotificationsData(updatedNotifs.data);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to broadcast notification');
     }
   };
 
-  // Nav categories structure
-  const navGroups: NavGroup[] = [
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.put('/admin/settings', systemSettings);
+      toast.success('Platform security & authentication settings saved.');
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to update settings');
+    }
+  };
+
+  // ----------------------------------------------------
+  // CALCULATED KPIs & BADGES
+  // ----------------------------------------------------
+  const unreadNotifsCount = notificationsData.notifications.filter((n) => !n.isRead).length;
+  const pendingVerifsCount = verificationsList.filter((v) => v.status === 'PENDING').length;
+  const pendingReviewsCount = reviewsData?.metrics?.pendingReviews || 0;
+
+  // ----------------------------------------------------
+  // SIDEBAR NAVIGATION (REAL MODULES ONLY)
+  // ----------------------------------------------------
+  const navGroups = [
     {
       group: 'MAIN',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'analytics', label: 'Analytics', icon: BarChart2 },
-      ],
+        { id: 'users', label: 'Users', icon: Users, badge: usersList.length > 0 ? usersList.length : undefined },
+        { id: 'organizations', label: 'Organizations', icon: Building2, badge: organizationsList.length > 0 ? organizationsList.length : undefined },
+        { id: 'projects', label: 'Projects', icon: FolderKanban, badge: projectsList.length > 0 ? projectsList.length : undefined },
+      ]
     },
     {
-      group: 'PLATFORM',
+      group: 'MANAGEMENT',
       items: [
-        { id: 'users', label: 'Users', icon: Users, badge: usersList.length },
-        { id: 'organizations', label: 'Organizations', icon: Building2, badge: organizationsList.length },
-        { id: 'verification', label: 'Verification', icon: CheckCircle2, badge: verificationsList.filter(v => v.status === 'PENDING').length },
-        { id: 'projects', label: 'Projects', icon: Folder, badge: projectsList.length },
-        { id: 'reviews', label: 'Reviews', icon: Eye, badge: reviewsData?.metrics?.pendingReviews || 0 },
-      ],
-    },
-    {
-      group: 'INTELLIGENCE',
-      items: [
-        { id: 'intelligence', label: 'Patent Intelligence', icon: Brain },
-        { id: 'ai-operations', label: 'AI Operations', icon: Sparkles },
-        { id: 'fto-monitoring', label: 'FTO Monitoring', icon: ShieldCheck },
-        { id: 'claims-oversight', label: 'Claims Oversight', icon: FileCode },
-      ],
-    },
-    {
-      group: 'CONTENT',
-      items: [
-        { id: 'documents', label: 'Documents', icon: FileText },
-        { id: 'reports', label: 'Reports', icon: FileSpreadsheet },
-      ],
-    },
-    {
-      group: 'GOVERNANCE',
-      items: [
-        { id: 'permissions', label: 'Roles & Permissions', icon: Lock },
-        { id: 'announcements', label: 'Notifications', icon: Bell },
-        { id: 'audit-logs', label: 'Audit Logs', icon: Clock },
-      ],
+        { id: 'verifications', label: 'Verification Requests', icon: UserCheck, badge: pendingVerifsCount > 0 ? pendingVerifsCount : undefined },
+        { id: 'roles', label: 'Roles & Permissions', icon: ShieldAlert },
+        { id: 'reviews', label: 'Reviews / Moderation', icon: Scale, badge: pendingReviewsCount > 0 ? pendingReviewsCount : undefined },
+        { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotifsCount > 0 ? unreadNotifsCount : undefined },
+      ]
     },
     {
       group: 'SYSTEM',
       items: [
+        { id: 'activity', label: 'Activity Log', icon: Activity },
         { id: 'settings', label: 'Settings', icon: Settings },
-      ],
-    },
+      ]
+    }
   ];
 
+  // ----------------------------------------------------
+  // FILTERED DATA VIEWS
+  // ----------------------------------------------------
   const filteredUsers = usersList.filter((u) => {
-    const matchesSearch =
-      u.fullName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      u.username.toLowerCase().includes(userSearchTerm.toLowerCase());
-    const matchesRole = userRoleFilter === 'ALL' || u.role === userRoleFilter;
-    const matchesStatus =
+    const matchRole = userRoleFilter === 'ALL' || u.role.toLowerCase() === userRoleFilter.toLowerCase();
+    const matchStatus =
       userStatusFilter === 'ALL' ||
       (userStatusFilter === 'ACTIVE' && u.isActive) ||
       (userStatusFilter === 'SUSPENDED' && !u.isActive);
-    return matchesSearch && matchesRole && matchesStatus;
+    const matchSearch =
+      !userSearchTerm.trim() ||
+      u.fullName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+      u.username.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+      (u.institution && u.institution.toLowerCase().includes(userSearchTerm.toLowerCase()));
+    return matchRole && matchStatus && matchSearch;
   });
 
+  const filteredProjects = projectsList.filter((p) => {
+    const matchStage = projectStageFilter === 'ALL' || p.stage === projectStageFilter;
+    const matchSearch =
+      !projectSearchTerm.trim() ||
+      p.title.toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
+      p.inventor.toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
+      p.organization.toLowerCase().includes(projectSearchTerm.toLowerCase());
+    return matchStage && matchSearch;
+  });
+
+  const filteredNotifications = notificationsData.notifications.filter((n) => {
+    const matchRead = notifFilter === 'ALL' || (notifFilter === 'UNREAD' && !n.isRead) || (notifFilter === 'READ' && n.isRead);
+    const matchType = notifTypeFilter === 'ALL' || n.type.toUpperCase() === notifTypeFilter.toUpperCase();
+    return matchRead && matchType;
+  });
+
+  const stageDist = metrics?.stageDistribution || {
+    IDEA: 0,
+    LITERATURE_REVIEW: 0,
+    DOCUMENTATION: 0,
+    PROTOTYPE: 0,
+    FORMS_PREPARATION: 0,
+    GUIDE_REVIEW: 0,
+    PATENT_EXPERT_REVIEW: 0,
+    FILING_READY: 0,
+    FILED: 0
+  };
+
+  const totalStageProjects: number =
+    (Object.values(stageDist) as number[]).reduce((a: number, b: number) => a + Number(b || 0), 0) ||
+    projectsList.length ||
+    1;
+
+  // Group permissions by category for the matrix
+  const permissionsByCategory: Record<string, any[]> = {};
+  allPermissionsList.forEach((p) => {
+    if (!permissionsByCategory[p.category]) {
+      permissionsByCategory[p.category] = [];
+    }
+    permissionsByCategory[p.category].push(p);
+  });
+
+  const ROLES_LIST = [
+    { key: 'Admin', label: 'Platform Admin' },
+    { key: 'OrgAdmin', label: 'Organization Admin' },
+    { key: 'Inventor', label: 'Inventor' },
+    { key: 'CoInventor', label: 'Co-Inventor' },
+    { key: 'Guide', label: 'Guide' },
+    { key: 'PatentExpert', label: 'Patent Expert' },
+  ];
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex font-sans antialiased">
-      {/* 1. LEFT ADMIN SIDEBAR (6-GROUP DESIGN) */}
-      <aside className="w-64 bg-white border-r border-slate-200/90 flex flex-col h-screen sticky top-0 shrink-0 z-40 shadow-xs">
+    <div className="h-screen bg-[#F7F9F8] text-[#253330] flex overflow-hidden font-sans antialiased">
+      {/* ==================================================== */}
+      {/* 1. ADMIN SIDEBAR */}
+      {/* ==================================================== */}
+      <aside
+        className={`${
+          sidebarCollapsed ? 'w-20' : 'w-64'
+        } bg-white border-r border-[#E5EBE8] flex flex-col h-screen shrink-0 z-40 transition-all duration-300 shadow-3xs`}
+      >
         {/* Brand Header */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100">
-          <Link to="/admin" className="flex items-center gap-3 overflow-hidden group">
-            <div className="w-8 h-8 rounded-xl bg-blue-900 flex items-center justify-center text-white shadow-sm shrink-0">
-              <Shield className="w-4 h-4 fill-white" />
+        <div className="h-16 flex items-center justify-between px-5 border-b border-[#E5EBE8]">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-8 h-8 rounded-xl bg-[#315C55] flex items-center justify-center text-white shadow-3xs shrink-0">
+              <ShieldAlert className="w-4 h-4" />
             </div>
-            <div>
-              <span className="font-black text-sm tracking-tight text-slate-950 block leading-none">
-                PatentHub-AI
-              </span>
-              <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider block mt-0.5">
-                Platform Governance
-              </span>
-            </div>
-          </Link>
+            {!sidebarCollapsed && (
+              <div>
+                <span className="font-black text-sm tracking-tight text-[#253330] block leading-none">
+                  PatentHub-AI
+                </span>
+                <span className="text-[10px] text-[#6F8F88] font-bold uppercase tracking-wider block mt-0.5">
+                  Platform Admin
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Scrollable Navigation Groups */}
+        {/* Sidebar Navigation */}
         <nav className="flex-1 py-4 px-3 space-y-4 overflow-y-auto">
           {navGroups.map((grp) => (
             <div key={grp.group} className="space-y-1">
-              <div className="px-3 text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">
-                {grp.group}
-              </div>
+              {!sidebarCollapsed && (
+                <span className="px-3 text-[10px] font-black uppercase tracking-wider text-[#71807C] block mb-1">
+                  {grp.group}
+                </span>
+              )}
               {grp.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeNav === item.id;
@@ -343,22 +597,23 @@ export const AdminDashboardPage: React.FC = () => {
                   <button
                     key={item.id}
                     onClick={() => setActiveNav(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-blue-900 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
+                        ? 'bg-[#315C55] text-white shadow-3xs'
+                        : 'text-[#5C6B67] hover:bg-[#F0F4F2] hover:text-[#253330]'
                     }`}
+                    title={item.label}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                      <span className="truncate">{item.label}</span>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Icon className="w-4 h-4 shrink-0" />
+                      {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                     </div>
-                    {typeof item.badge === 'number' && item.badge > 0 && (
+                    {!sidebarCollapsed && item.badge !== undefined && (
                       <span
-                        className={`px-1.5 py-0.5 rounded-md text-[9px] font-extrabold ${
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                           isActive
                             ? 'bg-white/20 text-white'
-                            : 'bg-slate-100 text-slate-600'
+                            : 'bg-[#E5EBE8] text-[#315C55]'
                         }`}
                       >
                         {item.badge}
@@ -371,1400 +626,2498 @@ export const AdminDashboardPage: React.FC = () => {
           ))}
         </nav>
 
-        {/* Bottom Sidebar User Profile & Logout */}
-        <div className="p-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-blue-900 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
-              AD
+        {/* User Footer Profile */}
+        <div className="p-3 border-t border-[#E5EBE8]">
+          <div className="flex items-center justify-between p-2 rounded-2xl bg-[#F7F9F8]">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-[#315C55] text-white font-black flex items-center justify-center text-xs shrink-0">
+                PA
+              </div>
+              {!sidebarCollapsed && (
+                <div className="min-w-0">
+                  <span className="font-extrabold text-xs text-[#253330] block truncate">
+                    Platform Admin
+                  </span>
+                  <span className="text-[10px] text-[#71807C] block truncate">
+                    Master Superuser
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="min-w-0">
-              <span className="text-xs font-extrabold text-slate-900 block truncate leading-tight">System Admin</span>
-              <span className="text-[10px] text-slate-400 block truncate leading-tight">Platform Master</span>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="p-1.5 rounded-lg text-[#71807C] hover:text-[#DC2626] hover:bg-rose-50 transition cursor-pointer"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={handleLogout}
-            title="Sign out"
-            className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 transition cursor-pointer shrink-0"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
         </div>
       </aside>
 
-      {/* 2. MAIN ADMIN CONTENT VIEWPORT */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        {/* Top Header Bar */}
-        <header className="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between sticky top-0 z-30 shadow-3xs">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              {navGroups.find((g) => g.items.some((i) => i.id === activeNav))?.group}
-            </span>
-            <span className="text-slate-300">/</span>
-            <h2 className="text-sm font-extrabold text-slate-900 capitalize flex items-center gap-2">
-              <span>{activeNav.replace('-', ' ')}</span>
-              {loading && <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />}
-            </h2>
+      {/* ==================================================== */}
+      {/* 2. MAIN CONTENT AREA */}
+      {/* ==================================================== */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Top Header */}
+        <header className="h-16 bg-white border-b border-[#E5EBE8] flex items-center justify-between px-6 shrink-0 z-30">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 text-[#71807C] hover:text-[#253330] hover:bg-[#F0F4F2] rounded-xl transition cursor-pointer"
+              title="Toggle sidebar"
+            >
+              <Sliders className="w-4 h-4" />
+            </button>
+            <div>
+              <h2 className="text-sm font-black text-[#253330] capitalize">
+                {activeNav.replace('-', ' ')}
+              </h2>
+              <span className="text-[10px] text-[#71807C] font-semibold">
+                PatentHub-AI Platform Governance
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Universal Search Bar */}
-            <div className="relative w-64 hidden sm:block">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* Global Search */}
+            <div className="relative hidden sm:block w-64">
+              <Search className="w-3.5 h-3.5 text-[#8A9B96] absolute left-3 top-2.5" />
               <input
                 type="text"
+                placeholder="Search platform..."
                 value={searchGlobal}
                 onChange={(e) => setSearchGlobal(e.target.value)}
-                placeholder="Search platform assets..."
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:border-blue-600 transition shadow-3xs"
+                className="w-full pl-9 pr-3.5 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs text-[#253330] placeholder-[#8A9B96] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#315C55]"
               />
             </div>
 
-            {/* Notification & Admin Profile Badge */}
+            {/* Refresh Button */}
             <button
-              onClick={() => setActiveNav('announcements')}
-              className="relative p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition cursor-pointer"
+              onClick={fetchAllAdminData}
+              className="p-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] border border-[#E5EBE8] rounded-xl text-[#5C6B67] transition cursor-pointer"
+              title="Refresh all metrics"
             >
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full" />
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#315C55]' : ''}`} />
             </button>
 
-            <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
-              <div className="w-8 h-8 rounded-xl bg-blue-900 text-white font-black text-xs flex items-center justify-center shadow-xs">
-                AD
-              </div>
-              <div className="hidden md:block text-left">
-                <span className="text-xs font-extrabold text-slate-900 block leading-tight">System Admin</span>
-                <span className="text-[10px] text-emerald-600 font-bold block leading-tight">Platform Master</span>
-              </div>
-            </div>
-
-            {/* Top Logout Button */}
+            {/* Live Notifications Bell */}
             <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 text-xs font-bold transition cursor-pointer shadow-3xs"
-              title="Sign out of PatentHub-AI"
+              onClick={() => setActiveNav('notifications')}
+              className="p-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] border border-[#E5EBE8] rounded-xl text-[#5C6B67] relative transition cursor-pointer"
+              title="View Notifications"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Logout</span>
+              <Bell className="w-3.5 h-3.5" />
+              {unreadNotifsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#315C55] text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                  {unreadNotifsCount}
+                </span>
+              )}
             </button>
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-6 space-y-6 max-w-7xl w-full mx-auto animate-fade-in">
-          {/* SECTION 1: DASHBOARD OVERVIEW */}
+        {/* Dynamic Main Body */}
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+          {/* ==================================================== */}
+          {/* VIEW: DASHBOARD OVERVIEW */}
+          {/* ==================================================== */}
           {activeNav === 'dashboard' && (
-            <div className="space-y-6">
-              {/* Header Greeting */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              {/* Top Greeting */}
+              <div className="p-6 sm:p-8 bg-white border border-[#E5EBE8] rounded-3xl shadow-3xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">Platform Governance Center</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Real-time ecosystem intelligence, trust verification, and patent lifecycle performance.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <button
-                    onClick={fetchAllAdminData}
-                    className="p-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-xs font-bold transition shadow-3xs cursor-pointer flex items-center gap-1.5"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Refresh</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveNav('reports')}
-                    className="px-4 py-2 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Platform Report</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 6 Top KPI Cards (100% Real Database Values) */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {[
-                  { label: 'Total Users', value: metrics?.kpis?.totalUsers ?? usersList.length, change: 'Registered', color: 'text-blue-600 bg-blue-50' },
-                  { label: 'Patent Projects', value: metrics?.kpis?.totalProjects ?? projectsList.length, change: 'In Portfolio', color: 'text-indigo-600 bg-indigo-50' },
-                  { label: 'Organizations', value: metrics?.kpis?.totalOrganizations ?? organizationsList.length, change: 'Active Org Domains', color: 'text-purple-600 bg-purple-50' },
-                  { label: 'Verifications', value: `${metrics?.kpis?.pendingVerifications ?? verificationsList.filter(v => v.status === 'PENDING').length} Pending`, change: 'Trust Queue', color: 'text-amber-600 bg-amber-50' },
-                  { label: 'Reviews', value: `${metrics?.kpis?.pendingReviews ?? reviewsData?.metrics?.pendingReviews ?? 0} Pending`, change: 'Review Desk', color: 'text-rose-600 bg-rose-50' },
-                  { label: 'Filing Ready', value: metrics?.kpis?.filingReadyProjects ?? 0, change: 'Ready for IPO', color: 'text-emerald-600 bg-emerald-50' },
-                ].map((kpi, idx) => (
-                  <div key={idx} className="app-card p-4 space-y-1.5 shadow-3xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{kpi.label}</span>
-                    <div className="text-xl font-black text-slate-900">{kpi.value}</div>
-                    <span className={`inline-block text-[9px] font-extrabold px-1.5 py-0.5 rounded ${kpi.color}`}>
-                      {kpi.change}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#6F8F88]">
+                      All Systems Operational
                     </span>
                   </div>
-                ))}
-              </div>
-
-              {/* 9-Stage Platform Patent Workflow Stepper */}
-              <div className="app-card p-6 space-y-4 shadow-xs">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-                    Platform Patent Workflow Stage Distribution
-                  </h3>
-                  <span className="text-[11px] text-emerald-600 font-bold">{projectsList.length} Active Projects Pipeline</span>
+                  <h1 className="text-2xl sm:text-3xl font-black text-[#253330] tracking-tight">
+                    Good morning, Admin 👋
+                  </h1>
+                  <p className="text-xs sm:text-sm text-[#71807C] font-medium mt-0.5">
+                    Platform Administration & Security Command Center
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2.5">
-                  {[
-                    { stage: 'Idea', count: metrics?.stageDistribution?.IDEA ?? 0, color: 'border-blue-200 bg-blue-50/40 text-blue-800' },
-                    { stage: 'Lit. Review', count: metrics?.stageDistribution?.LITERATURE_REVIEW ?? 0, color: 'border-cyan-200 bg-cyan-50/40 text-cyan-800' },
-                    { stage: 'Prototype', count: metrics?.stageDistribution?.PROTOTYPE ?? 0, color: 'border-indigo-200 bg-indigo-50/40 text-indigo-800' },
-                    { stage: 'Docs', count: metrics?.stageDistribution?.DOCUMENTATION ?? 0, color: 'border-teal-200 bg-teal-50/40 text-teal-800' },
-                    { stage: 'Forms Prep', count: metrics?.stageDistribution?.FORMS_PREPARATION ?? 0, color: 'border-amber-200 bg-amber-50/40 text-amber-800' },
-                    { stage: 'Guide Review', count: metrics?.stageDistribution?.GUIDE_REVIEW ?? 0, color: 'border-purple-200 bg-purple-50/40 text-purple-800' },
-                    { stage: 'Expert Review', count: metrics?.stageDistribution?.PATENT_EXPERT_REVIEW ?? 0, color: 'border-pink-200 bg-pink-50/40 text-pink-800' },
-                    { stage: 'Filing Ready', count: metrics?.stageDistribution?.FILING_READY ?? 0, color: 'border-emerald-300 bg-emerald-100/50 text-emerald-900' },
-                    { stage: 'Filed (IPO)', count: metrics?.stageDistribution?.FILED ?? 0, color: 'border-slate-300 bg-slate-100 text-slate-900' },
-                  ].map((st, i) => (
-                    <div key={i} className={`p-3 rounded-2xl border text-center space-y-1 ${st.color}`}>
-                      <span className="text-[10px] font-bold uppercase tracking-wider block truncate">{st.stage}</span>
-                      <div className="text-xl font-black">{st.count}</div>
-                      <span className="text-[9px] font-semibold opacity-75">projects</span>
+                <div className="flex items-center gap-3">
+                  <div className="px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-2xl flex items-center gap-2 text-xs font-bold text-[#5C6B67]">
+                    <Calendar className="w-3.5 h-3.5 text-[#8A9B96]" />
+                    <span>
+                      {new Date().toLocaleDateString(undefined, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowBroadcastModal(true)}
+                    className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-2xl text-xs font-bold transition shadow-3xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Broadcast</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 6 Real Database KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                {/* Total Users */}
+                <div
+                  onClick={() => setActiveNav('users')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Total Users</span>
+                    <Users className="w-4 h-4 text-[#315C55]" />
+                  </div>
+                  <p className="text-2xl font-black text-[#253330] font-mono">
+                    {metrics?.kpis?.totalUsers ?? usersList.length}
+                  </p>
+                  <span className="text-[10px] text-[#6F8F88] font-bold block">Registered accounts</span>
+                </div>
+
+                {/* Active Users */}
+                <div
+                  onClick={() => setActiveNav('users')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Active Users</span>
+                    <UserCheck className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <p className="text-2xl font-black text-emerald-700 font-mono">
+                    {metrics?.kpis?.activeUsers ?? usersList.filter((u) => u.isActive).length}
+                  </p>
+                  <span className="text-[10px] text-emerald-700 font-bold block">Verified & active</span>
+                </div>
+
+                {/* Total Organizations */}
+                <div
+                  onClick={() => setActiveNav('organizations')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Organizations</span>
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <p className="text-2xl font-black text-[#253330] font-mono">
+                    {metrics?.kpis?.totalOrganizations ?? organizationsList.length}
+                  </p>
+                  <span className="text-[10px] text-[#6F8F88] font-bold block">Campuses / Institutes</span>
+                </div>
+
+                {/* Total Projects */}
+                <div
+                  onClick={() => setActiveNav('projects')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Projects</span>
+                    <FolderKanban className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <p className="text-2xl font-black text-[#253330] font-mono">
+                    {metrics?.kpis?.totalProjects ?? projectsList.length}
+                  </p>
+                  <span className="text-[10px] text-[#6F8F88] font-bold block">Invention workspaces</span>
+                </div>
+
+                {/* Pending Verifications */}
+                <div
+                  onClick={() => setActiveNav('verifications')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Verifications</span>
+                    <ShieldAlert className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <p className="text-2xl font-black text-amber-700 font-mono">
+                    {metrics?.kpis?.pendingVerifications ?? pendingVerifsCount}
+                  </p>
+                  <span className="text-[10px] text-amber-700 font-bold block">Awaiting approval</span>
+                </div>
+
+                {/* Pending Reviews */}
+                <div
+                  onClick={() => setActiveNav('reviews')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Reviews</span>
+                    <Scale className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <p className="text-2xl font-black text-indigo-700 font-mono">
+                    {metrics?.kpis?.pendingReviews ?? pendingReviewsCount}
+                  </p>
+                  <span className="text-[10px] text-indigo-700 font-bold block">Milestone reviews</span>
+                </div>
+              </div>
+
+              {/* Distribution Sections */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Project Distribution */}
+                <div className="p-6 bg-white border border-[#E5EBE8] rounded-3xl shadow-3xs space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                        Project Stage Distribution
+                      </h3>
+                      <p className="text-[11px] text-[#71807C]">Real pipeline status across all inventions</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 3-Column Dashboard Matrix */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* Patent Intelligence (4 cols) */}
-                <div className="lg:col-span-4 app-card p-6 space-y-4 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-                      Platform Patent Health
-                    </h3>
-                    <button onClick={() => setActiveNav('intelligence')} className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
-                      Inspect →
+                    <button
+                      onClick={() => setActiveNav('projects')}
+                      className="text-xs font-bold text-[#315C55] hover:underline"
+                    >
+                      View All &gt;
                     </button>
                   </div>
 
-                  <div className="space-y-3.5">
+                  <div className="space-y-3 pt-2">
                     {[
-                      { label: 'Patent Eligibility', val: metrics?.intelligence?.patentEligibility ?? 0, color: 'bg-emerald-500' },
-                      { label: 'Prior Art Risk (Platform Avg)', val: metrics?.intelligence?.priorArtRisk ?? 0, color: 'bg-amber-500' },
-                      { label: 'Drawing Completeness', val: metrics?.intelligence?.drawingCompleteness ?? 0, color: 'bg-emerald-500' },
-                      { label: 'Legal Compliance', val: metrics?.intelligence?.legalCompliance ?? 0, color: 'bg-emerald-500' },
-                      { label: 'Team Execution Rate', val: metrics?.intelligence?.teamExecution ?? 0, color: 'bg-emerald-500' },
-                      { label: 'Filing Readiness Ratio', val: metrics?.intelligence?.filingReadiness ?? 0, color: 'bg-blue-500' },
-                    ].map((item, idx) => (
-                      <div key={idx} className="space-y-1">
-                        <div className="flex justify-between text-xs font-bold">
-                          <span className="text-slate-700">{item.label}</span>
-                          <span className="font-mono text-slate-900 font-extrabold">{item.val}%</span>
+                      { label: 'Draft & Idea', count: stageDist.IDEA || 0, color: 'bg-slate-400' },
+                      { label: 'Literature & Search', count: stageDist.LITERATURE_REVIEW || 0, color: 'bg-blue-500' },
+                      { label: 'Documentation & Claims', count: stageDist.DOCUMENTATION || 0, color: 'bg-indigo-500' },
+                      {
+                        label: 'Under Review (Guide/Expert)',
+                        count: (stageDist.GUIDE_REVIEW || 0) + (stageDist.PATENT_EXPERT_REVIEW || 0),
+                        color: 'bg-amber-500'
+                      },
+                      { label: 'Filing Ready', count: stageDist.FILING_READY || 0, color: 'bg-emerald-500' },
+                      { label: 'Completed & Filed', count: stageDist.FILED || 0, color: 'bg-[#315C55]' },
+                    ].map((item) => {
+                      const pct = Math.round((item.count / totalStageProjects) * 100);
+                      return (
+                        <div key={item.label} className="space-y-1">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-[#5C6B67]">{item.label}</span>
+                            <span className="text-[#253330] font-mono">
+                              {item.count} <span className="text-[10px] text-[#71807C]">({pct}%)</span>
+                            </span>
+                          </div>
+                          <div className="h-2 bg-[#F0F4F2] rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${item.color} rounded-full transition-all duration-500`}
+                              style={{ width: `${Math.max(item.count > 0 ? 6 : 0, pct)}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div className={`h-full ${item.color} rounded-full`} style={{ width: `${item.val}%` }} />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* User Role Distribution */}
+                <div className="p-6 bg-white border border-[#E5EBE8] rounded-3xl shadow-3xs space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                        User Role Distribution
+                      </h3>
+                      <p className="text-[11px] text-[#71807C]">Authenticated platform participants</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveNav('users')}
+                      className="text-xs font-bold text-[#315C55] hover:underline"
+                    >
+                      Manage Users &gt;
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    {rolesStats.map((r) => {
+                      const totalU = usersList.length || 1;
+                      const pct = Math.round((r.usersCount / totalU) * 100);
+                      return (
+                        <div key={r.name} className="space-y-1">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-[#5C6B67]">{r.displayName}</span>
+                            <span className="text-[#253330] font-mono">
+                              {r.usersCount} <span className="text-[10px] text-[#71807C]">({pct}%)</span>
+                            </span>
+                          </div>
+                          <div className="h-2 bg-[#F0F4F2] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#315C55] rounded-full transition-all duration-500"
+                              style={{ width: `${Math.max(r.usersCount > 0 ? 6 : 0, pct)}%` }}
+                            />
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="p-6 bg-white border border-[#E5EBE8] rounded-3xl shadow-3xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                      Recent Platform Audit Trail
+                    </h3>
+                    <p className="text-[11px] text-[#71807C]">Live events logged across all workspaces</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveNav('activity')}
+                    className="text-xs font-bold text-[#315C55] hover:underline"
+                  >
+                    View All Activity &gt;
+                  </button>
+                </div>
+
+                {metrics?.recentActivities && metrics.recentActivities.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {metrics.recentActivities.slice(0, 6).map((act: any) => (
+                      <div
+                        key={act.id}
+                        className="p-3 bg-[#F7F9F8] border border-[#E5EBE8] rounded-2xl flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-2 h-2 rounded-full bg-[#315C55] shrink-0" />
+                          <div className="min-w-0">
+                            <p className="font-extrabold text-[#253330] truncate">{act.action}</p>
+                            <p className="text-[11px] text-[#71807C]">
+                              Actor: <strong className="text-[#5C6B67]">{act.user}</strong> • Target: {act.target}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-mono text-[#71807C] shrink-0">{act.time}</span>
                       </div>
                     ))}
                   </div>
-                </div>
-
-                {/* Verification Trust Queue (4 cols) */}
-                <div className="lg:col-span-4 app-card p-6 space-y-4 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-                      Verification Queue
-                    </h3>
-                    <button onClick={() => setActiveNav('verification')} className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
-                      View All ({verificationsList.length}) →
-                    </button>
+                ) : (
+                  <div className="p-8 text-center bg-[#F7F9F8] rounded-2xl border border-dashed border-[#E5EBE8]">
+                    <Activity className="w-8 h-8 text-[#8A9B96] mx-auto mb-2" />
+                    <p className="text-xs font-bold text-[#71807C]">No activity logs recorded yet</p>
                   </div>
-
-                  {verificationsList.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl">
-                      No applications currently in queue.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {verificationsList.slice(0, 3).map((app) => (
-                        <div key={app.id} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-900">{app.applicantName}</span>
-                            <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100">
-                              {app.roleApplied}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-slate-500 font-medium truncate">{app.organization}</p>
-                          <div className="flex items-center justify-between pt-1 text-[10px]">
-                            <span className="text-slate-400 font-semibold">{app.specialization}</span>
-                            <button
-                              onClick={() => {
-                                setSelectedVerification(app);
-                                setVerificationDecisionModal(true);
-                              }}
-                              className="px-2.5 py-1 bg-white border border-slate-200 hover:border-blue-500 rounded-lg font-bold text-blue-700 cursor-pointer shadow-3xs"
-                            >
-                              Review App
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Review Performance & Recent Activity (4 cols) */}
-                <div className="lg:col-span-4 app-card p-6 space-y-4 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-                      Review Turnaround
-                    </h3>
-                    <button onClick={() => setActiveNav('reviews')} className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
-                      Manage →
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-center">
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Pending</span>
-                      <div className="text-lg font-black text-rose-600">
-                        {reviewsData?.metrics?.pendingReviews ?? metrics?.reviewPerformance?.pendingReviews ?? 0}
-                      </div>
-                    </div>
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Completed</span>
-                      <div className="text-lg font-black text-emerald-600">
-                        {reviewsData?.metrics?.completedReviews ?? metrics?.reviewPerformance?.completedReviews ?? 0}
-                      </div>
-                    </div>
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Overdue</span>
-                      <div className="text-lg font-black text-amber-600">
-                        {reviewsData?.metrics?.overdueReviews ?? metrics?.reviewPerformance?.overdueReviews ?? 0}
-                      </div>
-                    </div>
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Avg Time</span>
-                      <div className="text-lg font-black text-blue-600">
-                        {reviewsData?.metrics?.avgReviewTimeDays ?? metrics?.reviewPerformance?.avgTurnaroundDays ?? 0}d
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Activity Mini Log */}
-                  <div className="pt-2 border-t border-slate-100 space-y-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Live Audit Trail</span>
-                    {metrics?.recentActivities && metrics.recentActivities.length > 0 ? (
-                      metrics.recentActivities.slice(0, 3).map((act: any) => (
-                        <div key={act.id} className="text-xs space-y-0.5">
-                          <div className="flex justify-between font-bold text-slate-800">
-                            <span className="truncate">{act.user}</span>
-                            <span className="text-[10px] text-slate-400">{act.time}</span>
-                          </div>
-                          <p className="text-[10px] text-slate-500 leading-tight">{act.action}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-[10px] text-slate-400">No recent activity logged.</p>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* SECTION 2: USER MANAGEMENT */}
+          {/* ==================================================== */}
+          {/* VIEW: USERS MODULE (WITH COMPLETE USER PROFILE VIEW) */}
+          {/* ==================================================== */}
           {activeNav === 'users' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
                 <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">Platform User Management</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Manage {usersList.length} registered accounts across all institutional domains.
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">Platform Users</h1>
+                  <p className="text-xs text-[#71807C]">
+                    Manage accounts, roles, institutions, and inspect full user profiles
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-400">Total: {filteredUsers.length}</span>
-                </div>
-              </div>
-
-              {/* Filters Bar */}
-              <div className="app-card p-4 flex flex-wrap items-center justify-between gap-4 shadow-3xs">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="relative w-64">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="relative w-48">
+                    <Search className="w-3.5 h-3.5 text-[#8A9B96] absolute left-3 top-2.5" />
                     <input
                       type="text"
+                      placeholder="Search users..."
                       value={userSearchTerm}
                       onChange={(e) => setUserSearchTerm(e.target.value)}
-                      placeholder="Search name, email, username..."
-                      className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:border-blue-600 shadow-3xs"
+                      className="w-full pl-8 pr-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:outline-none"
                     />
                   </div>
-
                   <select
                     value={userRoleFilter}
                     onChange={(e) => setUserRoleFilter(e.target.value)}
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-3xs cursor-pointer"
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
                   >
                     <option value="ALL">All Roles</option>
-                    <option value="Inventor">Inventors</option>
-                    <option value="CoInventor">Co-Inventors</option>
-                    <option value="Guide">Faculty Guides</option>
-                    <option value="PatentExpert">Patent Experts</option>
-                    <option value="Admin">Administrators</option>
+                    <option value="Inventor">Inventor</option>
+                    <option value="CoInventor">Co-Inventor</option>
+                    <option value="Guide">Guide</option>
+                    <option value="PatentExpert">Patent Expert</option>
+                    <option value="OrgAdmin">Org Admin</option>
+                    <option value="Admin">Admin</option>
                   </select>
-
                   <select
                     value={userStatusFilter}
                     onChange={(e) => setUserStatusFilter(e.target.value)}
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-3xs cursor-pointer"
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
                   >
                     <option value="ALL">All Statuses</option>
-                    <option value="ACTIVE">Active Only</option>
-                    <option value="SUSPENDED">Suspended Only</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="SUSPENDED">Suspended</option>
                   </select>
                 </div>
               </div>
 
               {/* Users Table */}
-              <div className="app-card overflow-hidden shadow-xs border-slate-200">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      <tr>
-                        <th className="p-4">Name & Username</th>
-                        <th className="p-4">Account Type</th>
-                        <th className="p-4">Organization</th>
-                        <th className="p-4">Projects</th>
-                        <th className="p-4">Verification</th>
-                        <th className="p-4">Account Status</th>
-                        <th className="p-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredUsers.map((u) => (
-                        <tr key={u.id} className="hover:bg-slate-50/70 transition">
-                          <td className="p-4">
-                            <div className="font-bold text-slate-900">{u.fullName}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">@{u.username} • {u.email}</div>
-                          </td>
-                          <td className="p-4">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                              {u.role}
-                            </span>
-                          </td>
-                          <td className="p-4 font-semibold text-slate-700">{u.institution}</td>
-                          <td className="p-4 font-extrabold text-slate-900 font-mono">{u.projectsCount}</td>
-                          <td className="p-4">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                              u.verificationStatus === 'VERIFIED'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-amber-50 text-amber-700'
-                            }`}>
-                              {u.verificationStatus}
-                            </span>
-                          </td>
-                          <td className="p-4">
-                            <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${
-                              u.isActive ? 'text-emerald-600' : 'text-rose-600'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                              {u.isActive ? 'Active' : 'Suspended'}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right space-x-2 whitespace-nowrap">
-                            <button
-                              onClick={() => setSelectedUser(u)}
-                              className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition shadow-3xs cursor-pointer"
-                            >
-                              Edit Profile
-                            </button>
-                            <button
-                              onClick={() => handleToggleUserStatus(u.id, u.isActive)}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition shadow-3xs cursor-pointer border ${
-                                u.isActive
-                                  ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
-                                  : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                              }`}
-                            >
-                              {u.isActive ? 'Suspend' : 'Activate'}
-                            </button>
-                            <button
-                              onClick={() => setUserToDelete(u)}
-                              className="px-2.5 py-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-lg text-xs font-bold transition shadow-3xs cursor-pointer inline-flex items-center gap-1"
-                              title="Permanently delete user from database"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              <span>Delete</span>
-                            </button>
-                          </td>
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                {filteredUsers.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">User</th>
+                          <th className="py-3 px-4">Email</th>
+                          <th className="py-3 px-4">Role</th>
+                          <th className="py-3 px-4">Organization</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Projects</th>
+                          <th className="py-3 px-4">Joined</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 3: GUIDE & PATENT EXPERT VERIFICATION */}
-          {activeNav === 'verification' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">Trust Layer & Verification Queue</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Evaluate credentials, academic affiliations, and statutory licenses before granting Guide or Expert evaluation authority.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {verificationsList.map((app) => (
-                  <div key={app.id} className="app-card p-6 space-y-4 shadow-xs border-slate-200 flex flex-col justify-between">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Application #{app.id}</span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                          app.status === 'VERIFIED'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : app.status === 'UNDER_REVIEW'
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'bg-amber-50 text-amber-700'
-                        }`}>
-                          {app.status}
-                        </span>
-                      </div>
-
-                      <div>
-                        <h3 className="text-sm font-extrabold text-slate-900">{app.applicantName}</h3>
-                        <p className="text-xs text-blue-600 font-bold">{app.roleApplied} • {app.experienceYears} Years Exp</p>
-                      </div>
-
-                      <div className="space-y-1.5 text-xs text-slate-600">
-                        <p><strong>Qualification:</strong> {app.qualification}</p>
-                        <p><strong>Organization:</strong> {app.organization}</p>
-                        <p><strong>Domain Focus:</strong> {app.specialization}</p>
-                        <p><strong>Official Email:</strong> {app.officialEmail}</p>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-100">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1.5">Submitted Credentials</span>
-                        <div className="space-y-1">
-                          {app.documents.map((doc: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between text-[11px] p-2 bg-slate-50 rounded-xl border border-slate-200">
-                              <span className="truncate font-medium text-slate-800">{doc.name}</span>
-                              <span className="text-blue-600 font-bold text-[10px]">Inspect</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 pt-4 border-t border-slate-100">
-                      <button
-                        onClick={() => {
-                          setSelectedVerification(app);
-                          setVerificationDecisionModal(true);
-                        }}
-                        className="w-full py-2.5 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer text-center"
-                      >
-                        Evaluate & Make Decision
-                      </button>
-                    </div>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {filteredUsers.map((u, index) => (
+                          <tr key={u.id} className="hover:bg-[#F7F9F8] transition">
+                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                              {index + 1}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div
+                                onClick={() => handleOpenUserProfile(u)}
+                                className="flex items-center gap-2.5 cursor-pointer group"
+                              >
+                                <div className="w-7 h-7 rounded-xl bg-[#DDEBE6] text-[#315C55] font-black flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition">
+                                  {u.fullName[0]}
+                                </div>
+                                <div>
+                                  <span className="font-bold text-[#253330] block group-hover:text-[#315C55] transition">
+                                    {u.fullName}
+                                  </span>
+                                  <span className="text-[10px] text-[#71807C]">@{u.username}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-[#5C6B67]">{u.email}</td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
+                                {u.role}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-[#5C6B67] truncate max-w-[150px]">
+                              {u.institution || 'Independent'}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                  u.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {u.isActive ? 'Active' : 'Suspended'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono font-bold text-[#253330]">
+                              {u.projectsCount || 0}
+                            </td>
+                            <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                              {new Date(u.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleOpenUserProfile(u)}
+                                  className="px-2.5 py-1 bg-[#F0F4F2] hover:bg-[#DDEBE6] text-[#315C55] rounded-xl text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                                  title="View Complete User Profile"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Profile</span>
+                                </button>
+                                <button
+                                  onClick={() => handleToggleUserStatus(u.id, u.isActive)}
+                                  className={`p-1.5 rounded-lg transition cursor-pointer ${
+                                    u.isActive
+                                      ? 'hover:bg-amber-50 text-amber-700'
+                                      : 'hover:bg-emerald-50 text-emerald-700'
+                                  }`}
+                                  title={u.isActive ? 'Suspend User' : 'Activate User'}
+                                >
+                                  {u.isActive ? <Lock className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                                </button>
+                                <button
+                                  onClick={() => setUserToDelete(u)}
+                                  className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-lg transition cursor-pointer"
+                                  title="Delete User Permanently"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
+                ) : (
+                  <div className="p-12 text-center">
+                    <Users className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-[#253330]">No Users Found</h4>
+                    <p className="text-xs text-[#71807C] mt-1">No users match your selected filters.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* SECTION 4: ORGANIZATIONS */}
+          {/* ==================================================== */}
+          {/* VIEW: ORGANIZATIONS MODULE */}
+          {/* ==================================================== */}
           {activeNav === 'organizations' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
                 <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">Organization Governance</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Registered university campuses, research laboratories, and IP liaison cells.
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">Organizations & Campuses</h1>
+                  <p className="text-xs text-[#71807C]">
+                    Academic institutions, corporate labs, and research centers
                   </p>
                 </div>
                 <button
                   onClick={() => setShowCreateOrgModal(true)}
-                  className="px-4 py-2 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-2xl text-xs font-bold transition shadow-3xs flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5" />
                   <span>Register Organization</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {organizationsList.map((org) => (
-                  <div key={org.id} className="app-card p-6 space-y-4 shadow-xs border-slate-200 flex flex-col justify-between">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                        <span className="text-[10px] font-mono text-slate-400 uppercase">{org.domain}</span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">
-                          {org.status}
-                        </span>
-                      </div>
-
-                      <h3 className="text-base font-extrabold text-slate-900 leading-snug">{org.name}</h3>
-
-                      <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                        <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">Members</span>
-                          <div className="text-base font-black text-slate-900">{org.membersCount}</div>
-                        </div>
-                        <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">Projects</span>
-                          <div className="text-base font-black text-blue-600">{org.projectsCount}</div>
-                        </div>
-                        <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">Guides</span>
-                          <div className="text-base font-black text-slate-800">{org.guidesCount}</div>
-                        </div>
-                        <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">Experts</span>
-                          <div className="text-base font-black text-slate-800">{org.expertsCount}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <button className="w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition cursor-pointer">
-                        View Organization Portal →
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 5: PROJECT ECOSYSTEM */}
-          {activeNav === 'projects' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">Patent Project Ecosystem</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Platform-wide project auditing, supervisor assignments, and workflow governance.
-                  </p>
-                </div>
-              </div>
-
-              <div className="app-card overflow-hidden shadow-xs border-slate-200">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      <tr>
-                        <th className="p-4">Project & Title</th>
-                        <th className="p-4">Lead Inventor</th>
-                        <th className="p-4">Current Stage</th>
-                        <th className="p-4">Assigned Guide</th>
-                        <th className="p-4">Patent Expert</th>
-                        <th className="p-4">Readiness</th>
-                        <th className="p-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {projectsList.map((p) => (
-                        <tr key={p.id} className="hover:bg-slate-50/70 transition">
-                          <td className="p-4">
-                            <div className="font-bold text-slate-900">{p.title}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{p.category} • {p.technicalDomain}</div>
-                          </td>
-                          <td className="p-4 font-semibold text-slate-800">{p.inventor}</td>
-                          <td className="p-4">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              {p.stage}
-                            </span>
-                          </td>
-                          <td className="p-4 text-slate-700 font-medium">{p.guide}</td>
-                          <td className="p-4 text-slate-700 font-medium">{p.expert}</td>
-                          <td className="p-4 font-black font-mono text-emerald-600">{p.readinessScore}%</td>
-                          <td className="p-4 text-right space-x-2">
-                            <Link
-                              to={`/dashboard/projects/${p.id}`}
-                              className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition shadow-3xs"
-                            >
-                              Inspect
-                            </Link>
-                            <button
-                              onClick={() => {
-                                setSelectedProject(p);
-                                setShowAssignModal(true);
-                              }}
-                              className="px-2.5 py-1 bg-blue-900 hover:bg-blue-950 text-white rounded-lg text-xs font-bold transition shadow-3xs cursor-pointer"
-                            >
-                              Assign Staff
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 6: PATENT INTELLIGENCE & ANALYTICS */}
-          {(activeNav === 'intelligence' || activeNav === 'analytics') && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">Platform Patent Intelligence</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Aggregated AI novelty scores, Freedom-to-Operate risks, and statutory filing readiness.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="app-card p-6 space-y-4 shadow-xs">
-                  <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Average Patent Eligibility</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="text-3xl font-black text-emerald-600">{metrics?.intelligence?.patentEligibility ?? 0}%</div>
-                    <p className="text-xs text-slate-500 font-medium">Authoritative novelty index across all database projects.</p>
-                  </div>
-                </div>
-
-                <div className="app-card p-6 space-y-4 shadow-xs">
-                  <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Average Prior Art Risk</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="text-3xl font-black text-amber-600">{metrics?.intelligence?.priorArtRisk ?? 0}%</div>
-                    <p className="text-xs text-slate-500 font-medium">Computed across active public and statutory patent citations.</p>
-                  </div>
-                </div>
-
-                <div className="app-card p-6 space-y-4 shadow-xs">
-                  <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Filing Readiness Ratio</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="text-3xl font-black text-blue-600">{metrics?.intelligence?.filingReadiness ?? 0}%</div>
-                    <p className="text-xs text-slate-500 font-medium">{metrics?.kpis?.filingReadyProjects ?? 0} projects ready for immediate IPO submission.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 7: CLAIMS & FTO OVERSIGHT */}
-          {(activeNav === 'claims-oversight' || activeNav === 'fto-monitoring') && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">Claims & FTO Risk Oversight</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Platform-wide claim tree validations, Freedom-to-Operate overlaps, and infringement risk matrices.
-                  </p>
-                </div>
-              </div>
-
-              {/* FTO Risk Breakdown Meters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="app-card p-6 space-y-2 border-l-4 border-l-emerald-500 shadow-xs">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Clear / Low Risk</span>
-                  <div className="text-2xl font-black text-emerald-600">
-                    {claimsFtoData?.ftoMetrics?.riskDistribution?.lowRiskPercent ?? 100}%
-                  </div>
-                  <p className="text-xs text-slate-500">Zero active claim infringement overlaps.</p>
-                </div>
-
-                <div className="app-card p-6 space-y-2 border-l-4 border-l-amber-500 shadow-xs">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Moderate Overlap</span>
-                  <div className="text-2xl font-black text-amber-600">
-                    {claimsFtoData?.ftoMetrics?.riskDistribution?.mediumRiskPercent ?? 0}%
-                  </div>
-                  <p className="text-xs text-slate-500">Requires preamble claim narrowing.</p>
-                </div>
-
-                <div className="app-card p-6 space-y-2 border-l-4 border-l-rose-500 shadow-xs">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Critical Risk</span>
-                  <div className="text-2xl font-black text-rose-600">
-                    {claimsFtoData?.ftoMetrics?.riskDistribution?.highRiskPercent ?? 0}%
-                  </div>
-                  <p className="text-xs text-slate-500">Direct prior art overlap flagged.</p>
-                </div>
-              </div>
-
-              {/* Recent FTO Logs Table */}
-              <div className="app-card p-6 space-y-4 shadow-xs">
-                <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Recent FTO Analyses</h3>
-                {claimsFtoData?.recentFtoAnalyses && claimsFtoData.recentFtoAnalyses.length > 0 ? (
-                  <div className="divide-y divide-slate-100 text-xs">
-                    {claimsFtoData.recentFtoAnalyses.map((item: any) => (
-                      <div key={item.id} className="py-3 flex items-center justify-between">
-                        <div>
-                          <div className="font-bold text-slate-900">{item.projectTitle}</div>
-                          <div className="text-[10px] text-slate-400">Inventor: {item.inventor} • Overlaps: {item.overlappingPatents.join(', ')}</div>
-                        </div>
-                        <span className={`px-2.5 py-1 rounded text-[10px] font-extrabold ${
-                          item.riskLevel === 'LOW'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : item.riskLevel === 'MEDIUM'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                            : 'bg-rose-50 text-rose-700 border border-rose-200'
-                        }`}>
-                          {item.riskLevel} RISK ({item.score}%)
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 py-4 text-center">No FTO analyses recorded yet.</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 8: AI OPERATIONS */}
-          {activeNav === 'ai-operations' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">AI Operations & Gemini Monitoring</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Track token usage, request latencies, prompt generations, and operational health.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="app-card p-4 space-y-1 text-center shadow-3xs">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Claims Generated</span>
-                  <div className="text-xl font-black text-slate-900">
-                    {claimsFtoData?.claimsMetrics?.totalClaimsCreated ?? aiOperationsData?.summary?.claimGenerations ?? 0}
-                  </div>
-                </div>
-                <div className="app-card p-4 space-y-1 text-center shadow-3xs">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Patent Analyses</span>
-                  <div className="text-xl font-black text-blue-600">
-                    {aiOperationsData?.summary?.patentAnalyses ?? 0}
-                  </div>
-                </div>
-                <div className="app-card p-4 space-y-1 text-center shadow-3xs">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">FTO Analyses</span>
-                  <div className="text-xl font-black text-indigo-600">
-                    {claimsFtoData?.ftoMetrics?.totalFtoAnalyses ?? 0}
-                  </div>
-                </div>
-                <div className="app-card p-4 space-y-1 text-center shadow-3xs">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Success Rate</span>
-                  <div className="text-xl font-black text-emerald-600">
-                    {aiOperationsData?.summary?.successRate ?? 100}%
-                  </div>
-                </div>
-              </div>
-
-              {/* Usage by Organization */}
-              <div className="app-card p-6 space-y-4 shadow-xs">
-                <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">AI Usage by Organization</h3>
-                <div className="space-y-3">
-                  {aiOperationsData?.usageByOrg?.map((org: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between text-xs p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                      <span className="font-bold text-slate-800">{org.org}</span>
-                      <div className="flex items-center gap-4">
-                        <span className="font-mono text-slate-600">{org.requests} requests</span>
-                        <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-extrabold text-[10px]">{org.cost}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 9: REVIEWS OVERSIGHT */}
-          {activeNav === 'reviews' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">Review Governance Deck</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Monitor supervisor reviews, resolve bottlenecks, and track faculty turnaround times.
-                  </p>
-                </div>
-              </div>
-
-              <div className="app-card p-6 space-y-4 shadow-xs">
-                {reviewsData?.reviews && reviewsData.reviews.length > 0 ? (
-                  <div className="divide-y divide-slate-100 text-xs">
-                    {reviewsData.reviews.map((rev: any) => (
-                      <div key={rev.id} className="py-4 flex items-center justify-between gap-4">
-                        <div>
-                          <div className="font-extrabold text-slate-900 text-sm">{rev.projectTitle}</div>
-                          <div className="text-slate-500 mt-0.5">
-                            Reviewer: <strong>{rev.reviewer}</strong> ({rev.role}) • Task: {rev.type}
+              {/* Organizations Grid */}
+              {organizationsList.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {organizationsList.map((org, index) => (
+                    <div
+                      key={org.id || index}
+                      onClick={() => handleOpenOrgDetails(org)}
+                      className="p-6 bg-white border border-[#E5EBE8] rounded-3xl shadow-3xs space-y-4 flex flex-col justify-between hover:border-[#315C55] transition cursor-pointer group"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="w-10 h-10 rounded-2xl bg-[#DDEBE6] text-[#315C55] flex items-center justify-center font-black text-sm group-hover:scale-105 transition">
+                            <Building2 className="w-5 h-5" />
                           </div>
-                          <div className="text-[10px] text-slate-400 mt-1">Due Date: {rev.dueDate}</div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className={`px-2.5 py-1 rounded text-[10px] font-extrabold ${
-                            rev.status === 'COMPLETED' || rev.status === 'APPROVED'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}>
-                            {rev.status}
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800">
+                            {org.status}
                           </span>
-                          <button className="px-3 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg font-bold text-xs shadow-3xs cursor-pointer">
-                            Reassign
-                          </button>
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-black text-[#253330] truncate group-hover:text-[#315C55] transition">
+                            {org.name}
+                          </h3>
+                          <p className="text-xs text-[#71807C] font-mono">{org.domain}</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl">
-                    No milestone reviews currently recorded in the database.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* SECTION 10: ROLES & PERMISSIONS MATRIX */}
-          {activeNav === 'permissions' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">Roles & Permissions Matrix</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Platform capability matrix across Platform Admins, Organization Admins, Guides, Experts, and Inventors.
-                  </p>
-                </div>
-              </div>
-
-              <div className="app-card overflow-hidden shadow-xs border-slate-200">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      <tr>
-                        <th className="p-4">Platform Permission Capability</th>
-                        <th className="p-4 text-center">Inventor</th>
-                        <th className="p-4 text-center">Co-Inventor</th>
-                        <th className="p-4 text-center">Guide</th>
-                        <th className="p-4 text-center">Patent Expert</th>
-                        <th className="p-4 text-center">Org Admin</th>
-                        <th className="p-4 text-center">Platform Admin</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-semibold">
-                      {[
-                        { perm: 'Create New Patent Project', inv: true, coi: false, gde: false, exp: false, org: true, adm: true },
-                        { perm: 'Draft Claims & Add Dependent Claims', inv: true, coi: true, gde: true, exp: true, org: false, adm: true },
-                        { perm: 'Run Gemini AI Novelty & Prior Art', inv: true, coi: true, gde: true, exp: true, org: true, adm: true },
-                        { perm: 'Generate FTO Infringement Matrices', inv: true, coi: true, gde: true, exp: true, org: true, adm: true },
-                        { perm: 'Endorse & Approve Form 2 (Claims)', inv: false, coi: false, gde: true, exp: true, org: false, adm: true },
-                        { perm: 'Mark Project as Filing Ready', inv: false, coi: false, gde: false, exp: true, org: false, adm: true },
-                        { perm: 'Verify Guides & Patent Experts', inv: false, coi: false, gde: false, exp: false, org: false, adm: true },
-                        { perm: 'Manage Organization Members', inv: false, coi: false, gde: false, exp: false, org: true, adm: true },
-                        { perm: 'System Wide Audit Logs & Settings', inv: false, coi: false, gde: false, exp: false, org: false, adm: true },
-                      ].map((row, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50">
-                          <td className="p-4 font-bold text-slate-900">{row.perm}</td>
-                          <td className="p-4 text-center">{row.inv ? <Check className="w-4 h-4 text-emerald-600 mx-auto stroke-[3]" /> : <span className="text-slate-300">—</span>}</td>
-                          <td className="p-4 text-center">{row.coi ? <Check className="w-4 h-4 text-emerald-600 mx-auto stroke-[3]" /> : <span className="text-slate-300">—</span>}</td>
-                          <td className="p-4 text-center">{row.gde ? <Check className="w-4 h-4 text-emerald-600 mx-auto stroke-[3]" /> : <span className="text-slate-300">—</span>}</td>
-                          <td className="p-4 text-center">{row.exp ? <Check className="w-4 h-4 text-emerald-600 mx-auto stroke-[3]" /> : <span className="text-slate-300">—</span>}</td>
-                          <td className="p-4 text-center">{row.org ? <Check className="w-4 h-4 text-emerald-600 mx-auto stroke-[3]" /> : <span className="text-slate-300">—</span>}</td>
-                          <td className="p-4 text-center">{row.adm ? <Check className="w-4 h-4 text-emerald-600 mx-auto stroke-[3]" /> : <span className="text-slate-300">—</span>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 11: ANNOUNCEMENTS */}
-          {activeNav === 'announcements' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">System Announcements</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Broadcast critical updates, maintenance notices, and policy releases across the platform.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowCreateAnnModal(true)}
-                  className="px-4 py-2 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>New Announcement</span>
-                </button>
-              </div>
-
-              {announcementsList && announcementsList.length > 0 ? (
-                <div className="space-y-4">
-                  {announcementsList.map((ann) => (
-                    <div key={ann.id} className="app-card p-6 space-y-2 border-l-4 border-l-blue-600 shadow-xs">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-extrabold text-slate-900">{ann.title}</h3>
-                        <span className="text-[10px] text-slate-400 font-medium">{new Date(ann.createdAt).toLocaleDateString()}</span>
+                      <div className="grid grid-cols-3 gap-2 py-3 border-y border-[#E5EBE8] text-center text-xs">
+                        <div>
+                          <span className="text-[10px] text-[#71807C] block font-bold">Members</span>
+                          <span className="font-black text-[#253330] font-mono">{org.membersCount}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[#71807C] block font-bold">Projects</span>
+                          <span className="font-black text-[#253330] font-mono">{org.projectsCount}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[#71807C] block font-bold">Guides</span>
+                          <span className="font-black text-[#253330] font-mono">{org.guidesCount}</span>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-600 leading-relaxed font-medium">{ann.message}</p>
-                      <div className="flex items-center gap-3 pt-2 text-[10px] font-bold text-slate-400">
-                        <span>Target: {ann.targetRole}</span>
-                        <span>•</span>
-                        <span>By: {ann.createdBy}</span>
+
+                      <div className="flex items-center justify-between text-[11px] text-[#71807C]">
+                        <span className="truncate max-w-[180px]">Contact: {org.contactEmail}</span>
+                        <span className="text-xs font-bold text-[#315C55] group-hover:underline">
+                          Details →
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="p-8 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl">
-                  No active announcements broadcasted.
+                <div className="p-12 text-center bg-white rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                  <Building2 className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                  <h4 className="text-sm font-black text-[#253330]">No organizations registered yet.</h4>
+                  <p className="text-xs text-[#71807C] mt-1">
+                    Click the "Register Organization" button above to add your first institution.
+                  </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* SECTION 12: SYSTEM SETTINGS */}
-          {activeNav === 'settings' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* ==================================================== */}
+          {/* VIEW: PROJECTS MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'projects' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
                 <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight">System Configuration</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Manage platform registration policies, AI quotas, and security enforcement parameters.
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">Platform Projects Ecosystem</h1>
+                  <p className="text-xs text-[#71807C]">
+                    Monitor innovation stages, claim counts, filing readiness, and supervisor assignments
                   </p>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="relative w-48">
+                    <Search className="w-3.5 h-3.5 text-[#8A9B96] absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search projects..."
+                      value={projectSearchTerm}
+                      onChange={(e) => setProjectSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:outline-none"
+                    />
+                  </div>
+                  <select
+                    value={projectStageFilter}
+                    onChange={(e) => setProjectStageFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                  >
+                    <option value="ALL">All Stages</option>
+                    <option value="IDEA">Idea</option>
+                    <option value="LITERATURE_REVIEW">Search</option>
+                    <option value="DOCUMENTATION">Documentation</option>
+                    <option value="GUIDE_REVIEW">Guide Review</option>
+                    <option value="PATENT_EXPERT_REVIEW">Expert Review</option>
+                    <option value="FILING_READY">Filing Ready</option>
+                    <option value="FILED">Filed</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="app-card p-6 space-y-4 shadow-xs">
-                  <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b pb-2">
-                    Account & Registration Policy
-                  </h3>
-                  <div className="space-y-3 text-xs">
-                    <label className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-700">Open User Registration</span>
-                      <input type="checkbox" defaultChecked className="rounded text-blue-600" />
-                    </label>
-                    <label className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-700">Mandatory Institutional Email Verification</span>
-                      <input type="checkbox" defaultChecked className="rounded text-blue-600" />
-                    </label>
-                    <label className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-700">Strict Password Strength Rules</span>
-                      <input type="checkbox" defaultChecked className="rounded text-blue-600" />
-                    </label>
+              {/* Projects Table */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                {filteredProjects.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">Project</th>
+                          <th className="py-3 px-4">Lead Inventor</th>
+                          <th className="py-3 px-4">Organization</th>
+                          <th className="py-3 px-4">Stage</th>
+                          <th className="py-3 px-4">Filing Readiness</th>
+                          <th className="py-3 px-4">Guide</th>
+                          <th className="py-3 px-4">Expert</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {filteredProjects.map((p, index) => (
+                          <tr key={p.id} className="hover:bg-[#F7F9F8] transition">
+                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                              {index + 1}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-extrabold text-[#253330] block truncate max-w-[200px]">
+                                {p.title}
+                              </span>
+                              <span className="text-[10px] text-[#71807C]">{p.category || 'Invention'}</span>
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-[#5C6B67]">{p.inventor}</td>
+                            <td className="py-3.5 px-4 text-[#71807C] truncate max-w-[130px]">{p.organization}</td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
+                                {p.stage.replace('_', ' ')}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-1 w-24">
+                                <div className="flex justify-between text-[10px] font-mono font-bold">
+                                  <span>{p.readinessScore}%</span>
+                                </div>
+                                <div className="h-1.5 bg-[#F0F4F2] rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-emerald-500 rounded-full"
+                                    style={{ width: `${p.readinessScore}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{p.guide}</td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{p.expert}</td>
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedProject(p);
+                                    setShowAssignModal(true);
+                                  }}
+                                  className="px-2.5 py-1 bg-[#F0F4F2] hover:bg-[#DDEBE6] text-[#315C55] rounded-xl text-[11px] font-bold transition cursor-pointer"
+                                >
+                                  Assign
+                                </button>
+                                <button
+                                  onClick={() => navigate(`/dashboard/projects/${p.id}`)}
+                                  className="p-1.5 hover:bg-[#DDEBE6] text-[#315C55] rounded-lg transition cursor-pointer"
+                                  title="Open Workspace"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+                ) : (
+                  <div className="p-12 text-center">
+                    <FolderKanban className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-[#253330]">No Projects Found</h4>
+                    <p className="text-xs text-[#71807C] mt-1">No projects match your selected filters.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* VIEW: ROLES & PERMISSIONS MODULE (EDITABLE RBAC MATRIX) */}
+          {/* ==================================================== */}
+          {activeNav === 'roles' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                <div>
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">Roles & Permissions (RBAC)</h1>
+                  <p className="text-xs text-[#71807C]">
+                    View and customize granular permission capabilities across platform roles
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!isEditingPermissions ? (
+                    <button
+                      onClick={() => setIsEditingPermissions(true)}
+                      className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-2xl text-xs font-bold transition shadow-3xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit Permissions</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleCancelPermissionEdits}
+                        className="px-3.5 py-2 bg-[#F0F4F2] hover:bg-[#E5EBE8] text-[#5C6B67] rounded-2xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Cancel</span>
+                      </button>
+                      <button
+                        onClick={() => setShowConfirmSavePermissions(true)}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition shadow-3xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Save Changes</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Roles Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {rolesStats.map((r) => {
+                  const permsCount = (pendingPermissionChanges[r.name] || rolePermissions[r.name] || []).length;
+                  return (
+                    <div key={r.name} className="p-6 bg-white border border-[#E5EBE8] rounded-3xl shadow-3xs space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-black text-[#253330]">{r.displayName}</h3>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
+                          {r.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#71807C] leading-relaxed">{r.description}</p>
+                      <div className="flex items-center justify-between text-xs pt-2 border-t border-[#E5EBE8]">
+                        <span className="font-bold text-[#5C6B67]">{r.usersCount} Active Users</span>
+                        <span className="font-mono font-extrabold text-[#315C55]">{permsCount} Permissions</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Comprehensive Policy Matrix Table */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl p-6 shadow-3xs space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                      RBAC Permission Matrix
+                    </h3>
+                    <p className="text-[11px] text-[#71807C]">
+                      {isEditingPermissions
+                        ? 'Click checkboxes to grant or revoke specific role permissions, then click Save Changes.'
+                        : 'Granular capabilities mapped to backend Express policy guards.'}
+                    </p>
+                  </div>
+                  {isEditingPermissions && (
+                    <span className="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-full text-[11px] font-bold animate-pulse">
+                      ⚡ Editing Mode Active
+                    </span>
+                  )}
                 </div>
 
-                <div className="app-card p-6 space-y-4 shadow-xs">
-                  <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b pb-2">
-                    AI Model & Security Policy
-                  </h3>
-                  <div className="space-y-3 text-xs">
-                    <div className="space-y-1">
-                      <span className="font-semibold text-slate-700 block">Active LLM Provider</span>
-                      <select
-                        value={systemSettings?.aiProvider || 'Google Gemini Pro'}
-                        onChange={(e) => setSystemSettings({ ...systemSettings, aiProvider: e.target.value })}
-                        className="w-full p-2 bg-slate-50 border rounded-xl text-xs font-bold"
-                      >
-                        <option value="Google Gemini Pro">Google Gemini 1.5 Pro</option>
-                        <option value="Anthropic Claude 3.5">Anthropic Claude 3.5 Sonnet</option>
-                        <option value="OpenAI GPT-4o">OpenAI GPT-4o</option>
-                      </select>
-                    </div>
-                    <label className="flex items-center justify-between pt-2">
-                      <span className="font-semibold text-slate-700">Mandatory FTO Claim Charting Before Filing</span>
-                      <input type="checkbox" defaultChecked className="rounded text-blue-600" />
-                    </label>
-                  </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4">Permission</th>
+                        {ROLES_LIST.map((r) => (
+                          <th key={r.key} className="py-3 px-4 text-center">
+                            {r.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E5EBE8]">
+                      {Object.keys(permissionsByCategory).map((categoryKey) => (
+                        <React.Fragment key={categoryKey}>
+                          <tr className="bg-[#F7F9F8]">
+                            <td
+                              colSpan={ROLES_LIST.length + 1}
+                              className="py-2 px-4 font-black text-[10px] uppercase tracking-wider text-[#315C55]"
+                            >
+                              📂 {categoryKey.replace('_', ' ')} PERMISSIONS
+                            </td>
+                          </tr>
+                          {permissionsByCategory[categoryKey].map((perm) => (
+                            <tr key={perm.id} className="hover:bg-[#F7F9F8]/60 transition">
+                              <td className="py-2.5 px-4">
+                                <span className="font-bold text-[#253330] block">{perm.name}</span>
+                                <span className="text-[10px] text-[#71807C]">{perm.description}</span>
+                              </td>
+                              {ROLES_LIST.map((r) => {
+                                const currentPerms = isEditingPermissions
+                                  ? pendingPermissionChanges[r.key] || []
+                                  : rolePermissions[r.key] || [];
+                                const hasPerm = currentPerms.includes(perm.id);
+
+                                return (
+                                  <td key={r.key} className="py-2.5 px-4 text-center">
+                                    {isEditingPermissions ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={hasPerm}
+                                        onChange={() => handleToggleRolePermission(r.key, perm.id)}
+                                        className="w-4 h-4 rounded text-[#315C55] focus:ring-[#315C55] cursor-pointer"
+                                      />
+                                    ) : hasPerm ? (
+                                      <Check className="w-4 h-4 text-emerald-600 mx-auto" />
+                                    ) : (
+                                      <X className="w-3.5 h-3.5 text-slate-300 mx-auto" />
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
           )}
 
-          {/* FALLBACK FOR DOCUMENTS, AUDIT LOGS, REPORTS */}
-          {(activeNav === 'documents' || activeNav === 'reports' || activeNav === 'audit-logs') && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* ==================================================== */}
+          {/* VIEW: VERIFICATION REQUESTS MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'verifications' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
                 <div>
-                  <h1 className="text-2xl font-black text-slate-950 tracking-tight capitalize">{activeNav.replace('-', ' ')} Hub</h1>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Governance and export utilities for platform assets.
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">
+                    Verification Requests Trust Layer
+                  </h1>
+                  <p className="text-xs text-[#71807C]">
+                    Review and verify credentials for Guide and Patent Expert applicants
                   </p>
                 </div>
               </div>
 
-              <div className="app-card p-8 text-center space-y-3 shadow-xs">
-                <FileSpreadsheet className="w-12 h-12 text-blue-600 mx-auto" />
-                <h3 className="text-sm font-extrabold text-slate-900">Platform Data Ready for Export</h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Download full structured audit trails, filing checklists, and performance records in PDF or CSV.
-                </p>
-                <button
-                  onClick={() => toast.success('Report generation started. File will download shortly.')}
-                  className="px-5 py-2.5 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer inline-flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Download Comprehensive Export (.PDF)</span>
-                </button>
+              {/* Verification Applications Table */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                {verificationsList.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">Applicant</th>
+                          <th className="py-3 px-4">Role Requested</th>
+                          <th className="py-3 px-4">Organization</th>
+                          <th className="py-3 px-4">Specialization</th>
+                          <th className="py-3 px-4">Official Email</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Submitted</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {verificationsList.map((app, index) => (
+                          <tr key={app.id} className="hover:bg-[#F7F9F8] transition">
+                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                              {index + 1}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-[#253330]">{app.applicantName}</td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
+                                {app.roleApplied}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{app.organization}</td>
+                            <td className="py-3.5 px-4 text-[#71807C]">{app.specialization}</td>
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-[#5C6B67]">{app.email}</td>
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                  app.status === 'VERIFIED'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : app.status === 'PENDING'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {app.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                              {new Date(app.submittedAt).toLocaleDateString()}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => setSelectedVerification(app)}
+                                  className="px-2.5 py-1 bg-[#F0F4F2] hover:bg-[#DDEBE6] text-[#315C55] rounded-xl text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                                  title="Review Application"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Review</span>
+                                </button>
+                                {app.status === 'PENDING' && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedVerification(app);
+                                        handleProcessVerification('APPROVE');
+                                      }}
+                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition shadow-3xs cursor-pointer"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedVerification(app);
+                                        setVerificationDecisionModal(true);
+                                      }}
+                                      className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[11px] font-bold transition shadow-3xs cursor-pointer"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center">
+                    <UserCheck className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-[#253330]">No Verification Requests</h4>
+                    <p className="text-xs text-[#71807C] mt-1">
+                      There are no pending applications requiring verification.
+                    </p>
+                  </div>
+                )}
               </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* VIEW: REVIEWS / MODERATION MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'reviews' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                <div>
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">
+                    Reviews & Supervisor Moderation
+                  </h1>
+                  <p className="text-xs text-[#71807C]">
+                    Oversight of Guide and Patent Expert formal evaluations and stage advancement
+                  </p>
+                </div>
+                <select
+                  value={reviewFilter}
+                  onChange={(e) => setReviewFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                >
+                  <option value="ALL">All Review Statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+              </div>
+
+              {/* Reviews Table */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                {(reviewsData?.reviews || []).length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">Project Title</th>
+                          <th className="py-3 px-4">Inventor</th>
+                          <th className="py-3 px-4">Supervisor</th>
+                          <th className="py-3 px-4">Review Type</th>
+                          <th className="py-3 px-4">Decision</th>
+                          <th className="py-3 px-4">Date</th>
+                          <th className="py-3 px-4 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {(reviewsData?.reviews || []).map((rev: any, index: number) => (
+                          <tr key={rev.id || index} className="hover:bg-[#F7F9F8] transition">
+                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                              {index + 1}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-[#253330]">{rev.projectTitle}</td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{rev.inventor}</td>
+                            <td className="py-3.5 px-4 text-[#315C55] font-bold">{rev.reviewer}</td>
+                            <td className="py-3.5 px-4 text-[#71807C]">{rev.type}</td>
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                  rev.status === 'APPROVED'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : rev.status === 'PENDING'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {rev.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-[11px] text-[#71807C]">{rev.dueDate}</td>
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                onClick={() => setSelectedReviewDetails(rev)}
+                                className="p-1.5 hover:bg-[#DDEBE6] text-[#315C55] rounded-lg transition cursor-pointer"
+                                title="View Details"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center">
+                    <Scale className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-[#253330]">No Reviews Recorded</h4>
+                    <p className="text-xs text-[#71807C] mt-1">
+                      No project reviews have been logged in the system yet.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* VIEW: NOTIFICATIONS MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'notifications' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                <div>
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">
+                    Platform Notifications & Broadcasts
+                  </h1>
+                  <p className="text-xs text-[#71807C]">
+                    Dispatch platform alerts, system maintenance bulletins, and track notifications
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <select
+                    value={notifFilter}
+                    onChange={(e) => setNotifFilter(e.target.value as any)}
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="UNREAD">Unread</option>
+                    <option value="READ">Read</option>
+                  </select>
+                  <select
+                    value={notifTypeFilter}
+                    onChange={(e) => setNotifTypeFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                  >
+                    <option value="ALL">All Types</option>
+                    <option value="SYSTEM">System</option>
+                    <option value="GENERAL">General</option>
+                    <option value="WORKFLOW">Workflow</option>
+                  </select>
+                  <button
+                    onClick={() => setShowBroadcastModal(true)}
+                    className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-2xl text-xs font-bold transition shadow-3xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>New Broadcast</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Notifications Table */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                {filteredNotifications.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">Title</th>
+                          <th className="py-3 px-4">Recipient</th>
+                          <th className="py-3 px-4">Type</th>
+                          <th className="py-3 px-4">Message</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {filteredNotifications.map((notif, index) => (
+                          <tr key={notif.id} className="hover:bg-[#F7F9F8] transition">
+                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                              {index + 1}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-[#253330]">{notif.title}</td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{notif.recipient}</td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
+                                {notif.type}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-[#71807C] truncate max-w-xs">{notif.message}</td>
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                  notif.isRead ? 'bg-slate-100 text-slate-700' : 'bg-emerald-100 text-emerald-800'
+                                }`}
+                              >
+                                {notif.isRead ? 'Read' : 'Unread'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                              {new Date(notif.createdAt).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center">
+                    <Bell className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-[#253330]">No Notifications</h4>
+                    <p className="text-xs text-[#71807C] mt-1">No platform notifications to display.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* VIEW: ACTIVITY LOGS MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'activity' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                <div>
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">Platform Audit Trail</h1>
+                  <p className="text-xs text-[#71807C]">
+                    Complete chronological ledger of user actions, project mutations, and security events
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="relative w-48">
+                    <Search className="w-3.5 h-3.5 text-[#8A9B96] absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search activity..."
+                      value={activitySearchTerm}
+                      onChange={(e) => setActivitySearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:outline-none"
+                    />
+                  </div>
+                  <select
+                    value={activityTypeFilter}
+                    onChange={(e) => setActivityTypeFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                  >
+                    <option value="ALL">All Event Types</option>
+                    <option value="SYSTEM">System</option>
+                    <option value="AUTH">Auth</option>
+                    <option value="PROJECT">Project</option>
+                    <option value="CLAIM">Claim</option>
+                    <option value="DOCUMENT">Document</option>
+                    <option value="REVIEW">Review</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Activity Table */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                {activityLogsData.logs.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">Actor</th>
+                          <th className="py-3 px-4">Role</th>
+                          <th className="py-3 px-4">Event / Action</th>
+                          <th className="py-3 px-4">Target Resource</th>
+                          <th className="py-3 px-4">Type</th>
+                          <th className="py-3 px-4">Timestamp</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {activityLogsData.logs.map((log, index) => (
+                          <tr key={log.id} className="hover:bg-[#F7F9F8] transition">
+                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                              {(activityPage - 1) * 25 + index + 1}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-[#253330]">{log.user}</td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
+                                {log.userRole}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-extrabold text-[#253330]">{log.action}</td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{log.resource}</td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-slate-100 text-slate-700">
+                                {log.type}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-[#71807C]">
+                              {new Date(log.createdAt).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center">
+                    <Activity className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-[#253330]">No Activity Logs</h4>
+                    <p className="text-xs text-[#71807C] mt-1">No activity events match your query.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* VIEW: SETTINGS MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'settings' && systemSettings && (
+            <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+              <div className="bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                <h1 className="text-xl font-black text-[#253330] tracking-tight">Platform System Settings</h1>
+                <p className="text-xs text-[#71807C]">
+                  Configure global authentication policies, AI provider selection, and statutory clearance rules
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="space-y-6">
+                <div className="bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                    Authentication & Security Controls
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="flex items-center gap-3 p-3 bg-[#F7F9F8] rounded-2xl cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={systemSettings.registrationEnabled}
+                        onChange={(e) =>
+                          setSystemSettings({ ...systemSettings, registrationEnabled: e.target.checked })
+                        }
+                        className="w-4 h-4 rounded text-[#315C55]"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-[#253330] block">Public Registration</span>
+                        <span className="text-[10px] text-[#71807C]">Allow new inventors to register</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 bg-[#F7F9F8] rounded-2xl cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={systemSettings.emailVerificationRequired}
+                        onChange={(e) =>
+                          setSystemSettings({ ...systemSettings, emailVerificationRequired: e.target.checked })
+                        }
+                        className="w-4 h-4 rounded text-[#315C55]"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-[#253330] block">Mandatory OTP Verification</span>
+                        <span className="text-[10px] text-[#71807C]">Require email code before activation</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 bg-[#F7F9F8] rounded-2xl cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={systemSettings.strictFtoEnforcement}
+                        onChange={(e) =>
+                          setSystemSettings({ ...systemSettings, strictFtoEnforcement: e.target.checked })
+                        }
+                        className="w-4 h-4 rounded text-[#315C55]"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-[#253330] block">FTO Risk Gate</span>
+                        <span className="text-[10px] text-[#71807C]">Flag HIGH prior-art overlap</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 bg-[#F7F9F8] rounded-2xl cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={systemSettings.mandatoryForm2Precheck}
+                        onChange={(e) =>
+                          setSystemSettings({ ...systemSettings, mandatoryForm2Precheck: e.target.checked })
+                        }
+                        className="w-4 h-4 rounded text-[#315C55]"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-[#253330] block">Form 2 Pre-Filing Clearance</span>
+                        <span className="text-[10px] text-[#71807C]">Validate antecedent basis tree</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-[#315C55] hover:bg-[#254640] text-white rounded-2xl text-xs font-bold transition shadow-3xs cursor-pointer"
+                  >
+                    Save System Settings
+                  </button>
+                </div>
+              </form>
             </div>
           )}
         </main>
       </div>
 
-      {/* 3. VERIFICATION DECISION MODAL */}
-      {verificationDecisionModal && selectedVerification && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in font-sans">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-scale-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Verification Decision</h3>
-                <p className="text-[10px] text-slate-400 font-medium">{selectedVerification.applicantName} ({selectedVerification.roleApplied})</p>
-              </div>
-              <button onClick={() => setVerificationDecisionModal(false)} className="p-1 text-slate-400 hover:text-slate-700">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <p><strong>Organization:</strong> {selectedVerification.organization}</p>
-                <p><strong>Qualifications:</strong> {selectedVerification.qualification}</p>
-                <p><strong>Experience:</strong> {selectedVerification.experienceYears} Years</p>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Decision Notes / Reason</label>
-                <textarea
-                  rows={3}
-                  value={decisionNotes}
-                  onChange={(e) => setDecisionNotes(e.target.value)}
-                  placeholder="Enter endorsement notes or reason for revision request..."
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-medium"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
-              <button
-                onClick={() => handleProcessVerification('APPROVE')}
-                className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition cursor-pointer"
-              >
-                Approve ✓
-              </button>
-              <button
-                onClick={() => handleProcessVerification('REQUEST_INFO')}
-                className="py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs transition cursor-pointer"
-              >
-                Request Info
-              </button>
-              <button
-                onClick={() => handleProcessVerification('REJECT')}
-                className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs transition cursor-pointer"
-              >
-                Reject ✗
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. CREATE ORGANIZATION MODAL */}
-      {showCreateOrgModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in font-sans">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-scale-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-extrabold text-slate-900">Register Organization</h3>
-              <button onClick={() => setShowCreateOrgModal(false)} className="p-1 text-slate-400 hover:text-slate-700">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateOrg} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Organization Name</label>
-                <input
-                  type="text"
-                  required
-                  value={newOrgData.name}
-                  onChange={(e) => setNewOrgData({ ...newOrgData, name: e.target.value })}
-                  placeholder="e.g. National Institute of Technology"
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Email Domain</label>
-                <input
-                  type="text"
-                  required
-                  value={newOrgData.domain}
-                  onChange={(e) => setNewOrgData({ ...newOrgData, domain: e.target.value })}
-                  placeholder="e.g. nitc.ac.in"
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Contact Email</label>
-                <input
-                  type="email"
-                  required
-                  value={newOrgData.contactEmail}
-                  onChange={(e) => setNewOrgData({ ...newOrgData, contactEmail: e.target.value })}
-                  placeholder="e.g. ipr.cell@nitc.ac.in"
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateOrgModal(false)}
-                  className="w-1/3 py-2.5 bg-slate-100 rounded-xl font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="w-2/3 py-2.5 bg-blue-900 text-white rounded-xl font-bold"
-                >
-                  Register Organization
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 5. ASSIGN REVIEWER MODAL */}
-      {showAssignModal && selectedProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in font-sans">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-scale-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Assign Staff / Reviewer</h3>
-                <p className="text-[10px] text-slate-400 font-medium truncate">{selectedProject.title}</p>
-              </div>
-              <button onClick={() => setShowAssignModal(false)} className="p-1 text-slate-400 hover:text-slate-700">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAssignReviewer} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Staff Username or Email</label>
-                <input
-                  type="text"
-                  required
-                  value={assignReviewerData.username}
-                  onChange={(e) => setAssignReviewerData({ ...assignReviewerData, username: e.target.value })}
-                  placeholder="e.g. @meera_nair or meera@amaljyothi.ac.in"
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Designated Role</label>
-                <select
-                  value={assignReviewerData.role}
-                  onChange={(e) => setAssignReviewerData({ ...assignReviewerData, role: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold"
-                >
-                  <option value="GUIDE">Faculty Guide (Supervision & Comments)</option>
-                  <option value="PATENT_EXPERT">Patent Expert (Legal & FTO Evaluation)</option>
-                </select>
-              </div>
-
-              <div className="flex gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowAssignModal(false)}
-                  className="w-1/3 py-2.5 bg-slate-100 rounded-xl font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="w-2/3 py-2.5 bg-blue-900 text-white rounded-xl font-bold"
-                >
-                  Assign to Project
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 6. CREATE ANNOUNCEMENT MODAL */}
-      {showCreateAnnModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in font-sans">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-scale-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-extrabold text-slate-900">Broadcast Announcement</h3>
-              <button onClick={() => setShowCreateAnnModal(false)} className="p-1 text-slate-400 hover:text-slate-700">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateAnnouncement} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Announcement Title</label>
-                <input
-                  type="text"
-                  required
-                  value={newAnnData.title}
-                  onChange={(e) => setNewAnnData({ ...newAnnData, title: e.target.value })}
-                  placeholder="e.g. System Maintenance or New Policy"
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Target Audience</label>
-                <select
-                  value={newAnnData.targetRole}
-                  onChange={(e) => setNewAnnData({ ...newAnnData, targetRole: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold"
-                >
-                  <option value="ALL">All Platform Users</option>
-                  <option value="INVENTOR">Inventors Only</option>
-                  <option value="GUIDE">Faculty Guides Only</option>
-                  <option value="PATENT_EXPERT">Patent Experts Only</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Broadcast Message</label>
-                <textarea
-                  rows={4}
-                  required
-                  value={newAnnData.message}
-                  onChange={(e) => setNewAnnData({ ...newAnnData, message: e.target.value })}
-                  placeholder="Enter detailed broadcast notice..."
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-medium"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateAnnModal(false)}
-                  className="w-1/3 py-2.5 bg-slate-100 rounded-xl font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="w-2/3 py-2.5 bg-blue-900 text-white rounded-xl font-bold"
-                >
-                  Publish Announcement
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 7. EDIT USER DRAWER / MODAL */}
+      {/* ==================================================== */}
+      {/* DRAWER / MODAL: COMPLETE USER PROFILE VIEW */}
+      {/* ==================================================== */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in font-sans">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-scale-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Manage User Account</h3>
-                <p className="text-[10px] text-slate-400 font-medium">@{selectedUser.username} • {selectedUser.email}</p>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-[#E5EBE8] flex items-center justify-between bg-[#FAFBFB] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#315C55] text-white font-black flex items-center justify-center text-sm shadow-3xs">
+                  {selectedUser.fullName[0]}
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#253330]">{selectedUser.fullName}</h3>
+                  <p className="text-xs text-[#71807C] font-mono">
+                    @{selectedUser.username} • {selectedUser.email}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setSelectedUser(null)} className="p-1 text-slate-400 hover:text-slate-700">
+              <button
+                onClick={() => {
+                  setSelectedUser(null);
+                  setSelectedUserProfile(null);
+                }}
+                className="p-1.5 hover:bg-[#F0F4F2] rounded-xl text-[#71807C] transition cursor-pointer"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <p><strong>Name:</strong> {selectedUser.fullName}</p>
-                <p><strong>Institution:</strong> {selectedUser.institution}</p>
-                <p><strong>Total Projects:</strong> {selectedUser.projectsCount}</p>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Change User Role</label>
-                <select
-                  value={selectedUser.role}
-                  onChange={(e) => handleUpdateUserRole(selectedUser.id, e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold"
-                >
-                  <option value="Inventor">Inventor</option>
-                  <option value="CoInventor">Co-Inventor</option>
-                  <option value="Guide">Faculty Guide</option>
-                  <option value="PatentExpert">Patent Expert</option>
-                  <option value="Admin">Administrator</option>
-                </select>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex justify-between">
+            {/* Profile Navigation Tabs */}
+            <div className="flex border-b border-[#E5EBE8] bg-[#FAFBFB] px-6 gap-2 shrink-0 overflow-x-auto text-xs font-bold">
+              {[
+                { key: 'PERSONAL', label: 'Personal Details' },
+                { key: 'ROLE', label: 'Role & Access' },
+                { key: 'PROFESSIONAL', label: 'Professional' },
+                { key: 'PROJECTS', label: 'Projects' },
+                { key: 'ACTIVITY', label: 'Activity' },
+                { key: 'SECURITY', label: 'Security' },
+              ].map((tab) => (
                 <button
-                  onClick={() => handleToggleUserStatus(selectedUser.id, selectedUser.isActive)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-                    selectedUser.isActive ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  key={tab.key}
+                  onClick={() => setUserProfileTab(tab.key as any)}
+                  className={`py-3 px-3 border-b-2 transition cursor-pointer shrink-0 ${
+                    userProfileTab === tab.key
+                      ? 'border-[#315C55] text-[#315C55] font-black'
+                      : 'border-transparent text-[#71807C] hover:text-[#253330]'
                   }`}
                 >
-                  {selectedUser.isActive ? 'Suspend Account' : 'Activate Account'}
+                  {tab.label}
                 </button>
-                <button
-                  onClick={() => setSelectedUser(null)}
-                  className="px-5 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
-                >
-                  Done
-                </button>
-              </div>
+              ))}
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {selectedUserProfileLoading ? (
+                <div className="p-12 text-center">
+                  <Loader2 className="w-8 h-8 text-[#315C55] animate-spin mx-auto mb-2" />
+                  <p className="text-xs font-bold text-[#71807C]">Loading complete user profile...</p>
+                </div>
+              ) : selectedUserProfile ? (
+                <>
+                  {/* TAB 1: PERSONAL DETAILS */}
+                  {userProfileTab === 'PERSONAL' && (
+                    <div className="space-y-3 text-xs">
+                      <div className="grid grid-cols-2 gap-4 p-4 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8]">
+                        <div>
+                          <span className="text-[10px] text-[#71807C] font-bold block uppercase">Full Name</span>
+                          <span className="font-extrabold text-[#253330] text-sm">
+                            {selectedUserProfile.personalDetails.fullName}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[#71807C] font-bold block uppercase">Username</span>
+                          <span className="font-mono text-[#253330]">
+                            @{selectedUserProfile.personalDetails.username}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[#71807C] font-bold block uppercase">Email Address</span>
+                          <span className="font-mono text-[#5C6B67]">
+                            {selectedUserProfile.personalDetails.email}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[#71807C] font-bold block uppercase">Phone Number</span>
+                          <span className="font-mono text-[#5C6B67]">
+                            {selectedUserProfile.personalDetails.phone}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[#71807C] font-bold block uppercase">Account Status</span>
+                          <span
+                            className={`font-black uppercase ${
+                              selectedUserProfile.personalDetails.isActive ? 'text-emerald-700' : 'text-rose-700'
+                            }`}
+                          >
+                            {selectedUserProfile.personalDetails.isActive ? 'Active' : 'Suspended'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[#71807C] font-bold block uppercase">Account Created</span>
+                          <span className="text-[#5C6B67]">
+                            {new Date(selectedUserProfile.personalDetails.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: ROLE & ACCESS */}
+                  {userProfileTab === 'ROLE' && (
+                    <div className="space-y-4 text-xs">
+                      <div className="p-4 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] text-[#71807C] font-bold block uppercase">
+                              Current Role
+                            </span>
+                            <span className="px-3 py-1 bg-[#315C55] text-white rounded-full text-xs font-black uppercase inline-block mt-1">
+                              {selectedUserProfile.roleAndAccess.roleName}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={editingUserRole}
+                              onChange={(e) => setEditingUserRole(e.target.value)}
+                              className="px-3 py-1.5 bg-white border border-[#E5EBE8] rounded-xl text-xs font-bold"
+                            >
+                              <option value="Inventor">Inventor</option>
+                              <option value="CoInventor">Co-Inventor</option>
+                              <option value="Guide">Guide</option>
+                              <option value="PatentExpert">Patent Expert</option>
+                              <option value="OrgAdmin">Org Admin</option>
+                              <option value="Admin">Admin</option>
+                            </select>
+                            <button
+                              onClick={() => handleUpdateUserRole(selectedUser.id, editingUserRole)}
+                              className="px-3 py-1.5 bg-[#315C55] text-white rounded-xl text-xs font-bold cursor-pointer"
+                            >
+                              Reassign
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] text-[#71807C] font-bold block uppercase">
+                            Primary Organization
+                          </span>
+                          <span className="font-bold text-[#253330]">
+                            {selectedUserProfile.roleAndAccess.institution}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] text-[#71807C] font-bold block uppercase mb-1.5">
+                            Granted Permissions ({selectedUserProfile.roleAndAccess.permissions.length})
+                          </span>
+                          <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                            {selectedUserProfile.roleAndAccess.permissions.map((permId: string) => (
+                              <span
+                                key={permId}
+                                className="px-2 py-0.5 bg-white border border-[#E5EBE8] text-[#315C55] font-mono text-[10px] rounded-md"
+                              >
+                                {permId}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 3: PROFESSIONAL DETAILS */}
+                  {userProfileTab === 'PROFESSIONAL' && (
+                    <div className="space-y-3 text-xs">
+                      <div className="p-4 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8] space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-[10px] text-[#71807C] font-bold block uppercase">
+                              Designation
+                            </span>
+                            <span className="font-bold text-[#253330]">
+                              {selectedUserProfile.professionalDetails.designation}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-[#71807C] font-bold block uppercase">Department</span>
+                            <span className="font-bold text-[#253330]">
+                              {selectedUserProfile.professionalDetails.department}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-[#71807C] font-bold block uppercase">
+                              Institution
+                            </span>
+                            <span className="font-bold text-[#253330]">
+                              {selectedUserProfile.professionalDetails.institution}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-[#71807C] font-bold block uppercase">
+                              Research Domain
+                            </span>
+                            <span className="font-bold text-[#315C55]">
+                              {selectedUserProfile.professionalDetails.researchDomain}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-[#E5EBE8]">
+                          <span className="text-[10px] text-[#71807C] font-bold block uppercase mb-1">
+                            Biography & Abstract
+                          </span>
+                          <p className="text-xs text-[#5C6B67] leading-relaxed italic bg-white p-3 rounded-xl border border-[#E5EBE8]">
+                            "{selectedUserProfile.professionalDetails.bio}"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 4: PROJECTS */}
+                  {userProfileTab === 'PROJECTS' && (
+                    <div className="space-y-4 text-xs">
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-[#253330] mb-2">
+                          Owned Projects ({selectedUserProfile.projects.owned.length})
+                        </h4>
+                        {selectedUserProfile.projects.owned.length > 0 ? (
+                          <div className="space-y-2">
+                            {selectedUserProfile.projects.owned.map((p: any) => (
+                              <div
+                                key={p.id}
+                                className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] flex items-center justify-between"
+                              >
+                                <div>
+                                  <span className="font-bold text-[#253330] block">{p.title}</span>
+                                  <span className="text-[10px] text-[#71807C]">
+                                    Stage: {p.stage} • Claims: {p.claimsCount} • Documents: {p.documentsCount}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => navigate(`/dashboard/projects/${p.id}`)}
+                                  className="px-2.5 py-1 bg-white hover:bg-[#DDEBE6] text-[#315C55] rounded-lg font-bold border border-[#E5EBE8] cursor-pointer"
+                                >
+                                  Open
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-[#71807C]">No owned projects created by this user.</p>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-[#E5EBE8]">
+                        <h4 className="text-xs font-black uppercase text-[#253330] mb-2">
+                          Joined / Collaborated Projects ({selectedUserProfile.projects.joined.length})
+                        </h4>
+                        {selectedUserProfile.projects.joined.length > 0 ? (
+                          <div className="space-y-2">
+                            {selectedUserProfile.projects.joined.map((p: any) => (
+                              <div
+                                key={p.id}
+                                className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] flex items-center justify-between"
+                              >
+                                <div>
+                                  <span className="font-bold text-[#253330] block">{p.title}</span>
+                                  <span className="text-[10px] text-[#71807C]">
+                                    Role in Project: <strong className="text-[#315C55]">{p.projectRole}</strong> • Owner: {p.ownerName}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => navigate(`/dashboard/projects/${p.id}`)}
+                                  className="px-2.5 py-1 bg-white hover:bg-[#DDEBE6] text-[#315C55] rounded-lg font-bold border border-[#E5EBE8] cursor-pointer"
+                                >
+                                  Open
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-[#71807C]">No collaborative project memberships.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 5: ACTIVITY */}
+                  {userProfileTab === 'ACTIVITY' && (
+                    <div className="space-y-2 text-xs">
+                      {selectedUserProfile.activityHistory.length > 0 ? (
+                        selectedUserProfile.activityHistory.map((act: any) => (
+                          <div
+                            key={act.id}
+                            className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] flex items-center justify-between"
+                          >
+                            <div>
+                              <p className="font-bold text-[#253330]">{act.action}</p>
+                              <p className="text-[10px] text-[#71807C]">
+                                Type: {act.type} • Target: {act.target}
+                              </p>
+                            </div>
+                            <span className="text-[10px] font-mono text-[#71807C]">
+                              {new Date(act.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-[#71807C] p-4 text-center">No recent activity logs for this user.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 6: SECURITY */}
+                  {userProfileTab === 'SECURITY' && (
+                    <div className="space-y-4 text-xs">
+                      <div className="p-4 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8] space-y-3">
+                        <div className="flex justify-between items-center py-1">
+                          <span className="font-bold text-[#253330]">Account Status</span>
+                          <button
+                            onClick={() =>
+                              handleToggleUserStatus(selectedUser.id, selectedUserProfile.personalDetails.isActive)
+                            }
+                            className={`px-3 py-1 rounded-xl text-xs font-bold text-white transition cursor-pointer ${
+                              selectedUserProfile.personalDetails.isActive
+                                ? 'bg-amber-600 hover:bg-amber-700'
+                                : 'bg-emerald-600 hover:bg-emerald-700'
+                            }`}
+                          >
+                            {selectedUserProfile.personalDetails.isActive ? 'Suspend Account' : 'Activate Account'}
+                          </button>
+                        </div>
+                        <div className="flex justify-between items-center py-1 border-t border-[#E5EBE8]">
+                          <span className="font-bold text-[#253330]">Verification Status</span>
+                          <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-black text-[10px]">
+                            {selectedUserProfile.security.verificationStatus}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-t border-[#E5EBE8]">
+                          <div>
+                            <span className="font-bold text-rose-700 block">Delete Account Permanently</span>
+                            <span className="text-[10px] text-[#71807C]">
+                              Purge user account and all owned assets from database
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setUserToDelete(selectedUser);
+                            }}
+                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                          >
+                            Delete User
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-[#E5EBE8] bg-[#FAFBFB] flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedUser(null);
+                  setSelectedUserProfile(null);
+                }}
+                className="px-4 py-2 bg-[#315C55] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 8. DELETE USER CONFIRMATION MODAL */}
-      {userToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in font-sans">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-scale-in">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-              <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 shrink-0">
-                <Trash2 className="w-5 h-5" />
+      {/* ==================================================== */}
+      {/* DRAWER / MODAL: ORGANIZATION DETAILS */}
+      {/* ==================================================== */}
+      {selectedOrgDetails && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-[#E5EBE8] flex items-center justify-between bg-[#FAFBFB] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#315C55] text-white font-black flex items-center justify-center text-sm shadow-3xs">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#253330]">{selectedOrgDetails.overview.name}</h3>
+                  <p className="text-xs text-[#71807C] font-mono">
+                    {selectedOrgDetails.overview.domain} • Contact: {selectedOrgDetails.overview.contactEmail}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Delete User Account</h3>
-                <p className="text-[11px] text-slate-500">This action will permanently delete the record from the database</p>
-              </div>
+              <button
+                onClick={() => setSelectedOrgDetails(null)}
+                className="p-1.5 hover:bg-[#F0F4F2] rounded-xl text-[#71807C] transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <div className="p-3.5 bg-red-50/60 border border-red-100 rounded-2xl space-y-1.5 text-xs text-red-900">
-              <p className="font-bold">Are you sure you want to permanently delete this user?</p>
-              <p><strong>Name:</strong> {userToDelete.fullName}</p>
-              <p><strong>Username:</strong> @{userToDelete.username}</p>
-              <p><strong>Email:</strong> {userToDelete.email}</p>
-              <p><strong>Role:</strong> {userToDelete.role}</p>
-              <p className="text-[10px] text-red-700 pt-1">
-                ⚠️ All associated user data, memberships, and assigned reviews will be permanently removed.
-              </p>
+            {/* Navigation Tabs */}
+            <div className="flex border-b border-[#E5EBE8] bg-[#FAFBFB] px-6 gap-2 shrink-0 overflow-x-auto text-xs font-bold">
+              {[
+                { key: 'OVERVIEW', label: 'Overview' },
+                { key: 'MEMBERS', label: `Members (${selectedOrgDetails.members.length})` },
+                { key: 'PROJECTS', label: `Projects (${selectedOrgDetails.projects.length})` },
+                { key: 'GUIDES', label: `Guides (${selectedOrgDetails.guides.length})` },
+                { key: 'EXPERTS', label: `Experts (${selectedOrgDetails.patentExperts.length})` },
+                { key: 'ACTIVITY', label: 'Activity' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setOrgDetailsTab(tab.key as any)}
+                  className={`py-3 px-3 border-b-2 transition cursor-pointer shrink-0 ${
+                    orgDetailsTab === tab.key
+                      ? 'border-[#315C55] text-[#315C55] font-black'
+                      : 'border-transparent text-[#71807C] hover:text-[#253330]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+              {orgDetailsTab === 'OVERVIEW' && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] text-center">
+                    <span className="text-[10px] font-bold text-[#71807C] uppercase block">Members</span>
+                    <span className="text-xl font-black text-[#253330] font-mono">
+                      {selectedOrgDetails.overview.membersCount}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] text-center">
+                    <span className="text-[10px] font-bold text-[#71807C] uppercase block">Projects</span>
+                    <span className="text-xl font-black text-[#253330] font-mono">
+                      {selectedOrgDetails.overview.projectsCount}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] text-center">
+                    <span className="text-[10px] font-bold text-[#71807C] uppercase block">Guides</span>
+                    <span className="text-xl font-black text-[#253330] font-mono">
+                      {selectedOrgDetails.overview.guidesCount}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] text-center">
+                    <span className="text-[10px] font-bold text-[#71807C] uppercase block">Experts</span>
+                    <span className="text-xl font-black text-[#253330] font-mono">
+                      {selectedOrgDetails.overview.expertsCount}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {orgDetailsTab === 'MEMBERS' && (
+                <div className="space-y-2">
+                  {selectedOrgDetails.members.map((m: any, index: number) => (
+                    <div
+                      key={m.id}
+                      className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-mono text-[#71807C] text-[10px]">{index + 1}.</span>
+                        <div>
+                          <span className="font-bold text-[#253330] block">{m.fullName}</span>
+                          <span className="text-[10px] text-[#71807C]">
+                            @{m.username} • {m.email} • {m.department}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
+                        {m.role}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {orgDetailsTab === 'PROJECTS' && (
+                <div className="space-y-2">
+                  {selectedOrgDetails.projects.map((p: any, index: number) => (
+                    <div
+                      key={p.id}
+                      className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-bold text-[#253330] block">
+                          {index + 1}. {p.title}
+                        </span>
+                        <span className="text-[10px] text-[#71807C]">
+                          Owner: {p.owner} • Stage: {p.stage} • Claims: {p.claimsCount}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/dashboard/projects/${p.id}`)}
+                        className="px-2.5 py-1 bg-white hover:bg-[#DDEBE8] text-[#315C55] rounded-lg font-bold border border-[#E5EBE8] cursor-pointer"
+                      >
+                        Open
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {orgDetailsTab === 'GUIDES' && (
+                <div className="space-y-2">
+                  {selectedOrgDetails.guides.map((g: any) => (
+                    <div
+                      key={g.id}
+                      className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-bold text-[#253330] block">{g.fullName}</span>
+                        <span className="text-[10px] text-[#71807C]">
+                          {g.department} • Specialization: {g.specialization}
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-black text-[10px]">
+                        {g.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {orgDetailsTab === 'EXPERTS' && (
+                <div className="space-y-2">
+                  {selectedOrgDetails.patentExperts.map((e: any) => (
+                    <div
+                      key={e.id}
+                      className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-bold text-[#253330] block">{e.fullName}</span>
+                        <span className="text-[10px] text-[#71807C]">
+                          {e.department} • Specialization: {e.specialization}
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-black text-[10px]">
+                        {e.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {orgDetailsTab === 'ACTIVITY' && (
+                <div className="space-y-2">
+                  {selectedOrgDetails.activity.map((act: any) => (
+                    <div
+                      key={act.id}
+                      className="p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8] flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-bold text-[#253330] block">{act.action}</span>
+                        <span className="text-[10px] text-[#71807C]">
+                          User: {act.user} • Target: {act.target}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-[#71807C]">{act.time}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-[#E5EBE8] bg-[#FAFBFB] flex justify-end shrink-0">
               <button
                 type="button"
-                onClick={() => setUserToDelete(null)}
-                disabled={isDeletingUser}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                onClick={() => setSelectedOrgDetails(null)}
+                className="px-4 py-2 bg-[#315C55] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: CONFIRM PERMISSION CHANGES */}
+      {/* ==================================================== */}
+      {showConfirmSavePermissions && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-md w-full space-y-4 shadow-xl">
+            <div className="flex items-center gap-3 text-[#315C55]">
+              <Shield className="w-6 h-6 shrink-0" />
+              <h3 className="text-sm font-black text-[#253330]">Save Permission Matrix Changes?</h3>
+            </div>
+            <p className="text-xs text-[#71807C] leading-relaxed">
+              You are about to commit customized access control policies for platform roles. These permission updates
+              will immediately apply to all active API requests and user sessions.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmSavePermissions(false)}
+                className="px-4 py-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] text-[#5C6B67] rounded-xl text-xs font-bold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleConfirmDeleteUser}
-                disabled={isDeletingUser}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                disabled={savingPermissions}
+                onClick={handleSaveRolePermissions}
+                className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer flex items-center gap-1"
               >
-                {isDeletingUser ? 'Deleting...' : 'Delete Permanently'}
+                {savingPermissions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Confirm & Save</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: VERIFICATION APPLICATION REVIEW DETAILS */}
+      {/* ==================================================== */}
+      {selectedVerification && !verificationDecisionModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-lg w-full space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE8]">
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-[#315C55]" />
+                <h3 className="text-sm font-black text-[#253330]">Verification Application Profile</h3>
+              </div>
+              <button
+                onClick={() => setSelectedVerification(null)}
+                className="p-1 hover:bg-[#F0F4F2] rounded-lg text-[#71807C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3 bg-[#F7F9F8] rounded-xl border border-[#E5EBE8]">
+                <div>
+                  <span className="text-[10px] text-[#71807C] font-bold block uppercase">Applicant</span>
+                  <span className="font-extrabold text-[#253330]">{selectedVerification.applicantName}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#71807C] font-bold block uppercase">Role Requested</span>
+                  <span className="font-black text-[#315C55] uppercase">{selectedVerification.roleApplied}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#71807C] font-bold block uppercase">Official Email</span>
+                  <span className="font-mono text-[#5C6B67]">{selectedVerification.email}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#71807C] font-bold block uppercase">Organization</span>
+                  <span className="font-bold text-[#253330]">{selectedVerification.organization}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#71807C] font-bold block uppercase">Qualification</span>
+                  <span className="font-bold text-[#5C6B67]">{selectedVerification.qualification}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#71807C] font-bold block uppercase">Specialization</span>
+                  <span className="font-bold text-[#5C6B67]">{selectedVerification.specialization}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedVerification(null)}
+                className="px-4 py-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] text-[#5C6B67] rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Close
+              </button>
+              {selectedVerification.status === 'PENDING' && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVerificationDecisionModal(true)}
+                    className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Reject Application
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleProcessVerification('APPROVE')}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+                  >
+                    Approve Application
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: VERIFICATION DECISION REJECTION NOTES */}
+      {/* ==================================================== */}
+      {verificationDecisionModal && selectedVerification && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-md w-full space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE8]">
+              <h3 className="text-sm font-black text-[#253330]">Reject Verification Application</h3>
+              <button
+                onClick={() => {
+                  setVerificationDecisionModal(false);
+                  setSelectedVerification(null);
+                  setDecisionNotes('');
+                }}
+                className="p-1 hover:bg-[#F0F4F2] rounded-lg text-[#71807C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-[#71807C]">
+                Applicant: <strong className="text-[#253330]">{selectedVerification.applicantName}</strong> (
+                {selectedVerification.roleApplied})
+              </p>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Rejection Reason / Feedback</label>
+                <textarea
+                  rows={3}
+                  placeholder="Specify why this application was rejected or what additional documentation is required..."
+                  value={decisionNotes}
+                  onChange={(e) => setDecisionNotes(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setVerificationDecisionModal(false);
+                  setSelectedVerification(null);
+                  setDecisionNotes('');
+                }}
+                className="px-4 py-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] text-[#5C6B67] rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProcessVerification('REJECT')}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+              >
+                Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: BROADCAST NOTIFICATION */}
+      {/* ==================================================== */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-lg w-full space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE8]">
+              <h3 className="text-sm font-black text-[#253330]">Broadcast Platform Notification</h3>
+              <button
+                onClick={() => setShowBroadcastModal(false)}
+                className="p-1 hover:bg-[#F0F4F2] rounded-lg text-[#71807C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBroadcastNotification} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Notification Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Scheduled System Maintenance"
+                  value={broadcastData.title}
+                  onChange={(e) => setBroadcastData({ ...broadcastData, title: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Message Body</label>
+                <textarea
+                  rows={3}
+                  placeholder="Enter detailed message to dispatch to all active users..."
+                  value={broadcastData.message}
+                  onChange={(e) => setBroadcastData({ ...broadcastData, message: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#5C6B67]">Type</label>
+                  <select
+                    value={broadcastData.type}
+                    onChange={(e) => setBroadcastData({ ...broadcastData, type: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67]"
+                  >
+                    <option value="SYSTEM">System</option>
+                    <option value="GENERAL">General</option>
+                    <option value="WORKFLOW">Workflow</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#5C6B67]">Target Audience</label>
+                  <select
+                    value={broadcastData.targetRole}
+                    onChange={(e) => setBroadcastData({ ...broadcastData, targetRole: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67]"
+                  >
+                    <option value="ALL">All Active Users</option>
+                    <option value="Inventor">Inventors Only</option>
+                    <option value="Guide">Guides Only</option>
+                    <option value="PatentExpert">Patent Experts Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBroadcastModal(false)}
+                  className="px-4 py-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] text-[#5C6B67] rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+                >
+                  Dispatch Broadcast
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: DELETE USER CONFIRMATION */}
+      {/* ==================================================== */}
+      {userToDelete && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-md w-full space-y-4 shadow-xl">
+            <div className="flex items-center gap-3 text-rose-600">
+              <AlertTriangle className="w-6 h-6 shrink-0" />
+              <h3 className="text-sm font-black text-[#253330]">Permanently Delete User Account?</h3>
+            </div>
+            <p className="text-xs text-[#71807C] leading-relaxed">
+              Are you sure you want to permanently delete{' '}
+              <strong className="text-[#253330]">{userToDelete.fullName}</strong> (@{userToDelete.username})? All
+              owned projects, document links, and profile history will be deleted. This cannot be undone.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="px-4 py-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] text-[#5C6B67] rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingUser}
+                onClick={handleDeleteUserConfirm}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+              >
+                {isDeletingUser ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: CREATE ORGANIZATION */}
+      {/* ==================================================== */}
+      {showCreateOrgModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-md w-full space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE8]">
+              <h3 className="text-sm font-black text-[#253330]">Register New Organization</h3>
+              <button
+                onClick={() => setShowCreateOrgModal(false)}
+                className="p-1 hover:bg-[#F0F4F2] rounded-lg text-[#71807C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateOrganization} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Organization Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Stanford University Technology Lab"
+                  value={newOrgData.name}
+                  onChange={(e) => setNewOrgData({ ...newOrgData, name: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Primary Domain</label>
+                <input
+                  type="text"
+                  placeholder="e.g. stanford.edu"
+                  value={newOrgData.domain}
+                  onChange={(e) => setNewOrgData({ ...newOrgData, domain: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-mono focus:bg-white focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Contact Email</label>
+                <input
+                  type="email"
+                  placeholder="e.g. admin@stanford.edu"
+                  value={newOrgData.contactEmail}
+                  onChange={(e) => setNewOrgData({ ...newOrgData, contactEmail: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateOrgModal(false)}
+                  className="px-4 py-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] text-[#5C6B67] rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+                >
+                  Register
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: ASSIGN REVIEWER */}
+      {/* ==================================================== */}
+      {showAssignModal && selectedProject && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-md w-full space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE8]">
+              <h3 className="text-sm font-black text-[#253330]">Assign Project Supervisor</h3>
+              <button
+                onClick={() => setShowAssignModal(false)}
+                className="p-1 hover:bg-[#F0F4F2] rounded-lg text-[#71807C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignReviewer} className="space-y-3.5">
+              <p className="text-xs text-[#71807C]">
+                Assign a verified supervisor for project:{' '}
+                <strong className="text-[#253330]">{selectedProject.title}</strong>
+              </p>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Supervisor Role</label>
+                <select
+                  value={assignReviewerData.role}
+                  onChange={(e) => setAssignReviewerData({ ...assignReviewerData, role: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67]"
+                >
+                  <option value="GUIDE">Guide / Academic Supervisor</option>
+                  <option value="PATENT_EXPERT">Patent Expert Clearance</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Supervisor Username</label>
+                <input
+                  type="text"
+                  placeholder="e.g. meerajoseph"
+                  value={assignReviewerData.username}
+                  onChange={(e) => setAssignReviewerData({ ...assignReviewerData, username: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignModal(false)}
+                  className="px-4 py-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] text-[#5C6B67] rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+                >
+                  Confirm Assignment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: REVIEW DETAILS */}
+      {/* ==================================================== */}
+      {selectedReviewDetails && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-md w-full space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE8]">
+              <h3 className="text-sm font-black text-[#253330]">Review Milestone Details</h3>
+              <button
+                onClick={() => setSelectedReviewDetails(null)}
+                className="p-1 hover:bg-[#F0F4F2] rounded-lg text-[#71807C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <div className="flex justify-between py-1 border-b border-[#F0F4F2]">
+                <span className="text-[#71807C]">Project:</span>
+                <span className="font-extrabold text-[#253330]">{selectedReviewDetails.projectTitle}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#F0F4F2]">
+                <span className="text-[#71807C]">Inventor:</span>
+                <span className="font-bold text-[#5C6B67]">{selectedReviewDetails.inventor}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#F0F4F2]">
+                <span className="text-[#71807C]">Reviewer:</span>
+                <span className="font-bold text-[#315C55]">{selectedReviewDetails.reviewer}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#F0F4F2]">
+                <span className="text-[#71807C]">Review Type:</span>
+                <span className="font-bold text-[#253330]">{selectedReviewDetails.type}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#F0F4F2]">
+                <span className="text-[#71807C]">Decision:</span>
+                <span
+                  className={`font-black uppercase ${
+                    selectedReviewDetails.status === 'APPROVED'
+                      ? 'text-emerald-700'
+                      : selectedReviewDetails.status === 'PENDING'
+                      ? 'text-amber-700'
+                      : 'text-rose-700'
+                  }`}
+                >
+                  {selectedReviewDetails.status}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#F0F4F2]">
+                <span className="text-[#71807C]">Recorded Date:</span>
+                <span className="font-mono text-[#71807C]">{selectedReviewDetails.dueDate}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedReviewDetails.projectId) {
+                    navigate(`/dashboard/projects/${selectedReviewDetails.projectId}`);
+                  }
+                }}
+                className="px-4 py-2 bg-[#F0F4F2] hover:bg-[#DDEBE6] text-[#315C55] rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Open Workspace →
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedReviewDetails(null)}
+                className="px-4 py-2 bg-[#315C55] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>

@@ -42,22 +42,25 @@ class WorkflowPolicy {
             return true;
         const currentStage = project.stage;
         // Check transition path
-        if (!this.isStageTransitionValid(currentStage, nextStage)) {
+        if (!WorkflowPolicy.isStageTransitionValid(currentStage, nextStage)) {
             return false;
         }
         const isOwner = project.ownerId === user.userId;
         const projectMember = project.members?.find((m) => m.userId === user.userId);
         const projectRole = projectMember?.role;
+        const isInventor = projectRole === 'INVENTOR' || projectRole === 'CO_INVENTOR';
+        const canEdit = isOwner || (isInventor && (projectMember?.permissionLevel === 'EDIT' || projectMember?.permissionLevel === 'SUBMIT' || !projectMember?.permissionLevel));
+        const canSubmit = isOwner || (isInventor && projectMember?.permissionLevel === 'SUBMIT');
         switch (nextStage) {
             case 'LITERATURE_REVIEW':
             case 'PROTOTYPE':
             case 'DOCUMENTATION':
             case 'FORMS_PREPARATION':
-                // Project Owner or Co-inventor can progress early stages
-                return isOwner || projectRole === 'INVENTOR' || projectRole === 'CO_INVENTOR';
+                // Project Owner or Co-inventor with EDIT/SUBMIT can progress early stages
+                return isOwner || canEdit;
             case 'GUIDE_REVIEW':
-                // Submitting for guide review requires Owner or Co-inventor
-                return isOwner || projectRole === 'INVENTOR' || projectRole === 'CO_INVENTOR';
+                // Submitting for guide review requires Owner or Co-inventor with SUBMIT permission
+                return isOwner || canSubmit;
             case 'PATENT_EXPERT_REVIEW':
                 // Guide approves guide review. Owner/Inventors cannot approve.
                 if (isOwner || projectRole === 'INVENTOR' || projectRole === 'CO_INVENTOR') {
@@ -81,19 +84,19 @@ class WorkflowPolicy {
         }
     }
     static canSubmitForGuideReview(user, project) {
-        return this.canMoveToStage(user, project, 'GUIDE_REVIEW');
+        return WorkflowPolicy.canMoveToStage(user, project, 'GUIDE_REVIEW');
     }
     static canApproveGuideReview(user, project) {
-        return this.canMoveToStage(user, project, 'PATENT_EXPERT_REVIEW');
+        return WorkflowPolicy.canMoveToStage(user, project, 'PATENT_EXPERT_REVIEW');
     }
     static canSubmitForExpertReview(user, project) {
-        return this.canApproveGuideReview(user, project);
+        return WorkflowPolicy.canApproveGuideReview(user, project);
     }
     static canApproveExpertReview(user, project) {
-        return this.canMoveToStage(user, project, 'FILING_READY');
+        return WorkflowPolicy.canMoveToStage(user, project, 'FILING_READY');
     }
     static canMarkFilingReady(user, project) {
-        return this.canApproveExpertReview(user, project);
+        return WorkflowPolicy.canApproveExpertReview(user, project);
     }
 }
 exports.WorkflowPolicy = WorkflowPolicy;

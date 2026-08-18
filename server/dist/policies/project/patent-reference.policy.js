@@ -28,33 +28,33 @@ class PatentReferencePolicy {
      * Can search patents. Any project member (OWNER, ADMIN, EDITOR, VIEWER).
      */
     static canSearch(user, project) {
-        return this.getProjectRoleType(user, project) !== null;
+        return PatentReferencePolicy.getProjectRoleType(user, project) !== null;
     }
     /**
      * Can view saved references. Any project member.
      */
     static canViewReferences(user, project) {
-        return this.getProjectRoleType(user, project) !== null;
+        return PatentReferencePolicy.getProjectRoleType(user, project) !== null;
     }
     /**
      * Can save a reference. Only OWNER, ADMIN, or EDITOR (INVENTOR/CO_INVENTOR).
      */
     static canSaveReference(user, project) {
-        const role = this.getProjectRoleType(user, project);
+        const role = PatentReferencePolicy.getProjectRoleType(user, project);
         return role === 'OWNER' || role === 'ADMIN' || role === 'EDITOR';
     }
     /**
      * Can delete a reference. Only OWNER, ADMIN, or EDITOR.
      */
     static canDeleteReference(user, project) {
-        const role = this.getProjectRoleType(user, project);
+        const role = PatentReferencePolicy.getProjectRoleType(user, project);
         return role === 'OWNER' || role === 'ADMIN' || role === 'EDITOR';
     }
     /**
      * Can run AI similarity/novelty check on saved references. Any project member.
      */
     static canRunAiAnalysis(user, project) {
-        return this.getProjectRoleType(user, project) !== null;
+        return PatentReferencePolicy.getProjectRoleType(user, project) !== null;
     }
 }
 exports.PatentReferencePolicy = PatentReferencePolicy;

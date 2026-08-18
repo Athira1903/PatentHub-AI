@@ -58,6 +58,54 @@ export const getCoInventorDashboard = async (req: AuthenticatedRequest, res: Res
   }
 };
 
+export const getPatentExpertDashboard = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized access.' });
+      return;
+    }
+
+    const data = await AnalyticsService.getPatentExpertDashboardData(userId);
+    res.status(200).json(data);
+  } catch (error: any) {
+    console.error('[Get Patent Expert Dashboard Error]', error);
+    res.status(500).json({ message: error.message || 'Failed to fetch Patent Expert intelligence workspace data.' });
+  }
+};
+
+export const getGuideDashboard = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized access.' });
+      return;
+    }
+
+    const data = await AnalyticsService.getGuideDashboardData(userId);
+    res.status(200).json(data);
+  } catch (error: any) {
+    console.error('[Get Guide Dashboard Error]', error);
+    res.status(500).json({ message: error.message || 'Failed to fetch Guide platform workspace data.' });
+  }
+};
+
+export const getInventorDashboard = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized access.' });
+      return;
+    }
+
+    const data = await AnalyticsService.getInventorDashboardData(userId);
+    res.status(200).json(data);
+  } catch (error: any) {
+    console.error('[Get Inventor Dashboard Error]', error);
+    res.status(500).json({ message: error.message || 'Failed to fetch Inventor command center data.' });
+  }
+};
+
 export const generateComprehensiveReportPdf = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;

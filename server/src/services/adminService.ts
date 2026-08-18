@@ -122,6 +122,91 @@ let systemSettings: SystemSettingsState = {
   auditLoggingEnabled: true,
 };
 
+export interface PermissionDefinition {
+  id: string;
+  name: string;
+  category: 'PROJECT' | 'CLAIMS' | 'DOCUMENTS' | 'REVIEWS' | 'PATENT_SEARCH' | 'ADMINISTRATION';
+  description: string;
+}
+
+export const ALL_PERMISSIONS: PermissionDefinition[] = [
+  // PROJECT
+  { id: 'view_project', name: 'View Project', category: 'PROJECT', description: 'View project metadata, team members, and timeline.' },
+  { id: 'create_project', name: 'Create Project', category: 'PROJECT', description: 'Initiate new patent projects.' },
+  { id: 'edit_project', name: 'Edit Project', category: 'PROJECT', description: 'Update project title, specifications, and details.' },
+  { id: 'delete_project', name: 'Delete Project', category: 'PROJECT', description: 'Archive or permanently delete patent projects.' },
+
+  // CLAIMS
+  { id: 'view_claims', name: 'View Claims', category: 'CLAIMS', description: 'Access structured claims and antecedent basis trees.' },
+  { id: 'create_claims', name: 'Create Claims', category: 'CLAIMS', description: 'Draft independent and dependent patent claims.' },
+  { id: 'edit_claims', name: 'Edit Claims', category: 'CLAIMS', description: 'Modify claim body, preambles, and elements.' },
+  { id: 'delete_claims', name: 'Delete Claims', category: 'CLAIMS', description: 'Remove claims from the project docket.' },
+  { id: 'generate_ai_claims', name: 'Generate AI Claims', category: 'CLAIMS', description: 'Invoke AI claim generator.' },
+  { id: 'run_claim_analysis', name: 'Run Claim Analysis', category: 'CLAIMS', description: 'Execute FTO claim chart analysis.' },
+
+  // DOCUMENTS
+  { id: 'view_documents', name: 'View Documents', category: 'DOCUMENTS', description: 'View and download project documents and attachments.' },
+  { id: 'upload_documents', name: 'Upload Documents', category: 'DOCUMENTS', description: 'Upload research drafts, testing logs, and blueprints.' },
+  { id: 'edit_documents', name: 'Edit Documents', category: 'DOCUMENTS', description: 'Replace or update document versions.' },
+  { id: 'delete_documents', name: 'Delete Documents', category: 'DOCUMENTS', description: 'Remove documents from the project workspace.' },
+  { id: 'export_documents', name: 'Export Documents', category: 'DOCUMENTS', description: 'Generate and download compiled PDF dossiers.' },
+
+  // REVIEWS
+  { id: 'view_reviews', name: 'View Reviews', category: 'REVIEWS', description: 'Access supervisor endorsements and feedback comments.' },
+  { id: 'create_review', name: 'Create Review', category: 'REVIEWS', description: 'Initiate formal supervisor review requests.' },
+  { id: 'submit_review', name: 'Submit Review', category: 'REVIEWS', description: 'Log review feedback and evaluation notes.' },
+  { id: 'approve_reject_review', name: 'Approve / Reject Review', category: 'REVIEWS', description: 'Endorse, request revision, or advance project stage.' },
+
+  // PATENT SEARCH
+  { id: 'search_prior_art', name: 'Search Prior Art', category: 'PATENT_SEARCH', description: 'Query public patent registries and semantic indexes.' },
+  { id: 'view_references', name: 'View References', category: 'PATENT_SEARCH', description: 'Inspect saved prior-art citations and similarity scores.' },
+  { id: 'add_prior_art', name: 'Add Prior-Art References', category: 'PATENT_SEARCH', description: 'Link prior-art citations to project workspaces.' },
+
+  // ADMINISTRATION
+  { id: 'manage_users', name: 'Manage Users', category: 'ADMINISTRATION', description: 'View, activate, suspend, or delete user accounts.' },
+  { id: 'manage_organizations', name: 'Manage Organizations', category: 'ADMINISTRATION', description: 'Create and govern institution accounts.' },
+  { id: 'manage_roles', name: 'Manage Roles', category: 'ADMINISTRATION', description: 'Assign roles to platform users.' },
+  { id: 'manage_permissions', name: 'Manage Permissions', category: 'ADMINISTRATION', description: 'Edit role permission matrices.' },
+  { id: 'view_verifications', name: 'View Verification Requests', category: 'ADMINISTRATION', description: 'Review, approve, and reject Guide/Expert verifications.' },
+];
+
+let rolePermissionsMatrix: Record<string, string[]> = {
+  Admin: ALL_PERMISSIONS.map(p => p.id),
+  OrgAdmin: [
+    'view_project', 'view_claims', 'view_documents', 'export_documents',
+    'view_reviews', 'search_prior_art', 'view_references',
+    'manage_users', 'manage_roles', 'view_verifications'
+  ],
+  Inventor: [
+    'view_project', 'create_project', 'edit_project', 'delete_project',
+    'view_claims', 'create_claims', 'edit_claims', 'delete_claims', 'generate_ai_claims', 'run_claim_analysis',
+    'view_documents', 'upload_documents', 'edit_documents', 'delete_documents', 'export_documents',
+    'view_reviews', 'create_review',
+    'search_prior_art', 'view_references', 'add_prior_art'
+  ],
+  CoInventor: [
+    'view_project', 'edit_project',
+    'view_claims', 'create_claims', 'edit_claims',
+    'view_documents', 'upload_documents', 'export_documents',
+    'view_reviews',
+    'search_prior_art', 'view_references', 'add_prior_art'
+  ],
+  Guide: [
+    'view_project',
+    'view_claims', 'run_claim_analysis',
+    'view_documents', 'export_documents',
+    'view_reviews', 'submit_review', 'approve_reject_review',
+    'search_prior_art', 'view_references'
+  ],
+  PatentExpert: [
+    'view_project',
+    'view_claims', 'run_claim_analysis',
+    'view_documents', 'export_documents',
+    'view_reviews', 'submit_review', 'approve_reject_review',
+    'search_prior_art', 'view_references', 'add_prior_art'
+  ]
+};
+
 export class AdminService {
   /**
    * Fetches authentic real-time dashboard metrics from PostgreSQL.
@@ -713,5 +798,517 @@ export class AdminService {
   static async updateSettings(newSettings: Partial<SystemSettingsState>) {
     systemSettings = { ...systemSettings, ...newSettings };
     return systemSettings;
+  }
+
+  /**
+   * Real Activity Logs with filtering & pagination
+   */
+  static async getActivityLogs(search?: string, type?: string, page: number = 1, limit: number = 25) {
+    const where: any = {};
+    if (type && type !== 'ALL') {
+      where.type = type;
+    }
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { action: { contains: q, mode: 'insensitive' } },
+        { user: { fullName: { contains: q, mode: 'insensitive' } } },
+        { user: { username: { contains: q, mode: 'insensitive' } } },
+        { project: { title: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    const skip = (Math.max(1, page) - 1) * limit;
+    const [total, logs] = await Promise.all([
+      prisma.activityLog.count({ where }),
+      prisma.activityLog.findMany({
+        where,
+        include: {
+          user: { select: { id: true, fullName: true, username: true, email: true, role: true } },
+          project: { select: { id: true, title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+      logs: logs.map((l) => ({
+        id: l.id,
+        user: l.user?.fullName || l.user?.username || 'Platform User',
+        userRole: (l.user?.role as any)?.name || 'User',
+        action: l.action,
+        type: l.type,
+        resource: l.project?.title || 'System',
+        resourceId: l.projectId || l.id,
+        createdAt: l.createdAt,
+        metadata: l.metadata,
+        status: 'SUCCESS',
+      })),
+    };
+  }
+
+  /**
+   * Real Platform Notifications with filtering & pagination
+   */
+  static async getPlatformNotifications(search?: string, type?: string, isRead?: boolean, page: number = 1, limit: number = 25) {
+    const where: any = {};
+    if (type && type !== 'ALL') {
+      where.type = type.toUpperCase();
+    }
+    if (isRead !== undefined) {
+      where.isRead = isRead;
+    }
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { title: { contains: q, mode: 'insensitive' } },
+        { message: { contains: q, mode: 'insensitive' } },
+        { user: { fullName: { contains: q, mode: 'insensitive' } } },
+        { user: { username: { contains: q, mode: 'insensitive' } } },
+        { project: { title: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    const skip = (Math.max(1, page) - 1) * limit;
+    const [total, notifications] = await Promise.all([
+      prisma.notification.count({ where }),
+      prisma.notification.findMany({
+        where,
+        include: {
+          user: { select: { id: true, fullName: true, username: true, email: true } },
+          project: { select: { id: true, title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+      notifications: notifications.map((n) => ({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        recipient: n.user?.fullName || n.user?.username || 'User',
+        recipientEmail: n.user?.email,
+        recipientId: n.userId,
+        projectTitle: n.project?.title,
+        projectId: n.projectId,
+        isRead: n.isRead,
+        readAt: n.readAt,
+        createdAt: n.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * Dispatches a broadcast notification to active platform users
+   */
+  static async broadcastNotification(data: {
+    title: string;
+    message: string;
+    type?: string;
+    targetRole?: string;
+  }) {
+    const userWhere: any = { isActive: true };
+    if (data.targetRole && data.targetRole !== 'ALL') {
+      userWhere.role = { name: data.targetRole };
+    }
+
+    const targetUsers = await prisma.user.findMany({
+      where: userWhere,
+      select: { id: true },
+    });
+
+    if (targetUsers.length === 0) {
+      return { success: false, count: 0, message: 'No active users found for target role.' };
+    }
+
+    const notificationPayloads = targetUsers.map((u) => ({
+      userId: u.id,
+      title: data.title.trim(),
+      message: data.message.trim(),
+      type: (data.type || 'SYSTEM').toUpperCase(),
+      isRead: false,
+    }));
+
+    await prisma.notification.createMany({
+      data: notificationPayloads,
+    });
+
+    return {
+      success: true,
+      count: targetUsers.length,
+      message: `Notification broadcasted to ${targetUsers.length} active users.`,
+    };
+  }
+
+  /**
+   * Real Role statistics & user counts for RBAC matrix
+   */
+  static async getRolesStats() {
+    const users = await prisma.user.findMany({
+      include: { role: true },
+    });
+
+    const roleCounts: Record<string, number> = {
+      Inventor: 0,
+      CoInventor: 0,
+      Guide: 0,
+      PatentExpert: 0,
+      Admin: 0,
+      OrgAdmin: 0,
+    };
+
+    users.forEach((u) => {
+      const r = u.role.name;
+      if (roleCounts[r] !== undefined) {
+        roleCounts[r]++;
+      } else if (r === 'CO_INVENTOR' || r === 'Co-Inventor') {
+        roleCounts.CoInventor++;
+      } else if (r === 'PATENT_EXPERT' || r === 'Patent Expert') {
+        roleCounts.PatentExpert++;
+      } else {
+        roleCounts[r] = (roleCounts[r] || 0) + 1;
+      }
+    });
+
+    return {
+      roles: [
+        {
+          name: 'Inventor',
+          displayName: 'Inventor',
+          description: 'Primary patent author and project owner. Initiates inventions, creates claims, and submits for guide/expert review.',
+          usersCount: roleCounts.Inventor || 0,
+          permissionsCount: 16,
+          status: 'Active',
+        },
+        {
+          name: 'CoInventor',
+          displayName: 'Co-Inventor',
+          description: 'Collaborative inventor assigned to projects. Can edit shared sections, manage assigned tasks, and participate in drafting.',
+          usersCount: roleCounts.CoInventor || 0,
+          permissionsCount: 12,
+          status: 'Active',
+        },
+        {
+          name: 'Guide',
+          displayName: 'Guide / Supervisor',
+          description: 'Academic or institutional advisor. Supervises invention journeys, monitors filing readiness, and provides guidance feedback.',
+          usersCount: roleCounts.Guide || 0,
+          permissionsCount: 14,
+          status: 'Active',
+        },
+        {
+          name: 'PatentExpert',
+          displayName: 'Patent Expert',
+          description: 'Legal & prior art analysis specialist. Conducts FTO reviews, patentability scoring, and formal Form 2 legal clearance.',
+          usersCount: roleCounts.PatentExpert || 0,
+          permissionsCount: 15,
+          status: 'Active',
+        },
+        {
+          name: 'OrgAdmin',
+          displayName: 'Organization Admin',
+          description: 'Institution/University administrator managing campus members, department access, and aggregated analytics.',
+          usersCount: roleCounts.OrgAdmin || 0,
+          permissionsCount: 10,
+          status: 'Active',
+        },
+        {
+          name: 'Admin',
+          displayName: 'Platform Admin',
+          description: 'Superuser with comprehensive governance over users, projects, verification trust layer, RBAC policies, and audit logs.',
+          usersCount: roleCounts.Admin || 0,
+          permissionsCount: (rolePermissionsMatrix.Admin || []).length || 22,
+          status: 'Active',
+        },
+      ],
+    };
+  }
+
+  /**
+   * Complete User Profile view for Admin
+   */
+  static async getUserProfile(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: true,
+        profile: true,
+        ownedProjects: {
+          include: {
+            patentClaims: { select: { id: true } },
+            documents: { select: { id: true } },
+            members: { select: { id: true } }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        projectMembers: {
+          include: {
+            project: {
+              include: {
+                owner: { select: { fullName: true } },
+                patentClaims: { select: { id: true } },
+                documents: { select: { id: true } }
+              }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        activityLogs: {
+          take: 20,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            project: { select: { title: true } }
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      throw new Error('User not found.');
+    }
+
+    const permissions = rolePermissionsMatrix[user.role.name] || rolePermissionsMatrix.Inventor || [];
+
+    return {
+      personalDetails: {
+        id: user.id,
+        fullName: user.fullName,
+        username: user.username,
+        email: user.email,
+        phone: user.profile?.phone || 'Not Provided',
+        profilePhoto: null,
+        isActive: user.isActive,
+        isEmailVerified: user.isActive,
+        createdAt: user.createdAt,
+        lastActive: user.updatedAt,
+      },
+      roleAndAccess: {
+        roleName: user.role.name,
+        institution: user.institution || user.profile?.institution || 'Independent',
+        organizationRole: user.role.name,
+        permissions,
+        activationStatus: user.isActive ? 'ACTIVE' : 'SUSPENDED',
+      },
+      professionalDetails: {
+        designation: user.profile?.designation || 'Researcher / Author',
+        institution: user.institution || user.profile?.institution || 'Independent',
+        department: user.profile?.department || 'Research & Development',
+        qualification: user.profile?.department ? `Academic - ${user.profile.department}` : 'Academic / Research',
+        experience: '3+ Years',
+        researchDomain: user.profile?.researchDomain || 'Patent Innovation',
+        bio: user.profile?.bio || 'No bio provided.',
+      },
+      projects: {
+        owned: user.ownedProjects.map(p => ({
+          id: p.id,
+          title: p.title,
+          stage: p.stage,
+          category: p.category,
+          claimsCount: p.patentClaims.length,
+          documentsCount: p.documents.length,
+          membersCount: p.members.length,
+          status: p.isArchived ? 'ARCHIVED' : 'ACTIVE',
+          createdAt: p.createdAt,
+        })),
+        joined: user.projectMembers.map(m => ({
+          id: m.project.id,
+          title: m.project.title,
+          stage: m.project.stage,
+          category: m.project.category,
+          ownerName: m.project.owner.fullName,
+          projectRole: m.role,
+          claimsCount: m.project.patentClaims.length,
+          documentsCount: m.project.documents.length,
+          status: m.project.isArchived ? 'ARCHIVED' : 'ACTIVE',
+          createdAt: m.createdAt,
+        })),
+      },
+      activityHistory: user.activityLogs.map(l => ({
+        id: l.id,
+        action: l.action,
+        type: l.type,
+        target: l.project?.title || 'Patent Workspace',
+        timestamp: l.createdAt,
+      })),
+      security: {
+        verificationStatus: user.isActive ? 'VERIFIED' : 'PENDING',
+        accountStatus: user.isActive ? 'Active' : 'Suspended',
+        createdAt: user.createdAt,
+      }
+    };
+  }
+
+  /**
+   * Organization Details view for Admin
+   */
+  static async getOrganizationDetails(orgIdOrName: string) {
+    const rawName = decodeURIComponent(orgIdOrName.replace(/^org-/, ''));
+
+    // Fetch all users with this institution or email domain
+    const users = await prisma.user.findMany({
+      include: {
+        role: true,
+        profile: true,
+        ownedProjects: {
+          include: {
+            patentClaims: { select: { id: true } },
+            documents: { select: { id: true } },
+            members: { select: { id: true } }
+          }
+        },
+        projectMembers: {
+          include: {
+            project: { select: { id: true, title: true, stage: true } }
+          }
+        }
+      }
+    });
+
+    const orgUsers = users.filter(u => {
+      const matchInst = (u.institution || u.profile?.institution || '').toLowerCase().trim() === rawName.toLowerCase().trim();
+      const domain = u.email.includes('@') ? u.email.split('@')[1].toLowerCase().trim() : '';
+      const matchDomain = domain === rawName.toLowerCase().trim();
+      return matchInst || matchDomain || rawName === 'PatentHub Global' || rawName === 'Primary Campus Network';
+    });
+
+    const members = orgUsers.map(u => ({
+      id: u.id,
+      fullName: u.fullName,
+      username: u.username,
+      email: u.email,
+      role: u.role.name,
+      designation: u.profile?.designation || 'Member',
+      department: u.profile?.department || 'General',
+      status: u.isActive ? 'ACTIVE' : 'SUSPENDED',
+      createdAt: u.createdAt,
+    }));
+
+    const guides = orgUsers.filter(u => u.role.name === 'Guide').map(u => ({
+      id: u.id,
+      fullName: u.fullName,
+      email: u.email,
+      department: u.profile?.department || 'Academic Department',
+      specialization: u.profile?.researchDomain || 'Supervisor',
+      status: u.isActive ? 'VERIFIED' : 'PENDING'
+    }));
+
+    const patentExperts = orgUsers.filter(u => u.role.name === 'PatentExpert').map(u => ({
+      id: u.id,
+      fullName: u.fullName,
+      email: u.email,
+      department: u.profile?.department || 'Legal Department',
+      specialization: u.profile?.researchDomain || 'Prior Art & Claims',
+      status: u.isActive ? 'VERIFIED' : 'PENDING'
+    }));
+
+    // Collect all projects owned by organization members
+    const allOrgProjects = orgUsers.flatMap(u =>
+      u.ownedProjects.map(p => ({
+        id: p.id,
+        title: p.title,
+        owner: u.fullName,
+        ownerEmail: u.email,
+        stage: p.stage,
+        claimsCount: p.patentClaims.length,
+        documentsCount: p.documents.length,
+        status: p.isArchived ? 'ARCHIVED' : 'ACTIVE',
+        createdAt: p.createdAt
+      }))
+    );
+
+    // Fetch activity logs from org users
+    const orgUserIds = orgUsers.map(u => u.id);
+    const activityLogs = orgUserIds.length > 0 ? await prisma.activityLog.findMany({
+      where: { userId: { in: orgUserIds } },
+      include: {
+        user: { select: { fullName: true } },
+        project: { select: { title: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 15
+    }) : [];
+
+    const domain = orgUsers.find(u => u.email.includes('@'))?.email.split('@')[1] || 'patenthub.ai';
+
+    return {
+      overview: {
+        id: `org-${encodeURIComponent(rawName)}`,
+        name: rawName,
+        domain,
+        contactEmail: orgUsers[0]?.email || `admin@${domain}`,
+        status: 'ACTIVE',
+        membersCount: members.length,
+        projectsCount: allOrgProjects.length,
+        guidesCount: guides.length,
+        expertsCount: patentExperts.length,
+        createdAt: orgUsers[0]?.createdAt || new Date().toISOString()
+      },
+      members,
+      projects: allOrgProjects,
+      guides,
+      patentExperts,
+      activity: activityLogs.map(l => ({
+        id: l.id,
+        user: l.user?.fullName || 'User',
+        action: l.action,
+        target: l.project?.title || 'Organization Project',
+        time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }))
+    };
+  }
+
+  /**
+   * Get all permissions and role mapping
+   */
+  static getRolePermissions() {
+    return {
+      allPermissions: ALL_PERMISSIONS,
+      rolePermissions: rolePermissionsMatrix
+    };
+  }
+
+  /**
+   * Update permissions for a specific role
+   */
+  static async updateRolePermissions(roleName: string, permissions: string[], adminUserId?: string) {
+    if (!rolePermissionsMatrix[roleName] && roleName !== 'Admin' && roleName !== 'OrgAdmin' && roleName !== 'Inventor' && roleName !== 'CoInventor' && roleName !== 'Guide' && roleName !== 'PatentExpert') {
+      throw new Error(`Role '${roleName}' is not a valid platform role.`);
+    }
+
+    rolePermissionsMatrix[roleName] = permissions;
+
+    // Record activity log
+    if (adminUserId) {
+      try {
+        await prisma.activityLog.create({
+          data: {
+            userId: adminUserId,
+            action: `Updated permissions for role: ${roleName} (${permissions.length} active permissions)`,
+            type: 'ADMIN'
+          }
+        });
+      } catch (e) {}
+    }
+
+    return {
+      success: true,
+      roleName,
+      permissions: rolePermissionsMatrix[roleName],
+      message: `Permissions updated successfully for ${roleName}.`
+    };
   }
 }

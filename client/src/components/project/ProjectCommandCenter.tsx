@@ -15,15 +15,13 @@ import {
   FileText,
   Layers,
   Sparkles,
-  Bot,
-  Send,
   Info,
   ChevronRight,
-  MoreVertical,
   Check,
   X,
   Loader2,
   Save,
+  Download
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -36,6 +34,18 @@ interface ProjectCommandCenterProps {
   onRefreshProject?: () => void;
 }
 
+const formatTimeAgo = (dateStr: string) => {
+  if (!dateStr) return 'Recently';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffSec < 60) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+};
+
 export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
   project,
   analyticsSummary,
@@ -43,9 +53,6 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
   onRefreshProject,
 }) => {
   const [isStarred, setIsStarred] = useState(false);
-  const [aiQuestion, setAiQuestion] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiResponse, setAiResponse] = useState<string | null>(null);
 
   // Invite Collaborator Modal
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -89,21 +96,21 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const scores = analyticsSummary?.scores || {
-    patentEligibilityScore: 82,
-    priorArtRiskIndex: 32,
-    claimCoverageScore: 74,
-    marketRelevanceScore: 80,
-    teamExecutionScore: 91,
-    filingReadinessScore: 78,
-  };
+  const scores = analyticsSummary?.scores;
+
+  // Real Dynamic Patent Journey Calculation
+  const hasReferences = (project?.patentReferences?.length || 0) > 0;
+  const hasClaims = (project?.patentClaims?.length || 0) > 0;
+  const hasApprovedReview = project?.projectReviews?.some((r: any) => r.decision === 'APPROVED');
+  const isFiled = project?.stage === 'FILED';
+  const isFilingReady = project?.stage === 'FILING_READY' || isFiled;
 
   const journeySteps = [
     {
       id: 1,
       name: '1. Idea Captured',
       status: 'Completed',
-      date: project?.createdAt ? new Date(project.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '20 Apr 2024',
+      date: project?.createdAt ? new Date(project.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Created',
       icon: Lightbulb,
       state: 'complete',
       tabTarget: 'Innovation Details',
@@ -111,46 +118,46 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
     {
       id: 2,
       name: '2. Prior Art Search',
-      status: 'Completed',
-      date: 'Completed',
+      status: hasReferences ? 'Completed' : (project?.stage === 'LITERATURE_REVIEW' ? 'In Progress' : 'Pending'),
+      date: hasReferences ? `${project.patentReferences.length} references saved` : (project?.stage === 'LITERATURE_REVIEW' ? 'In Progress' : 'Pending'),
       icon: Search,
-      state: 'complete',
+      state: hasReferences ? 'complete' : (project?.stage === 'LITERATURE_REVIEW' ? 'in_progress' : 'pending'),
       tabTarget: 'Prior Art Search',
     },
     {
       id: 3,
       name: '3. Claims Engineering',
-      status: 'In Progress',
-      date: 'In Progress',
+      status: hasClaims ? 'In Progress' : 'Pending',
+      date: hasClaims ? `${project.patentClaims.length} claims drafted` : 'Pending',
       icon: PenTool,
-      state: 'in_progress',
+      state: hasClaims ? 'in_progress' : 'pending',
       tabTarget: 'Claims Studio',
     },
     {
       id: 4,
       name: '4. FTO Analysis',
-      status: 'Pending',
-      date: 'Pending',
+      status: hasReferences && hasClaims ? 'In Progress' : 'Pending',
+      date: hasReferences && hasClaims ? 'Ready to analyze' : 'Pending',
       icon: Shield,
-      state: 'pending',
+      state: hasReferences && hasClaims ? 'in_progress' : 'pending',
       tabTarget: 'FTO Analysis',
     },
     {
       id: 5,
       name: '5. Review',
-      status: 'Pending',
-      date: 'Pending',
+      status: hasApprovedReview ? 'Completed' : (project?.stage === 'GUIDE_REVIEW' || project?.stage === 'PATENT_EXPERT_REVIEW' ? 'In Progress' : 'Pending'),
+      date: hasApprovedReview ? 'Supervisor Approved' : (project?.stage === 'GUIDE_REVIEW' ? 'Under Guide Review' : 'Pending'),
       icon: Users,
-      state: 'pending',
+      state: hasApprovedReview ? 'complete' : (project?.stage === 'GUIDE_REVIEW' || project?.stage === 'PATENT_EXPERT_REVIEW' ? 'in_progress' : 'pending'),
       tabTarget: 'Reviews',
     },
     {
       id: 6,
       name: '6. Filing Ready',
-      status: 'Pending',
-      date: 'Pending',
+      status: isFilingReady ? 'Filing Ready' : 'Pending',
+      date: isFilingReady ? (isFiled ? 'Officially Filed' : 'Ready for Registry') : 'Pending',
       icon: FileCheck2,
-      state: 'pending',
+      state: isFilingReady ? 'complete' : 'pending',
       tabTarget: 'Forms & Filing',
     },
   ];
@@ -202,128 +209,83 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
       subtitle: 'Get intelligent help',
       icon: Sparkles,
       color: 'text-purple-600 bg-purple-50/80 hover:bg-purple-100/60',
-      action: () => {
-        const inputEl = document.getElementById('ai-assistant-input');
-        inputEl?.focus();
-        toast('AI Assistant is ready below!');
-      },
+      action: () => onNavigateTab('AI Assistant'),
     },
   ];
+
+  // Real Intelligence Metrics (No Fake Hardcoded Percentages!)
+  const totalTasks = project?.tasks?.length || 0;
+  const completedTasks = project?.tasks?.filter((t: any) => t.status === 'COMPLETED').length || 0;
+  const totalDrawings = (project?.drawingFigures?.length || 0) + (project?.prototypes?.length || 0);
 
   const intelligenceMetrics = [
     {
       label: 'Patent Eligibility',
-      value: scores.patentEligibilityScore || 82,
-      tag: (scores.patentEligibilityScore || 82) >= 80 ? 'High' : 'Moderate',
+      hasValue: scores?.patentEligibilityScore !== undefined,
+      value: scores?.patentEligibilityScore ?? 0,
+      display: scores?.patentEligibilityScore !== undefined ? `${scores.patentEligibilityScore}%` : 'Insufficient data',
+      tag: scores?.patentEligibilityScore !== undefined ? (scores.patentEligibilityScore >= 80 ? 'High' : 'Moderate') : 'Pending',
       color: 'bg-emerald-500',
       textColor: 'text-emerald-600',
     },
     {
       label: 'Prior Art Risk',
-      value: scores.priorArtRiskIndex || 32,
-      tag: (scores.priorArtRiskIndex || 32) > 50 ? 'High Risk' : (scores.priorArtRiskIndex || 32) > 25 ? 'Medium' : 'Low Risk',
-      color: (scores.priorArtRiskIndex || 32) > 50 ? 'bg-rose-500' : 'bg-amber-500',
-      textColor: (scores.priorArtRiskIndex || 32) > 50 ? 'text-rose-600' : 'text-amber-600',
+      hasValue: hasReferences && scores?.priorArtRiskIndex !== undefined,
+      value: scores?.priorArtRiskIndex ?? 0,
+      display: hasReferences && scores?.priorArtRiskIndex !== undefined ? `${scores.priorArtRiskIndex}%` : 'Not analyzed',
+      tag: hasReferences && scores?.priorArtRiskIndex !== undefined ? (scores.priorArtRiskIndex > 50 ? 'High Risk' : scores.priorArtRiskIndex > 25 ? 'Medium' : 'Low Risk') : 'No Citations',
+      color: scores?.priorArtRiskIndex && scores.priorArtRiskIndex > 50 ? 'bg-rose-500' : 'bg-amber-500',
+      textColor: scores?.priorArtRiskIndex && scores.priorArtRiskIndex > 50 ? 'text-rose-600' : 'text-amber-600',
     },
     {
       label: 'Technical Drawing Score',
-      value: scores.claimCoverageScore || 74,
-      tag: 'Good',
+      hasValue: totalDrawings > 0,
+      value: scores?.technicalDrawingScore ?? 0,
+      display: totalDrawings > 0 ? `${scores?.technicalDrawingScore ?? 0}%` : 'Not available',
+      tag: totalDrawings > 0 ? (scores?.technicalDrawingScore >= 70 ? 'Good' : 'Needs Review') : 'No Drawings',
       color: 'bg-emerald-500',
       textColor: 'text-emerald-600',
     },
     {
       label: 'Legal Compliance',
-      value: scores.marketRelevanceScore || 80,
-      tag: 'Good',
+      hasValue: (project?.patentForms?.length || 0) > 0,
+      value: scores?.legalComplianceHealth ?? 0,
+      display: (project?.patentForms?.length || 0) > 0 ? `${scores?.legalComplianceHealth ?? 0}%` : 'Pending',
+      tag: (project?.patentForms?.length || 0) > 0 ? 'Verified' : 'Incomplete Forms',
       color: 'bg-emerald-500',
       textColor: 'text-emerald-600',
     },
     {
       label: 'Team Execution',
-      value: scores.teamExecutionScore || 91,
-      tag: 'Excellent',
+      hasValue: totalTasks > 0,
+      value: scores?.teamExecutionVelocity ?? 0,
+      display: totalTasks > 0 ? `${scores?.teamExecutionVelocity ?? 0}% (${completedTasks}/${totalTasks})` : 'No tasks',
+      tag: totalTasks > 0 ? (completedTasks === totalTasks ? 'Completed' : 'In Progress') : 'Setup Tasks',
       color: 'bg-emerald-500',
       textColor: 'text-emerald-600',
     },
     {
       label: 'Filing Readiness',
-      value: scores.filingReadinessScore || 78,
-      tag: 'Good',
+      hasValue: scores?.filingReadinessScore !== undefined,
+      value: scores?.filingReadinessScore ?? 0,
+      display: scores?.filingReadinessScore !== undefined ? `${scores.filingReadinessScore}%` : 'Pending',
+      tag: scores?.filingReadinessScore && scores.filingReadinessScore >= 80 ? 'Ready' : 'In Progress',
       color: 'bg-emerald-500',
       textColor: 'text-emerald-600',
     },
   ];
 
-  const recentActivities = [
-    { text: 'Claim 4 modified', time: '2m ago' },
-    { text: 'FIG. 2 uploaded', time: '1h ago' },
-    { text: 'Prior art search completed', time: '3h ago' },
-    { text: 'AI analysis report generated', time: '5h ago' },
-    { text: 'Project created', time: '1d ago' },
-  ];
+  // Real Project Activity Logs
+  const recentActivities = (project?.activityLogs || []).slice(0, 5);
 
-  const projectDocuments = [
-    {
-      id: 'doc-1',
-      title: 'Invention Disclosure',
-      type: 'PDF',
-      typeBadgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
-      size: '245 KB',
-      updated: 'Updated 2h ago',
-    },
-    {
-      id: 'doc-2',
-      title: 'Technical Specification',
-      type: 'DOCX',
-      typeBadgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      size: '1.2 MB',
-      updated: 'Updated 5h ago',
-    },
-    {
-      id: 'doc-3',
-      title: 'FIG. 1 - System Diagram',
-      type: 'PNG',
-      typeBadgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
-      size: '1.8 MB',
-      updated: 'Updated 1d ago',
-    },
-    {
-      id: 'doc-4',
-      title: 'AI Analysis Report',
-      type: 'PDF',
-      typeBadgeBg: 'bg-purple-50 text-purple-700 border-purple-200',
-      size: '890 KB',
-      updated: 'Updated 1d ago',
-    },
-  ];
-
-  const keyInnovationsList = [
-    'AI-driven real-time data analysis',
-    'Autonomous decision-making module',
-    'Multi-sensor intelligent fusion',
-    'Adaptive response mechanism',
-  ];
-
-  const handleAskAI = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiQuestion.trim()) return;
-
-    setAiLoading(true);
-    try {
-      const res = await api.post(`/projects/${project?.id}/ai/chat`, {
-        message: aiQuestion.trim(),
-      });
-      setAiResponse(res.data?.response || res.data?.message || 'Based on your invention specifications, Claim 1 can be reinforced by detailing the adaptive threshold module.');
-      toast.success('AI response generated!');
-    } catch (e: any) {
-      setAiResponse(
-        `Analysis for "${aiQuestion}": The current independent claims demonstrate strong novelty over US20230123456A1. Proceed with FTO mapping once Claim 4 is finalized.`
-      );
-    } finally {
-      setAiLoading(false);
-    }
-  };
+  // Key Innovations Parser
+  const keyInnovationsList: string[] = [];
+  if (project?.novelFeatures) {
+    const lines = project.novelFeatures.split(/\n|;|\./).map((s: string) => s.trim()).filter((s: string) => s.length > 5);
+    keyInnovationsList.push(...lines.slice(0, 4));
+  } else if (project?.innovationIdea) {
+    keyInnovationsList.push(project.innovationIdea.substring(0, 90) + '...');
+  }
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -401,7 +363,7 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
 
           <div className="flex flex-wrap items-center gap-3 mt-1">
             <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight flex items-center gap-2">
-              <span>{project?.title || 'Smart Autonomous Monitoring System'}</span>
+              <span>{project?.title || 'Invention Workspace'}</span>
               <button
                 onClick={() => {
                   setIsStarred(!isStarred);
@@ -414,16 +376,16 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
             </h1>
 
             <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
-              {project?.stage ? project.stage.replace(/_/g, ' ') : 'Claims Engineering'}
+              {project?.stage ? project.stage.replace(/_/g, ' ') : 'Idea'}
             </span>
           </div>
 
           <p className="text-xs text-slate-500 font-medium mt-1">
-            Project ID: <strong className="text-slate-800">PH-{project?.id ? project.id.substring(0, 8).toUpperCase() : '2024-0007'}</strong>
+            Project ID: <strong className="text-slate-800">PH-{project?.id ? project.id.substring(0, 8).toUpperCase() : '2024'}</strong>
             {' • '}
-            Created on: {project?.createdAt ? new Date(project.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '20 Apr 2024'}
+            Created: {project?.createdAt ? new Date(project.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently'}
             {' • '}
-            Inventor: <strong className="text-slate-800">{inventorsList.join(', ')}</strong>
+            Inventors: <strong className="text-slate-800">{inventorsList.join(', ')}</strong>
           </p>
         </div>
 
@@ -451,7 +413,9 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
       <div className="app-card p-6 shadow-xs">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
           <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Patent Journey</h3>
-          <span className="text-[11px] text-emerald-600 font-bold">Stage 3 of 6 • Claims Engineering</span>
+          <span className="text-[11px] text-emerald-600 font-bold">
+            Stage: {project?.stage ? project.stage.replace(/_/g, ' ') : 'Idea'}
+          </span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4 relative">
@@ -524,20 +488,20 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
             {/* Title */}
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Invention Title</span>
-              <p className="font-bold text-slate-900 mt-0.5">{project?.title || 'Smart Autonomous Monitoring System'}</p>
+              <p className="font-bold text-slate-900 mt-0.5">{project?.title || 'Untitled Project'}</p>
             </div>
 
             {/* Technical Field */}
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Technical Field</span>
-              <p className="font-semibold text-slate-800 mt-0.5">{project?.technicalDomain || 'Instrumentation, AI, Control Systems'}</p>
+              <p className="font-semibold text-slate-800 mt-0.5">{project?.technicalDomain || 'General Technology'}</p>
             </div>
 
             {/* Problem Statement */}
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Problem Statement</span>
               <p className="text-slate-600 font-medium mt-0.5 leading-relaxed">
-                {project?.problemStatement || 'Existing monitoring systems lack real-time adaptive response and autonomous decision-making.'}
+                {project?.problemStatement || 'Problem statement to be specified in Innovation Details.'}
               </p>
             </div>
 
@@ -545,23 +509,27 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Proposed Solution</span>
               <p className="text-slate-600 font-medium mt-0.5 leading-relaxed">
-                {project?.proposedSolution || 'An AI-powered autonomous monitoring system that analyzes data in real time and triggers adaptive actions.'}
+                {project?.proposedSolution || 'Proposed solution to be specified in Innovation Details.'}
               </p>
             </div>
 
             {/* Key Innovations */}
             <div className="pt-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Key Innovations</span>
-              <div className="space-y-2">
-                {keyInnovationsList.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[11px] text-slate-700 font-medium">
-                    <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[9px] shrink-0">
-                      ✓
+              {keyInnovationsList.length > 0 ? (
+                <div className="space-y-2">
+                  {keyInnovationsList.map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 text-[11px] text-slate-700 font-medium">
+                      <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[9px] shrink-0">
+                        ✓
+                      </div>
+                      <span>{item}</span>
                     </div>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-400 italic">No key innovations detailed yet.</p>
+              )}
             </div>
           </div>
 
@@ -603,45 +571,6 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
               })}
             </div>
           </div>
-
-          {/* AI Assistant Compact Panel */}
-          <div className="app-card p-5 space-y-3 bg-gradient-to-b from-white to-slate-50/70 shadow-xs border-slate-200">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
-                <Bot className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-extrabold text-slate-900">AI Assistant</h4>
-                <p className="text-[10px] text-slate-500 font-medium leading-tight">
-                  Ask anything about your invention, prior art, claims, or patentability.
-                </p>
-              </div>
-            </div>
-
-            {aiResponse && (
-              <div className="p-3 bg-emerald-50/70 border border-emerald-150 rounded-xl text-xs text-emerald-950 leading-relaxed font-medium">
-                {aiResponse}
-              </div>
-            )}
-
-            <form onSubmit={handleAskAI} className="relative">
-              <input
-                id="ai-assistant-input"
-                type="text"
-                value={aiQuestion}
-                onChange={(e) => setAiQuestion(e.target.value)}
-                placeholder="Type your question here..."
-                className="w-full pl-3.5 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/10 shadow-3xs"
-              />
-              <button
-                type="submit"
-                disabled={aiLoading}
-                className="w-7 h-7 absolute right-1.5 top-1/2 -translate-y-1/2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg flex items-center justify-center transition cursor-pointer disabled:opacity-50"
-              >
-                {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3 h-3" />}
-              </button>
-            </form>
-          </div>
         </div>
 
         {/* COLUMN 3: INTELLIGENCE OVERVIEW & RECENT ACTIVITY (4 cols) */}
@@ -668,18 +597,20 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-slate-700">{metric.label}</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-slate-900 font-mono">{metric.value}%</span>
+                      <span className="font-extrabold text-slate-900 font-mono">{metric.display}</span>
                       <span className={`text-[10px] font-extrabold ${metric.textColor}`}>
                         {metric.tag}
                       </span>
                     </div>
                   </div>
-                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${metric.color} rounded-full transition-all duration-500`}
-                      style={{ width: `${metric.value}%` }}
-                    />
-                  </div>
+                  {metric.hasValue && (
+                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${metric.color} rounded-full transition-all duration-500`}
+                        style={{ width: `${Math.max(5, Math.min(100, metric.value))}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -698,17 +629,23 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
               </button>
             </div>
 
-            <div className="space-y-3">
-              {recentActivities.map((act, idx) => (
-                <div key={idx} className="flex items-center justify-between text-xs py-0.5">
-                  <div className="flex items-center gap-2.5 text-slate-700 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                    <span>{act.text}</span>
+            {recentActivities.length > 0 ? (
+              <div className="space-y-3">
+                {recentActivities.map((act: any, idx: number) => (
+                  <div key={act.id || idx} className="flex items-center justify-between text-xs py-0.5">
+                    <div className="flex items-center gap-2.5 text-slate-700 font-medium truncate max-w-[200px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
+                      <span className="truncate">{act.action}</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-medium shrink-0">
+                      {formatTimeAgo(act.createdAt)}
+                    </span>
                   </div>
-                  <span className="text-[11px] text-slate-400 font-medium">{act.time}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-slate-400 text-xs py-4 text-center">No activity yet</div>
+            )}
           </div>
         </div>
       </div>
@@ -728,32 +665,59 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {projectDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                className="p-3.5 bg-slate-50/60 border border-slate-200/80 rounded-2xl flex flex-col justify-between space-y-3 hover:border-slate-300 transition"
-              >
-                <div className="flex items-start justify-between">
-                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${doc.typeBadgeBg}`}>
-                    {doc.type}
-                  </span>
-                  <button className="text-slate-400 hover:text-slate-700 cursor-pointer">
-                    <MoreVertical className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+          {(project?.documents?.length || 0) > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {project.documents.slice(0, 4).map((doc: any) => {
+                const isPdf = doc.name.toLowerCase().endsWith('.pdf');
+                return (
+                  <div
+                    key={doc.id}
+                    className="p-3.5 bg-slate-50/60 border border-slate-200/80 rounded-2xl flex flex-col justify-between space-y-3 hover:border-slate-300 transition"
+                  >
+                    <div className="flex items-start justify-between">
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${
+                          isPdf ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}
+                      >
+                        {isPdf ? 'PDF' : 'DOC'}
+                      </span>
+                      {doc.fileUrl && (
+                        <a
+                          href={`http://localhost:5000${doc.fileUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-slate-400 hover:text-slate-700"
+                          title="Download document"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
 
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 truncate">{doc.title}</h4>
-                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">{doc.type} • {doc.size}</p>
-                </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 truncate" title={doc.name}>
+                        {doc.name}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                        {doc.category || 'General'}
+                      </p>
+                    </div>
 
-                <div className="text-[10px] text-slate-400 font-medium pt-1 border-t border-slate-100">
-                  {doc.updated}
-                </div>
-              </div>
-            ))}
-          </div>
+                    <div className="text-[10px] text-slate-400 font-medium pt-1 border-t border-slate-100">
+                      {formatTimeAgo(doc.createdAt)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-xs text-slate-400">
+              <FileText className="w-8 h-8 mx-auto text-slate-300 mb-1" />
+              <p className="font-bold text-slate-600">No documents uploaded yet.</p>
+              <p className="text-[11px] text-slate-400">Upload or generate specifications in the Documents tab.</p>
+            </div>
+          )}
         </div>
 
         {/* Next Recommended Step (4 cols) */}
@@ -765,19 +729,41 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Next Recommended Step</span>
               <h4 className="text-xs font-extrabold text-slate-900 leading-snug">
-                Continue with Claims Engineering
+                {!hasReferences
+                  ? 'Perform Prior Art Search'
+                  : !hasClaims
+                  ? 'Draft Patent Claims'
+                  : !isFilingReady
+                  ? 'Complete Filing Forms'
+                  : 'Filing Ready'}
               </h4>
               <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                Your prior art analysis is complete. Strengthen your claims to protect your invention effectively.
+                {!hasReferences
+                  ? 'Search and save patent citations to establish strong novelty and lower prior-art risk.'
+                  : !hasClaims
+                  ? 'Generate or refine structured independent and dependent claims in Claims Studio.'
+                  : !isFilingReady
+                  ? 'Compile IPO statutory Forms 1, 2, 3, 5 and request supervisor review.'
+                  : 'All core milestones completed. Export the official filing package.'}
               </p>
             </div>
           </div>
 
           <button
-            onClick={() => onNavigateTab('Claims Studio')}
+            onClick={() => {
+              if (!hasReferences) onNavigateTab('Prior Art Search');
+              else if (!hasClaims) onNavigateTab('Claims Studio');
+              else onNavigateTab('Forms & Filing');
+            }}
             className="w-full py-3 bg-[#064E3B] hover:bg-[#043E2F] text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>Go to Claims Studio</span>
+            <span>
+              {!hasReferences
+                ? 'Go to Prior Art Search'
+                : !hasClaims
+                ? 'Go to Claims Studio'
+                : 'Go to Forms & Filing'}
+            </span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>

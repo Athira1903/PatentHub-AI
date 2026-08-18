@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateComprehensiveReportPdf = exports.getCoInventorDashboard = exports.getDashboardAnalytics = exports.getProjectAnalytics = void 0;
+exports.generateComprehensiveReportPdf = exports.getInventorDashboard = exports.getGuideDashboard = exports.getPatentExpertDashboard = exports.getCoInventorDashboard = exports.getDashboardAnalytics = exports.getProjectAnalytics = void 0;
 const analyticsService_1 = require("../services/analyticsService");
 const pdfService_1 = require("../services/pdfService");
 const getProjectAnalytics = async (req, res) => {
@@ -57,6 +57,54 @@ const getCoInventorDashboard = async (req, res) => {
     }
 };
 exports.getCoInventorDashboard = getCoInventorDashboard;
+const getPatentExpertDashboard = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized access.' });
+            return;
+        }
+        const data = await analyticsService_1.AnalyticsService.getPatentExpertDashboardData(userId);
+        res.status(200).json(data);
+    }
+    catch (error) {
+        console.error('[Get Patent Expert Dashboard Error]', error);
+        res.status(500).json({ message: error.message || 'Failed to fetch Patent Expert intelligence workspace data.' });
+    }
+};
+exports.getPatentExpertDashboard = getPatentExpertDashboard;
+const getGuideDashboard = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized access.' });
+            return;
+        }
+        const data = await analyticsService_1.AnalyticsService.getGuideDashboardData(userId);
+        res.status(200).json(data);
+    }
+    catch (error) {
+        console.error('[Get Guide Dashboard Error]', error);
+        res.status(500).json({ message: error.message || 'Failed to fetch Guide platform workspace data.' });
+    }
+};
+exports.getGuideDashboard = getGuideDashboard;
+const getInventorDashboard = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized access.' });
+            return;
+        }
+        const data = await analyticsService_1.AnalyticsService.getInventorDashboardData(userId);
+        res.status(200).json(data);
+    }
+    catch (error) {
+        console.error('[Get Inventor Dashboard Error]', error);
+        res.status(500).json({ message: error.message || 'Failed to fetch Inventor command center data.' });
+    }
+};
+exports.getInventorDashboard = getInventorDashboard;
 const generateComprehensiveReportPdf = async (req, res) => {
     try {
         const userId = req.user?.userId;

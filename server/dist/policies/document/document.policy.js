@@ -16,6 +16,9 @@ class DocumentPolicy {
         if (!member)
             return null;
         if (member.role === 'INVENTOR' || member.role === 'CO_INVENTOR') {
+            if (member.permissionLevel === 'VIEW') {
+                return 'VIEWER';
+            }
             return 'EDITOR';
         }
         if (member.role === 'GUIDE' || member.role === 'PATENT_EXPERT') {
@@ -27,46 +30,46 @@ class DocumentPolicy {
      * Can upload documents. Only OWNER, ADMIN, or EDITOR.
      */
     static canUpload(user, project) {
-        const role = this.getProjectRoleType(user, project);
+        const role = DocumentPolicy.getProjectRoleType(user, project);
         return role === 'OWNER' || role === 'ADMIN' || role === 'EDITOR';
     }
     /**
      * Can view documents. Any project member (OWNER, ADMIN, EDITOR, COMMENTER, VIEWER).
      */
-    static canView(user, project, document) {
-        const role = this.getProjectRoleType(user, project);
+    static canView(user, project, _document) {
+        const role = DocumentPolicy.getProjectRoleType(user, project);
         return role !== null;
     }
     /**
      * Can download documents. Any project member.
      */
     static canDownload(user, project, document) {
-        return this.canView(user, project, document);
+        return DocumentPolicy.canView(user, project, document);
     }
     /**
      * Can edit documents. Only OWNER, ADMIN, or EDITOR.
      */
-    static canEdit(user, project, document) {
-        const role = this.getProjectRoleType(user, project);
+    static canEdit(user, project, _document) {
+        const role = DocumentPolicy.getProjectRoleType(user, project);
         return role === 'OWNER' || role === 'ADMIN' || role === 'EDITOR';
     }
     /**
      * Can delete documents. Only OWNER, ADMIN, or EDITOR.
      */
     static canDelete(user, project, document) {
-        return this.canEdit(user, project, document);
+        return DocumentPolicy.canEdit(user, project, document);
     }
     /**
      * Can replace a document version. Only OWNER, ADMIN, or EDITOR.
      */
-    static canReplaceVersion(user, project, document) {
-        return this.canUpload(user, project);
+    static canReplaceVersion(user, project, _document) {
+        return DocumentPolicy.canUpload(user, project);
     }
     /**
      * Can add a comment to a document. OWNER, ADMIN, EDITOR, or COMMENTER.
      */
-    static canComment(user, project, document) {
-        const role = this.getProjectRoleType(user, project);
+    static canComment(user, project, _document) {
+        const role = DocumentPolicy.getProjectRoleType(user, project);
         return role === 'OWNER' || role === 'ADMIN' || role === 'EDITOR' || role === 'COMMENTER';
     }
 }

@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getUnreadNotificationsCount = exports.listMyNotifications = exports.listMyInvitations = exports.respondToInvitation = exports.inviteMember = void 0;
+exports.updateMemberPermission = exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getUnreadNotificationsCount = exports.listMyNotifications = exports.listMyInvitations = exports.respondToInvitation = exports.inviteMember = void 0;
 const db_1 = require("../config/db");
 const client_1 = require("@prisma/client");
 const mailService_1 = require("../services/mailService");
+const membership_policy_1 = require("../policies/project/membership.policy");
 const inviteMember = async (req, res) => {
     try {
         const senderId = req.user?.userId;
@@ -11,7 +12,7 @@ const inviteMember = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized.' });
             return;
         }
-        const { projectId, username, identifier, role } = req.body; // role: 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
+        const { projectId, username, identifier, role, permissionLevel } = req.body; // role: 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
         const targetQuery = (identifier || username || '').trim();
         if (!projectId || !targetQuery || !role) {
             res.status(400).json({ message: 'Project ID, identifier (email or username), and role are required.' });
@@ -21,6 +22,9 @@ const inviteMember = async (req, res) => {
             res.status(400).json({ message: `Invalid project role: ${role}` });
             return;
         }
+        const validPermissionLevel = permissionLevel && Object.values(client_1.PermissionLevel).includes(permissionLevel)
+            ? permissionLevel
+            : 'EDIT';
         const project = await db_1.prisma.patentProject.findUnique({
             where: { id: projectId },
         });
@@ -79,6 +83,7 @@ const inviteMember = async (req, res) => {
                 senderId,
                 receiverId: receiver.id,
                 role: role,
+                permissionLevel: validPermissionLevel,
                 status: 'PENDING',
             },
         });
@@ -185,6 +190,7 @@ const respondToInvitation = async (req, res) => {
                         projectId: invitation.projectId,
                         userId: receiverId,
                         role: invitation.role,
+                        permissionLevel: invitation.permissionLevel || 'EDIT',
                     },
                 });
             }
@@ -369,3 +375,63 @@ const markAllNotificationsAsRead = async (req, res) => {
     }
 };
 exports.markAllNotificationsAsRead = markAllNotificationsAsRead;
+const updateMemberPermission = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized.' });
+            return;
+        }
+        const projectId = req.params.projectId;
+        const memberId = req.params.memberId;
+        const { permissionLevel } = req.body;
+        if (!permissionLevel || !Object.values(client_1.PermissionLevel).includes(permissionLevel)) {
+            res.status(400).json({ message: 'Valid permissionLevel (VIEW, EDIT, SUBMIT) is required.' });
+            return;
+        }
+        const project = await db_1.prisma.patentProject.findUnique({
+            where: { id: projectId },
+            include: { members: true },
+        });
+        if (!project) {
+            res.status(404).json({ message: 'Project not found.' });
+            return;
+        }
+        const canUpdate = membership_policy_1.MembershipPolicy.canUpdatePermissionLevel(req.user, project, memberId);
+        if (!canUpdate) {
+            res.status(403).json({ message: 'Access denied. Only project owners and administrators can adjust member permissions.' });
+            return;
+        }
+        const updatedMember = await db_1.prisma.projectMember.update({
+            where: {
+                projectId_userId: {
+                    projectId,
+                    userId: memberId,
+                },
+            },
+            data: {
+                permissionLevel: permissionLevel,
+            },
+            include: {
+                user: { select: { id: true, fullName: true, username: true } },
+            },
+        });
+        // Log Activity
+        await db_1.prisma.activityLog.create({
+            data: {
+                userId,
+                projectId,
+                action: `Updated permission level for ${updatedMember.user.fullName} to ${permissionLevel}.`,
+                type: 'MEMBERSHIP',
+            },
+        });
+        res.status(200).json({
+            message: `Permission level updated to ${permissionLevel} for ${updatedMember.user.fullName}.`,
+            member: updatedMember,
+        });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to update member permission.' });
+    }
+};
+exports.updateMemberPermission = updateMemberPermission;

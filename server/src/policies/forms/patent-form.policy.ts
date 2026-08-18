@@ -18,7 +18,7 @@ export class PatentFormPolicy {
   static validateDependencies(project: any, formType: string): boolean {
     if (formType === 'Form 2' || formType === '2') {
       // Form 2 cannot be submitted until Form 1 exists.
-      return this.hasForm(project, '1');
+      return PatentFormPolicy.hasForm(project, '1');
     }
     return true;
   }
@@ -28,31 +28,35 @@ export class PatentFormPolicy {
    */
   static areMandatoryFormsComplete(project: any): boolean {
     return (
-      this.hasForm(project, '1') &&
-      this.hasForm(project, '2') &&
-      this.hasForm(project, '3') &&
-      this.hasForm(project, '5')
+      PatentFormPolicy.hasForm(project, '1') &&
+      PatentFormPolicy.hasForm(project, '2') &&
+      PatentFormPolicy.hasForm(project, '3') &&
+      PatentFormPolicy.hasForm(project, '5')
     );
   }
 
   /**
    * Check if the user can create/fill a form.
    */
-  static canCreate(user: any, project: any, formType: string): boolean {
+  static canCreate(user: any, project: any, _formType: string): boolean {
     if (!user) return false;
     if (user.role === 'Admin') return true;
+    if (project.ownerId === user.userId) return true;
 
-    const isOwner = project.ownerId === user.userId;
     const projectMember = project.members?.find((m: any) => m.userId === user.userId);
-    const isInventor = projectMember?.role === 'INVENTOR' || projectMember?.role === 'CO_INVENTOR';
+    if (!projectMember) return false;
 
-    return isOwner || isInventor;
+    const isInventor = projectMember.role === 'INVENTOR' || projectMember.role === 'CO_INVENTOR';
+    if (!isInventor) return false;
+
+    // VIEW permission level cannot create/edit forms
+    return projectMember.permissionLevel === 'EDIT' || projectMember.permissionLevel === 'SUBMIT' || !projectMember.permissionLevel;
   }
 
   /**
    * Check if the user can view forms.
    */
-  static canView(user: any, project: any, formType: string): boolean {
+  static canView(user: any, project: any, _formType: string): boolean {
     if (!user) return false;
     if (user.role === 'Admin') return true;
 
@@ -66,18 +70,24 @@ export class PatentFormPolicy {
    * Check if the user can edit a form.
    */
   static canEdit(user: any, project: any, formType: string): boolean {
-    return this.canCreate(user, project, formType);
+    return PatentFormPolicy.canCreate(user, project, formType);
   }
 
   /**
    * Check if the user can submit a form.
    */
   static canSubmit(user: any, project: any, formType: string): boolean {
-    const hasCreatorRights = this.canCreate(user, project, formType);
-    if (!hasCreatorRights) return false;
+    if (!user) return false;
+    if (user.role === 'Admin') return true;
+
+    const isOwner = project.ownerId === user.userId;
+    const projectMember = project.members?.find((m: any) => m.userId === user.userId);
+    const hasSubmitRights = isOwner || (projectMember && projectMember.permissionLevel === 'SUBMIT');
+
+    if (!hasSubmitRights) return false;
 
     // Check dependencies
-    return this.validateDependencies(project, formType);
+    return PatentFormPolicy.validateDependencies(project, formType);
   }
 
   /**
@@ -91,11 +101,11 @@ export class PatentFormPolicy {
     const projectRole = projectMember?.role;
 
     if (projectRole === 'GUIDE') {
-      return this.areMandatoryFormsComplete(project);
+      return PatentFormPolicy.areMandatoryFormsComplete(project);
     }
 
     if (projectRole === 'PATENT_EXPERT') {
-      return this.areMandatoryFormsComplete(project);
+      return PatentFormPolicy.areMandatoryFormsComplete(project);
     }
 
     return false;

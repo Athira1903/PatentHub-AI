@@ -40,8 +40,27 @@ export class TaskService {
     }
 
     // Validate assigned user is a valid project member
-    if (data.assignedToId) {
-      const isMember = await this.isProjectMember(projectId, data.assignedToId);
+    let resolvedAssignedToId = data.assignedToId || null;
+    if (!resolvedAssignedToId && (data as any).assignedToUsername) {
+      const usernameInput = (data as any).assignedToUsername.trim();
+      if (usernameInput) {
+        const foundUser = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { username: { equals: usernameInput, mode: 'insensitive' } },
+              { email: { equals: usernameInput, mode: 'insensitive' } },
+              { fullName: { equals: usernameInput, mode: 'insensitive' } }
+            ]
+          }
+        });
+        if (foundUser) {
+          resolvedAssignedToId = foundUser.id;
+        }
+      }
+    }
+
+    if (resolvedAssignedToId) {
+      const isMember = await this.isProjectMember(projectId, resolvedAssignedToId);
       if (!isMember) {
         throw new Error('Task assigned user is not a valid member of this project.');
       }
@@ -62,7 +81,7 @@ export class TaskService {
         priority,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         createdBy: creatorId,
-        assignedToId: data.assignedToId || null
+        assignedToId: resolvedAssignedToId
       },
       include: {
         assignedTo: { select: { id: true, fullName: true, username: true } }
@@ -94,12 +113,32 @@ export class TaskService {
   }
 
   /**
-   * Retrieves all tasks for a project with optional status filter.
+   * Retrieves all tasks for a project with user role/assignment visibility and optional status filter.
    */
-  static async getProjectTasks(projectId: string, statusFilter?: string): Promise<Task[]> {
+  static async getProjectTasks(
+    projectId: string,
+    userId?: string,
+    userRole?: string,
+    statusFilter?: string
+  ): Promise<Task[]> {
+    const project = await prisma.patentProject.findUnique({
+      where: { id: projectId },
+      select: { ownerId: true }
+    });
+
+    const isOwnerOrAdmin = userRole === 'Admin' || (project && userId && project.ownerId === userId);
+
     const whereClause: any = { projectId };
     if (statusFilter && statusFilter.toUpperCase() !== 'ALL') {
       whereClause.status = statusFilter.toUpperCase();
+    }
+
+    // If not project owner or admin, only see tasks assigned to the user or created by the user
+    if (!isOwnerOrAdmin && userId) {
+      whereClause.OR = [
+        { assignedToId: userId },
+        { createdBy: userId }
+      ];
     }
 
     return prisma.task.findMany({
@@ -160,10 +199,11 @@ export class TaskService {
     }
 
     if (data.status) {
-      const s = data.status.toUpperCase();
+      let s = data.status.toUpperCase();
+      if (s === 'PENDING') s = 'TODO';
       const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
       if (!validStatuses.includes(s)) {
-        throw new Error(`Invalid status "${data.status}".`);
+        throw new Error(`Invalid status "${data.status}". Valid values: TODO, IN_PROGRESS, COMPLETED, CANCELLED.`);
       }
       updateData.status = s;
 

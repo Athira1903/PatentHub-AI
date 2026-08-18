@@ -25,6 +25,7 @@ const prototypeService_1 = require("../services/prototypeService");
 const pdfService_1 = require("../services/pdfService");
 const activityService_1 = require("../services/activityService");
 const notificationService_1 = require("../services/notificationService");
+const mailService_1 = require("../services/mailService");
 const taskService_1 = require("../services/taskService");
 const analyticsService_1 = require("../services/analyticsService");
 const claimService_1 = require("../services/claimService");
@@ -329,6 +330,7 @@ test('Controller: respondToInvitation successfully accepts and writes within a t
     const originalUpdate = db_1.prisma.invitation.update;
     const originalCreateMember = db_1.prisma.projectMember.create;
     const originalCreateNotification = db_1.prisma.notification.create;
+    const originalUpdateManyNotification = db_1.prisma.notification.updateMany;
     const originalCreateActivity = db_1.prisma.activityLog.create;
     let invitationUpdated = false;
     let memberCreated = false;
@@ -340,7 +342,8 @@ test('Controller: respondToInvitation successfully accepts and writes within a t
         role: 'GUIDE',
         status: 'PENDING',
         project: { id: 'p1', title: 'Test Project' },
-        receiver: { fullName: 'Recipient Name' }
+        receiver: { fullName: 'Recipient Name', username: 'recipient_user' },
+        sender: { id: 'sender_1', email: 'sender@example.com', fullName: 'Sender Name' },
     });
     db_1.prisma.projectMember.findUnique = async () => null;
     db_1.prisma.$transaction = async (callback) => {
@@ -360,6 +363,9 @@ test('Controller: respondToInvitation successfully accepts and writes within a t
         notificationsDispatched = true;
         return {};
     };
+    db_1.prisma.notification.updateMany = async () => {
+        return { count: 1 };
+    };
     db_1.prisma.activityLog.create = async () => {
         return {};
     };
@@ -374,6 +380,7 @@ test('Controller: respondToInvitation successfully accepts and writes within a t
     db_1.prisma.invitation.update = originalUpdate;
     db_1.prisma.projectMember.create = originalCreateMember;
     db_1.prisma.notification.create = originalCreateNotification;
+    db_1.prisma.notification.updateMany = originalUpdateManyNotification;
     db_1.prisma.activityLog.create = originalCreateActivity;
 });
 // ----------------------------------------------------
@@ -3166,6 +3173,76 @@ test('Co-Inventor Integration (2): Co-Inventor cannot delete or archive projects
     const coInventorUser = { userId: 'coinventor_1', role: 'CoInventor' };
     assert_1.default.strictEqual(project_policy_1.ProjectPolicy.canDeleteProject(coInventorUser, project1), false);
     assert_1.default.strictEqual(project_policy_1.ProjectPolicy.canArchiveProject(coInventorUser, project1), false);
+});
+test('Collaboration & Notification (1): NotificationService creates persistent database notifications with user isolation', async () => {
+    const origCreate = db_1.prisma.notification.create;
+    db_1.prisma.notification.create = async ({ data }) => ({
+        id: 'notif_mock_1',
+        createdAt: new Date(),
+        readAt: null,
+        metadata: data.metadata || null,
+        ...data,
+    });
+    const user1 = 'test_user_notif_1';
+    const n1 = await notificationService_1.NotificationService.createNotification(user1, 'Collaboration Request', 'Alice invited you to collaborate on Smart Traffic Signal.', 'INVITATION', 'inv-100', 'proj-100', { role: 'CO_INVENTOR' });
+    assert_1.default.ok(n1);
+    assert_1.default.strictEqual(n1?.userId, user1);
+    assert_1.default.strictEqual(n1?.isRead, false);
+    assert_1.default.strictEqual(n1?.type, 'INVITATION');
+    db_1.prisma.notification.create = origCreate;
+});
+test('Collaboration & Notification (2): Notification recipient ownership and unread count', async () => {
+    const origCount = db_1.prisma.notification.count;
+    db_1.prisma.notification.count = async ({ where }) => {
+        assert_1.default.strictEqual(where.userId, 'test_user_notif_1');
+        assert_1.default.strictEqual(where.isRead, false);
+        return 3;
+    };
+    const user1 = 'test_user_notif_1';
+    const unread = await notificationService_1.NotificationService.getUnreadCount(user1);
+    assert_1.default.strictEqual(unread, 3);
+    db_1.prisma.notification.count = origCount;
+});
+test('Collaboration & Notification (3): InvitationPolicy validates sender authority and prevents unauthorized invites', async () => {
+    const origFindFirst = db_1.prisma.user.findFirst;
+    const origFindUnique = db_1.prisma.user.findUnique;
+    db_1.prisma.user.findFirst = async () => ({ id: 'target_id', username: 'target_user', email: 'target@example.com' });
+    db_1.prisma.user.findUnique = async () => ({ id: 'target_id', username: 'target_user', email: 'target@example.com' });
+    const project = {
+        id: 'proj_auth_1',
+        ownerId: 'owner_1',
+        members: [{ userId: 'member_1', role: 'CO_INVENTOR' }]
+    };
+    const owner = { userId: 'owner_1', role: 'Inventor' };
+    const stranger = { userId: 'stranger_1', role: 'Inventor' };
+    // Owner can invite
+    const canOwnerInvite = await invitation_policy_1.InvitationPolicy.canInvite(owner, project, 'target_user', 'CO_INVENTOR');
+    assert_1.default.strictEqual(canOwnerInvite, true);
+    // Stranger cannot invite (throws Access Denied Error)
+    await assert_1.default.rejects(async () => {
+        await invitation_policy_1.InvitationPolicy.canInvite(stranger, project, 'target_user', 'CO_INVENTOR');
+    }, /Access denied/);
+    db_1.prisma.user.findFirst = origFindFirst;
+    db_1.prisma.user.findUnique = origFindUnique;
+});
+test('Collaboration & Notification (4): InvitationPolicy enforces recipient ownership on accept / reject', async () => {
+    const invitation = {
+        id: 'inv_101',
+        projectId: 'proj_101',
+        senderId: 'owner_1',
+        receiverId: 'target_receiver',
+        role: 'CO_INVENTOR',
+        status: 'PENDING'
+    };
+    const correctReceiver = { userId: 'target_receiver', role: 'CoInventor' };
+    const unauthorizedUser = { userId: 'impostor_user', role: 'CoInventor' };
+    assert_1.default.strictEqual(invitation_policy_1.InvitationPolicy.canAccept(correctReceiver, invitation), true);
+    assert_1.default.strictEqual(invitation_policy_1.InvitationPolicy.canAccept(unauthorizedUser, invitation), false);
+});
+test('Collaboration & Notification (5): Email failure does not throw or break mail service caller', async () => {
+    // Test that mailService returns a boolean and does not throw on invalid recipient
+    const res = await mailService_1.MailService.sendCollaborationInviteEmail('invalid-email@test.internal', 'Test Recipient', 'Test Sender', 'Test Project', 'co-inventor');
+    assert_1.default.strictEqual(typeof res, 'boolean');
 });
 // Summary reporting and sequential execution
 async function runAllTests() {

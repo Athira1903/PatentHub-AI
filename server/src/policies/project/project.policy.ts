@@ -53,7 +53,7 @@ export class ProjectPolicy {
    * Determine if the user can restore (unarchive) a project.
    */
   static canRestoreProject(user: any, project: any): boolean {
-    return this.canArchiveProject(user, project);
+    return ProjectPolicy.canArchiveProject(user, project);
   }
 
   /**
@@ -73,27 +73,27 @@ export class ProjectPolicy {
     if (!user) return false;
     if (user.role === 'Admin') return true;
 
-    const isOwner = project.ownerId === user.userId;
-    const isMember = project.members?.some((m: any) => m.userId === user.userId);
+    if (project.ownerId === user.userId) return true;
 
-    return isOwner || isMember;
+    const member = project.members?.find((m: any) => m.userId === user.userId);
+    if (!member) return false;
+
+    // VIEW permission cannot create tasks
+    return member.permissionLevel === 'EDIT' || member.permissionLevel === 'SUBMIT' || !member.permissionLevel;
   }
 
   /**
    * Determine if a user can update a task.
    */
   static canUpdateTask(user: any, project: any): boolean {
-    return this.canCreateTask(user, project);
+    return ProjectPolicy.canCreateTask(user, project);
   }
 
   /**
    * Determine if a user can delete a task.
    */
   static canDeleteTask(user: any, project: any): boolean {
-    if (!user) return false;
-    if (user.role === 'Admin') return true;
-
-    return project.ownerId === user.userId;
+    return ProjectPolicy.canCreateTask(user, project);
   }
 
   /**

@@ -48,7 +48,7 @@ class ProjectService {
                     { members: { some: { userId } } },
                 ],
             };
-        return db_1.prisma.patentProject.findMany({
+        const projects = await db_1.prisma.patentProject.findMany({
             where: whereClause,
             include: {
                 owner: {
@@ -56,13 +56,14 @@ class ProjectService {
                 },
                 members: {
                     include: {
-                        user: { select: { id: true, fullName: true, username: true } },
+                        user: { select: { id: true, fullName: true, username: true, role: true } },
                     },
                 },
                 tasks: {
                     include: {
                         assignedTo: { select: { id: true, fullName: true, username: true } },
                     },
+                    orderBy: { createdAt: 'desc' }
                 },
                 comments: {
                     include: {
@@ -76,6 +77,19 @@ class ProjectService {
             },
             orderBy: { updatedAt: 'desc' },
         });
+        // Task Visibility Rules:
+        // - Project Owners & Admins see all tasks for their projects and whom they are assigned to.
+        // - Collaborators/Members only see tasks assigned to them or created/assigned by them.
+        return projects.map((p) => {
+            const isOwnerOrAdmin = userRole === 'Admin' || p.ownerId === userId;
+            if (isOwnerOrAdmin) {
+                return p;
+            }
+            return {
+                ...p,
+                tasks: p.tasks.filter((t) => t.assignedToId === userId || t.createdBy === userId)
+            };
+        });
     }
     static async getProjectById(projectId, userId, userRole) {
         const project = await db_1.prisma.patentProject.findUnique({
@@ -86,11 +100,16 @@ class ProjectService {
                 },
                 members: {
                     include: {
-                        user: { select: { id: true, fullName: true, username: true, email: true, institution: true } },
+                        user: { select: { id: true, fullName: true, username: true, email: true, institution: true, role: true } },
                     },
                 },
                 documents: { orderBy: { createdAt: 'desc' } },
-                tasks: { orderBy: { createdAt: 'desc' } },
+                tasks: {
+                    include: {
+                        assignedTo: { select: { id: true, fullName: true, username: true } }
+                    },
+                    orderBy: { createdAt: 'desc' }
+                },
                 comments: {
                     include: {
                         user: { select: { id: true, fullName: true, username: true, role: true } }
@@ -115,7 +134,15 @@ class ProjectService {
         if (!isOwner && !isMember && !isAdmin) {
             throw new Error('Access denied. You are not a member of this project.');
         }
-        return { ...project, isOwner: isOwner || isAdmin };
+        // Filter tasks if member
+        const filteredTasks = (isOwner || isAdmin)
+            ? project.tasks
+            : project.tasks.filter((t) => t.assignedToId === userId || t.createdBy === userId);
+        return {
+            ...project,
+            tasks: filteredTasks,
+            isOwner: isOwner || isAdmin
+        };
     }
     static async updateProject(projectId, userId, input) {
         const project = await db_1.prisma.patentProject.findUnique({ where: { id: projectId } });

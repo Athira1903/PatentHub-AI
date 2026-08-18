@@ -10,7 +10,7 @@ export class InvitationPolicy {
     user: any,
     project: any,
     inviteeUsername: string,
-    roleToInvite: ProjectRole
+    _roleToInvite: ProjectRole
   ): Promise<boolean> {
     if (!user) return false;
 
@@ -93,14 +93,14 @@ export class InvitationPolicy {
    * Determine if user can reject a project invitation.
    */
   static canReject(user: any, invitation: any): boolean {
-    return this.canAccept(user, invitation);
+    return InvitationPolicy.canAccept(user, invitation);
   }
 
   /**
    * Determine if user can remove a member from the project.
    * Only owner or admin can remove.
    */
-  static canRemoveMember(user: any, project: any, memberId: string): boolean {
+  static canRemoveMember(user: any, project: any, _memberId: string): boolean {
     if (!user) return false;
     if (user.role === 'Admin') return true;
 

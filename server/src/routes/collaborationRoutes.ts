@@ -8,6 +8,7 @@ import {
   getUnreadNotificationsCount,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  updateMemberPermission,
 } from '../controllers/collaborationController';
 import { authorize } from '../policies/middleware/authorize';
 import { InvitationPolicy } from '../policies/invitation/invitation.policy';
@@ -66,5 +67,7 @@ router.put(
   }) as any,
   markNotificationAsRead as any
 );
+
+router.put('/projects/:projectId/members/:memberId/permission', updateMemberPermission as any);
 
 export default router;

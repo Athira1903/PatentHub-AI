@@ -25,6 +25,9 @@ import {
   Users,
   Activity,
   Lightbulb,
+  MessageSquare,
+  BarChart3,
+  FileCheck,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -130,6 +133,7 @@ export const DashboardLayout: React.FC = () => {
   }, [applicantType, calcPages, calcClaims]);
 
   useEffect(() => {
+    if (user) return;
     const fetchProfile = async () => {
       try {
         const response = await api.get('/auth/profile');
@@ -145,7 +149,7 @@ export const DashboardLayout: React.FC = () => {
       }
     };
     fetchProfile();
-  }, [navigate, location.pathname]);
+  }, [navigate, user]);
 
   const handleLogout = () => {
     localStorage.removeItem('patenthub_token');
@@ -155,16 +159,32 @@ export const DashboardLayout: React.FC = () => {
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Administrator';
   const isCoInventor = user?.role === 'CoInventor' || user?.role === 'CO_INVENTOR' || user?.role === 'Co-Inventor';
+  const isPatentExpert = user?.role === 'PatentExpert' || user?.role === 'Patent Expert' || user?.role === 'PATENT_EXPERT';
+  const isGuide = user?.role === 'Guide' || user?.role === 'GUIDE';
 
-  const navItems = isCoInventor
+  const navItems = isGuide
     ? [
         { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
-        { label: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare, badge: '8' },
-        { label: 'Claims', path: '/dashboard/projects', icon: PenTool },
-        { label: 'Documents', path: '/dashboard/projects', icon: FileText },
+        { label: 'Review Queue', path: '/dashboard/reviews', icon: CheckSquare, badge: '5' },
+        { label: 'Claims', path: '/dashboard/claims', icon: PenTool },
+        { label: 'Prior Art', path: '/dashboard/prior-art', icon: Search },
         { label: 'Drawings', path: '/dashboard/projects', icon: Layers },
-        { label: 'Reviews', path: '/dashboard/projects', icon: Scale },
+        { label: 'Documents', path: '/dashboard/documents', icon: FileText },
+      ]
+    : isPatentExpert
+    ? [
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'Review Queue', path: '/dashboard/reviews', icon: CheckSquare, badge: '3' },
+        { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
+      ]
+    : isCoInventor
+    ? [
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
+        { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+        { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
+        { label: 'Settings', path: '/dashboard/profile', icon: Settings },
       ]
     : [
         { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -175,15 +195,53 @@ export const DashboardLayout: React.FC = () => {
         ...(isAdmin ? [{ label: 'Admin Governance', path: '/admin', icon: Shield }] : []),
       ];
 
-  const collaborationItems = isCoInventor
+  const intelligenceItems = isPatentExpert
     ? [
-        { label: 'Team', path: '/dashboard/projects', icon: Users },
-        { label: 'Activity', path: '/dashboard/notifications', icon: Activity },
+        { label: 'Prior Art Search', path: '/dashboard/prior-art', icon: Search },
+        { label: 'Claims Engineering', path: '/dashboard/claims', icon: PenTool },
+        { label: 'FTO Analysis', path: '/dashboard/reviews', icon: Scale },
+        { label: 'Patentability Review', path: '/dashboard/reviews', icon: Shield },
       ]
     : [];
 
-  const settingsItems = isCoInventor
+  const documentItems = isPatentExpert
     ? [
+        { label: 'Specifications', path: '/dashboard/documents', icon: FileText },
+        { label: 'Forms', path: '/dashboard/projects', icon: FileText },
+        { label: 'Drawings', path: '/dashboard/projects', icon: Layers },
+        { label: 'Reports', path: '/dashboard/projects', icon: FileText },
+      ]
+    : [];
+
+  const supervisionItems = isGuide
+    ? [
+        { label: 'Inventors', path: '/dashboard/team', icon: Users },
+        { label: 'Feedback', path: '/dashboard/reviews', icon: MessageSquare },
+        { label: 'Reviews', path: '/dashboard/reviews', icon: Scale },
+        { label: 'Activity', path: '/dashboard/activity', icon: Activity },
+      ]
+    : [];
+
+  const reportItems = isGuide
+    ? [
+        { label: 'Filing Readiness', path: '/dashboard/projects', icon: FileCheck },
+        { label: 'Project Analytics', path: '/dashboard/projects', icon: BarChart3 },
+        { label: 'Reports', path: '/dashboard/projects', icon: FileText },
+      ]
+    : [];
+
+  const collaborationItems = isPatentExpert
+    ? [
+        { label: 'Inventors', path: '/dashboard/team', icon: Users },
+        { label: 'Guides', path: '/dashboard/team', icon: Users },
+        { label: 'Activity', path: '/dashboard/activity', icon: Activity },
+      ]
+    : [];
+
+  const settingsItems = isPatentExpert || isGuide
+    ? [
+        { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
+        { label: 'Profile', path: '/dashboard/profile', icon: User },
         { label: 'Settings', path: '/dashboard/profile', icon: Settings },
       ]
     : [];
@@ -192,10 +250,11 @@ export const DashboardLayout: React.FC = () => {
   const getBreadcrumbs = () => {
     const p = location.pathname;
     if (p === '/admin') return { parent: 'Platform', current: 'Admin Dashboard' };
-    if (p === '/dashboard') return { parent: 'Workspace', current: isCoInventor ? 'Co-Inventor Workspace' : 'Inventor Dashboard' };
+    if (p === '/dashboard') return { parent: 'Workspace', current: isGuide ? 'Patent Development Platform' : isPatentExpert ? 'Patent Intelligence Workspace' : isCoInventor ? 'Co-Inventor Workspace' : 'Inventor Dashboard' };
     if (p.includes('/dashboard/projects/')) return { parent: 'Projects', current: 'Project Overview' };
-    if (p.includes('/dashboard/projects')) return { parent: 'Workspace', current: isCoInventor ? 'My Projects' : 'My Inventions' };
+    if (p.includes('/dashboard/projects')) return { parent: 'Workspace', current: isCoInventor || isPatentExpert || isGuide ? 'My Projects' : 'My Inventions' };
     if (p.includes('/dashboard/tasks')) return { parent: 'Workspace', current: 'Tasks' };
+    if (p.includes('/dashboard/reviews')) return { parent: 'Workspace', current: 'Review Queue' };
     if (p.includes('/dashboard/notifications')) return { parent: 'Workspace', current: 'Notifications' };
     if (p.includes('/dashboard/create-project')) return { parent: 'Projects', current: 'Create Invention' };
     if (p.includes('/dashboard/profile')) return { parent: 'Settings', current: 'Account Profile' };
@@ -225,7 +284,7 @@ export const DashboardLayout: React.FC = () => {
                     PatentHub-AI
                   </span>
                   <span className="text-[9px] text-emerald-700 font-bold uppercase tracking-wider block mt-0.5">
-                    {isCoInventor ? 'Co-Inventor Workspace' : `${user?.role || 'Inventor'} Workspace`}
+                    {isGuide ? 'Patent Development Platform' : isPatentExpert ? 'Patent Intelligence Workspace' : isCoInventor ? 'Co-Inventor Workspace' : `${user?.role || 'Inventor'} Workspace`}
                   </span>
                 </div>
               )}
@@ -233,21 +292,21 @@ export const DashboardLayout: React.FC = () => {
           </div>
 
           {/* Navigation Items */}
-          <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
+          <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive =
                 item.path === '/dashboard'
                   ? location.pathname === '/dashboard'
-                  : location.pathname.startsWith(item.path);
+                  : location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path + '/'));
 
               return (
                 <Link
                   key={item.label}
                   to={item.path}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                  className={`flex items-center justify-between px-3.5 py-2 rounded-2xl text-xs font-bold transition-all ${
                     isActive
-                      ? isCoInventor
+                      ? isCoInventor || isPatentExpert || isGuide
                         ? 'bg-[#E6F4EA] text-[#064E3B] font-extrabold shadow-3xs'
                         : 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
@@ -255,12 +314,12 @@ export const DashboardLayout: React.FC = () => {
                 >
                   <div className="flex items-center gap-3">
                     <Icon className={`w-4 h-4 shrink-0 ${
-                      isActive ? (isCoInventor ? 'text-[#064E3B]' : 'text-white') : 'text-slate-400'
+                      isActive ? (isCoInventor || isPatentExpert || isGuide ? 'text-[#064E3B]' : 'text-white') : 'text-slate-400'
                     }`} />
                     {!collapsed && <span>{item.label}</span>}
                   </div>
                   {!collapsed && (item as any).badge && (
-                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-extrabold">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
                       {(item as any).badge}
                     </span>
                   )}
@@ -268,9 +327,97 @@ export const DashboardLayout: React.FC = () => {
               );
             })}
 
-            {/* Collaboration Group for Co-Inventor */}
+            {/* Supervision Group for Guide */}
+            {supervisionItems.length > 0 && !collapsed && (
+              <div className="pt-3 pb-1">
+                <span className="px-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                  Supervision
+                </span>
+                {supervisionItems.map((sItem) => {
+                  const Icon = sItem.icon;
+                  return (
+                    <Link
+                      key={sItem.label}
+                      to={sItem.path}
+                      className="flex items-center gap-3 px-3.5 py-2 rounded-2xl text-xs font-bold text-slate-600 hover:text-slate-950 hover:bg-slate-50 transition-all"
+                    >
+                      <Icon className="w-4 h-4 text-slate-400" />
+                      <span>{sItem.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Reports Group for Guide */}
+            {reportItems.length > 0 && !collapsed && (
+              <div className="pt-3 pb-1">
+                <span className="px-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                  Reports
+                </span>
+                {reportItems.map((rItem) => {
+                  const Icon = rItem.icon;
+                  return (
+                    <Link
+                      key={rItem.label}
+                      to={rItem.path}
+                      className="flex items-center gap-3 px-3.5 py-2 rounded-2xl text-xs font-bold text-slate-600 hover:text-slate-950 hover:bg-slate-50 transition-all"
+                    >
+                      <Icon className="w-4 h-4 text-slate-400" />
+                      <span>{rItem.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Patent Intelligence Group for Patent Expert */}
+            {intelligenceItems.length > 0 && !collapsed && (
+              <div className="pt-3 pb-1">
+                <span className="px-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                  Patent Intelligence
+                </span>
+                {intelligenceItems.map((iItem) => {
+                  const Icon = iItem.icon;
+                  return (
+                    <Link
+                      key={iItem.label}
+                      to={iItem.path}
+                      className="flex items-center gap-3 px-3.5 py-2 rounded-2xl text-xs font-bold text-slate-600 hover:text-slate-950 hover:bg-slate-50 transition-all"
+                    >
+                      <Icon className="w-4 h-4 text-slate-400" />
+                      <span>{iItem.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Documents Group for Patent Expert */}
+            {documentItems.length > 0 && !collapsed && (
+              <div className="pt-3 pb-1">
+                <span className="px-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                  Documents
+                </span>
+                {documentItems.map((dItem) => {
+                  const Icon = dItem.icon;
+                  return (
+                    <Link
+                      key={dItem.label}
+                      to={dItem.path}
+                      className="flex items-center gap-3 px-3.5 py-2 rounded-2xl text-xs font-bold text-slate-600 hover:text-slate-950 hover:bg-slate-50 transition-all"
+                    >
+                      <Icon className="w-4 h-4 text-slate-400" />
+                      <span>{dItem.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Collaboration Group */}
             {collaborationItems.length > 0 && !collapsed && (
-              <div className="pt-4 pb-1">
+              <div className="pt-3 pb-1">
                 <span className="px-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
                   Collaboration
                 </span>
@@ -290,11 +437,11 @@ export const DashboardLayout: React.FC = () => {
               </div>
             )}
 
-            {/* Settings Group for Co-Inventor */}
+            {/* System / Settings Group */}
             {settingsItems.length > 0 && !collapsed && (
               <div className="pt-3 pb-1">
                 <span className="px-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                  Settings
+                  {isPatentExpert || isGuide ? 'System' : 'Settings'}
                 </span>
                 {settingsItems.map((sItem) => {
                   const Icon = sItem.icon;

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateSettings = exports.getSettings = exports.createAnnouncement = exports.getAnnouncements = exports.getAiOperations = exports.getClaimsFtoOversight = exports.getReviewsOversight = exports.assignProjectReviewer = exports.getProjects = exports.createOrganization = exports.getOrganizations = exports.processVerification = exports.getVerifications = exports.deleteUser = exports.updateUserRole = exports.updateUserStatus = exports.getUsers = exports.getDashboardMetrics = void 0;
+exports.updateRolePermissions = exports.getRolePermissions = exports.getOrganizationDetails = exports.getUserProfile = exports.getRolesStats = exports.broadcastNotification = exports.getNotifications = exports.getActivityLogs = exports.updateSettings = exports.getSettings = exports.createAnnouncement = exports.getAnnouncements = exports.getAiOperations = exports.getClaimsFtoOversight = exports.getReviewsOversight = exports.assignProjectReviewer = exports.getProjects = exports.createOrganization = exports.getOrganizations = exports.processVerification = exports.getVerifications = exports.deleteUser = exports.updateUserRole = exports.updateUserStatus = exports.getUsers = exports.getDashboardMetrics = void 0;
 const adminService_1 = require("../services/adminService");
 const getDashboardMetrics = async (req, res) => {
     try {
@@ -198,3 +198,99 @@ const updateSettings = async (req, res) => {
     }
 };
 exports.updateSettings = updateSettings;
+const getActivityLogs = async (req, res) => {
+    try {
+        const { search, type, page, limit } = req.query;
+        const data = await adminService_1.AdminService.getActivityLogs(search, type, page ? parseInt(page, 10) : 1, limit ? parseInt(limit, 10) : 25);
+        res.status(200).json(data);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch activity logs.' });
+    }
+};
+exports.getActivityLogs = getActivityLogs;
+const getNotifications = async (req, res) => {
+    try {
+        const { search, type, isRead, page, limit } = req.query;
+        const isReadBool = isRead === 'true' ? true : isRead === 'false' ? false : undefined;
+        const data = await adminService_1.AdminService.getPlatformNotifications(search, type, isReadBool, page ? parseInt(page, 10) : 1, limit ? parseInt(limit, 10) : 25);
+        res.status(200).json(data);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch platform notifications.' });
+    }
+};
+exports.getNotifications = getNotifications;
+const broadcastNotification = async (req, res) => {
+    try {
+        const { title, message, type, targetRole } = req.body;
+        if (!title || !message) {
+            res.status(400).json({ message: 'Title and message are required.' });
+            return;
+        }
+        const result = await adminService_1.AdminService.broadcastNotification({ title, message, type, targetRole });
+        res.status(201).json(result);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to broadcast notification.' });
+    }
+};
+exports.broadcastNotification = broadcastNotification;
+const getRolesStats = async (req, res) => {
+    try {
+        const data = await adminService_1.AdminService.getRolesStats();
+        res.status(200).json(data);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch roles & permissions stats.' });
+    }
+};
+exports.getRolesStats = getRolesStats;
+const getUserProfile = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const profile = await adminService_1.AdminService.getUserProfile(id);
+        res.status(200).json(profile);
+    }
+    catch (error) {
+        res.status(404).json({ message: error.message || 'Failed to fetch user profile.' });
+    }
+};
+exports.getUserProfile = getUserProfile;
+const getOrganizationDetails = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const details = await adminService_1.AdminService.getOrganizationDetails(id);
+        res.status(200).json(details);
+    }
+    catch (error) {
+        res.status(404).json({ message: error.message || 'Failed to fetch organization details.' });
+    }
+};
+exports.getOrganizationDetails = getOrganizationDetails;
+const getRolePermissions = async (req, res) => {
+    try {
+        const data = adminService_1.AdminService.getRolePermissions();
+        res.status(200).json(data);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch role permissions matrix.' });
+    }
+};
+exports.getRolePermissions = getRolePermissions;
+const updateRolePermissions = async (req, res) => {
+    try {
+        const roleName = req.params.roleName;
+        const { permissions } = req.body;
+        if (!Array.isArray(permissions)) {
+            res.status(400).json({ message: 'Permissions array is required.' });
+            return;
+        }
+        const result = await adminService_1.AdminService.updateRolePermissions(roleName, permissions, req.user?.userId);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to update role permissions.' });
+    }
+};
+exports.updateRolePermissions = updateRolePermissions;

@@ -16,30 +16,30 @@ export class NotificationPolicy {
   }
 
   static shouldNotifyInvitation(senderId: string, receiverId: string): boolean {
-    return this.shouldNotifyUser(senderId, receiverId);
+    return NotificationPolicy.shouldNotifyUser(senderId, receiverId);
   }
 
   static shouldNotifyTaskAssignment(assignerId: string, assigneeId: string): boolean {
-    return !!assigneeId && this.shouldNotifyUser(assignerId, assigneeId);
+    return !!assigneeId && NotificationPolicy.shouldNotifyUser(assignerId, assigneeId);
   }
 
   static shouldNotifyReviewRequest(actorId: string, targetUserId: string): boolean {
-    return this.shouldNotifyUser(actorId, targetUserId);
+    return NotificationPolicy.shouldNotifyUser(actorId, targetUserId);
   }
 
   static shouldNotifyReviewCompleted(actorId: string, targetUserId: string): boolean {
-    return this.shouldNotifyUser(actorId, targetUserId);
+    return NotificationPolicy.shouldNotifyUser(actorId, targetUserId);
   }
 
   static shouldNotifyDocumentUploaded(uploaderId: string, targetUserId: string): boolean {
-    return this.shouldNotifyUser(uploaderId, targetUserId);
+    return NotificationPolicy.shouldNotifyUser(uploaderId, targetUserId);
   }
 
   static shouldNotifyStageChanged(actorId: string, targetUserId: string): boolean {
-    return this.shouldNotifyUser(actorId, targetUserId);
+    return NotificationPolicy.shouldNotifyUser(actorId, targetUserId);
   }
 
   static shouldNotifyFilingApproved(actorId: string, targetUserId: string): boolean {
-    return this.shouldNotifyUser(actorId, targetUserId);
+    return NotificationPolicy.shouldNotifyUser(actorId, targetUserId);
   }
 }

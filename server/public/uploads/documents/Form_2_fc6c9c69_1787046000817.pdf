@@ -1,0 +1,574 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 5242
+>>
+stream
+0.5670000000000001 w
+0 G
+0.12 0.16 0.23 rg
+0. 841.8899999999999864 595.2755905511811534 -99.2125984251968589 re
+f
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+1. g
+42.5196850393700814 799.3703149606299121 Td
+(IPO Patent Form 2) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+1. g
+42.5196850393700814 771.0238582677164914 Td
+(Intellectual Property India \(Government of India / Patent Office Registry\)) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 700.15771653543311 Td
+(FORM 2 [FILING PREPARATION DRAFT]) Tj
+ET
+0.78 G
+42.5196850393700814 685.9844881889763428 m
+552.7559055118110791 685.9844881889763428 l
+S
+BT
+/F2 10 Tf
+11.5 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 657.6380314960629221 Td
+(PROVISIONAL / COMPLETE SPECIFICATION \(Section 10; Rule 13\)) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 620.7876377952754865 Td
+(1. Title of Invention:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 620.7876377952754865 Td
+(AI-Powered Adaptive Traffic Signal Optimization Using Real-Time Traffic Prediction) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 598.1104724409448181 Td
+(2. Specification Type:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 598.1104724409448181 Td
+(COMPLETE) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 575.4333070866141497 Td
+(3. Preamble to Description:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 575.4333070866141497 Td
+(The following specification particularly describes the invention and the manner in which it is to be) Tj
+T* (performed.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 524.4096850393700606 Td
+(4. DESCRIPTION & CLAIMS:) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 501.7325196850393354 Td
+(Abstract Description:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 501.7325196850393354 Td
+(# Innovation Abstract) Tj
+T* () Tj
+T* (The proposed invention is an AI-powered adaptive traffic signal optimization system designed to) Tj
+T* (dynamically control traffic signals based on real-time and predicted traffic conditions. Unlike) Tj
+T* (conventional traffic signal systems that operate using fixed timing schedules or predefined traffic) Tj
+T* (rules, the proposed system continuously analyzes traffic conditions and automatically) Tj
+T* (determines optimized signal timings.) Tj
+T* () Tj
+T* (The system collects traffic information from cameras, sensors, connected vehicles, and historical) Tj
+T* (traffic datasets. AI-based computer vision and machine learning techniques are used to estimate) Tj
+T* (vehicle density, queue length, traffic flow, waiting time, and congestion levels at individual road) Tj
+T* (segments and intersections.) Tj
+T* () Tj
+T* (The system further predicts short-term traffic conditions using historical and real-time traffic) Tj
+T* (patterns. Based on the predicted traffic state, an optimization mechanism dynamically adjusts) Tj
+T* (signal phases, green-light duration, red-light duration, and phase priorities.) Tj
+T* () Tj
+T* (The system can also coordinate multiple interconnected traffic signals rather than optimizing) Tj
+T* (each intersection independently. This enables traffic flow to be considered across a larger road) Tj
+T* (network and reduces the propagation of congestion between neighboring intersections.) Tj
+T* () Tj
+T* (The proposed invention therefore provides an adaptive traffic management mechanism capable) Tj
+T* (of continuously sensing, predicting, optimizing, and modifying traffic signal behavior according to) Tj
+T* (changing traffic conditions.) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 153.0711023622046696 Td
+(Problem Statement:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 153.0711023622046696 Td
+(# Problem Statement) Tj
+T* () Tj
+T* (Conventional traffic signal systems generally operate using fixed timing schedules or) Tj
+T* (predetermined traffic rules. These systems cannot effectively respond to sudden changes in) Tj
+T* (traffic volume, unexpected congestion, accidents, road blockages, weather conditions, or) Tj
+T* (variations in traffic demand.) Tj
+T* () Tj
+T* (As a result, vehicles may experience unnecessary waiting time even when one direction has) Tj
+T* (significantly higher traffic demand than another. Independent operation of traffic signals can also) Tj
+T* (create congestion between adjacent intersections and produce inefficient traffic flow across an) Tj
+T* (entire road network.) Tj
+T* () Tj
+T* (Existing adaptive systems may respond to current traffic conditions but may not sufficiently) Tj
+T* (incorporate short-term traffic prediction and coordinated optimization across multiple) Tj
+T* (intersections.) Tj
+T* () Tj
+T* (There is therefore a need for an intelligent traffic management system capable of continuously) Tj
+T* (detecting current traffic conditions, predicting near-future traffic states, and dynamically) Tj
+T* (optimizing traffic signal timings across interconnected intersections.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/Length 5416
+>>
+stream
+0.5670000000000001 w
+0.78 G
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 785.1970866141732586 Td
+(Proposed Solution:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 785.1970866141732586 Td
+(# Proposed Technical Solution) Tj
+T* () Tj
+T* (The proposed system operates through the following technical process:) Tj
+T* () Tj
+T* (1. **Traffic Data Collection:**) Tj
+T* (   Traffic information is collected from roadside cameras, traffic sensors, connected devices, and) Tj
+T* (historical traffic datasets.) Tj
+T* () Tj
+T* (2. **Traffic Detection:**) Tj
+T* (   Computer vision and sensor-processing techniques identify vehicles and estimate traffic) Tj
+T* (parameters such as vehicle count, queue length, vehicle speed, lane occupancy, and traffic) Tj
+T* (density.) Tj
+T* () Tj
+T* (3. **Real-Time Traffic State Generation:**) Tj
+T* (   The detected information is converted into a structured representation of the current traffic) Tj
+T* (condition at each monitored intersection.) Tj
+T* () Tj
+T* (4. **Traffic Prediction:**) Tj
+T* (   A machine learning prediction module analyzes historical and real-time traffic patterns to) Tj
+T* (estimate short-term future traffic conditions.) Tj
+T* () Tj
+T* (5. **Congestion Assessment:**) Tj
+T* (   The system calculates congestion indicators based on traffic density, queue length, waiting) Tj
+T* (time, vehicle flow, and predicted demand.) Tj
+T* () Tj
+T* (6. **Signal Optimization:**) Tj
+T* (   An optimization engine determines suitable signal phase sequences and dynamically) Tj
+T* (calculates green-light duration, red-light duration, and phase priorities.) Tj
+T* () Tj
+T* (7. **Multi-Intersection Coordination:**) Tj
+T* (   Traffic conditions from neighboring intersections are considered together to coordinate signal) Tj
+T* (timings and reduce congestion propagation across connected roads.) Tj
+T* () Tj
+T* (8. **Dynamic Signal Control:**) Tj
+T* (   The optimized signal configuration is transmitted to the traffic signal controller.) Tj
+T* () Tj
+T* (9. **Continuous Monitoring:**) Tj
+T* (   The system continuously receives new traffic information and evaluates the effect of the) Tj
+T* (current signal configuration.) Tj
+T* () Tj
+T* (10. **Adaptive Reoptimization:**) Tj
+T* (    When traffic conditions change, the system recalculates the traffic prediction and signal) Tj
+T* (configuration, creating a continuous feedback loop between traffic sensing, prediction,) Tj
+T* (optimization, and signal control.) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 153.0711023622046696 Td
+(Novel Features:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 153.0711023622046696 Td
+(Novel Features Mapped) Tj
+T* (Real-Time Multi-Parameter Traffic State Generation) Tj
+T* (The system simultaneously evaluates vehicle density, queue length, lane occupancy, vehicle) Tj
+T* (speed, traffic flow, and waiting time to generate a comprehensive real-time traffic state.) Tj
+T* (Short-Term Traffic Prediction for Signal Control) Tj
+T* (Instead of responding only to current traffic conditions, the system predicts near-future traffic) Tj
+T* (demand using historical and real-time traffic data and uses the prediction during signal) Tj
+T* (optimization.) Tj
+T* (Predictive Congestion Prevention) Tj
+T* (The system identifies traffic conditions that are likely to produce congestion and proactively) Tj
+T* (modifies signal timings before excessive queue formation occurs.) Tj
+T* (Dynamic Signal Phase Optimization) Tj
+T* (Green duration, red duration, phase sequence, and phase priority are dynamically calculated) Tj
+T* (according to changing traffic demand rather than relying on fixed timing configurations.) Tj
+T* (Multi-Intersection Coordinated Optimization) Tj
+T* (The system considers traffic conditions at neighboring intersections and coordinates signal) Tj
+T* (timings across connected intersections to improve overall traffic flow.) Tj
+T* (Continuous Feedback-Based Reoptimization) Tj
+T* (After applying an optimized signal configuration, the system continuously measures the resulting) Tj
+T* (traffic conditions and automatically reoptimizes the configuration when significant changes are) Tj
+T* (detected.) Tj
+T* (Real-Time Prediction-to-Control Feedback Loop) Tj
+T* ( T r a f f i c   s e n s i n g  !’   t r a f f i c - s t a t e   g e n e r a t i o n  !’   p r e d i c t i o n  !’   c o n g e s t i o n   a s s e s s m e n t  !’   s i g n a l) Tj
+T* ( o p t i m i z a t i o n  !’   s i g n a l   c o n t r o l  !’   p e r f o r m a n c e   m o n i t o r i n g  !’   r e o p t i m i z a t i o n   f o r m s   a   c o n t i n u o u s) Tj
+T* (automated control loop.) Tj
+T* (Adaptive Response to Unexpected Traffic Changes) Tj
+T* (The system can dynamically modify signal behavior when sudden traffic demand changes,) Tj
+T* (unexpected queue formation, or localized congestion is detected.) Tj
+T* (Network-Level Traffic Optimization) Tj
+T* (The optimization objective can consider the combined condition of multiple interconnected) Tj
+T* (intersections instead of optimizing each intersection independently.) Tj
+T* (Integrated AI Traffic Decision Mechanism) Tj
+T* (Traffic detection, prediction, congestion assessment, signal optimization, and feedback-based) Tj
+T* (adaptation are integrated into a single intelligent decision-making framework.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 8 0 R
+>>
+endobj
+8 0 obj
+<<
+/Length 1525
+>>
+stream
+0.5670000000000001 w
+0.78 G
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 785.1970866141732586 Td
+(Claims Count:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 785.1970866141732586 Td
+(3) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 762.5199212598424765 Td
+(Claims Scope:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 762.5199212598424765 Td
+(1. An automated intelligent ai-powered adaptive traffic signal optimization using real-time traffic) Tj
+T* (prediction system, comprising: \(a\) a distributed sensor module configured to capture real-time) Tj
+T* (operational environmental parameters;) Tj
+T* (\(b\) an edge computing processor coupled to the sensor module to execute adaptive analytics;) Tj
+T* (\(c\) a communication interface transmitting diagnostic status telemetries to a centralized registry.) Tj
+T* () Tj
+T* (2. The system of claim 1, wherein: the edge computing processor further executes real-time) Tj
+T* (machine-learning anomaly detection based on statistical deviation thresholds.) Tj
+T* () Tj
+T* (3. The system of claim 1, wherein: the communication interface encrypts telemetries utilizing) Tj
+T* (asymmetric cryptographic handshakes before dispatch.) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.392 0.455 0.545 rg
+42.5196850393700814 34.0159842519684616 Td
+(Note: This is a pre-filing preparation draft compiled by PatentHub AI. Not an official filing receipt.) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R 7 0 R ]
+/Count 3
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+19 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+20 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+21 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+22 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 9 0 R
+/F2 10 0 R
+/F3 11 0 R
+/F4 12 0 R
+/F5 13 0 R
+/F6 14 0 R
+/F7 15 0 R
+/F8 16 0 R
+/F9 17 0 R
+/F10 18 0 R
+/F11 19 0 R
+/F12 20 0 R
+/F13 21 0 R
+/F14 22 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+23 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20260818151000+05'30')
+>>
+endobj
+24 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 25
+0000000000 65535 f 
+0000012765 00000 n 
+0000014598 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000005446 00000 n 
+0000005583 00000 n 
+0000011051 00000 n 
+0000011188 00000 n 
+0000012834 00000 n 
+0000012959 00000 n 
+0000013090 00000 n 
+0000013224 00000 n 
+0000013362 00000 n 
+0000013486 00000 n 
+0000013615 00000 n 
+0000013747 00000 n 
+0000013883 00000 n 
+0000014011 00000 n 
+0000014138 00000 n 
+0000014267 00000 n 
+0000014400 00000 n 
+0000014502 00000 n 
+0000014850 00000 n 
+0000014936 00000 n 
+trailer
+<<
+/Size 25
+/Root 24 0 R
+/Info 23 0 R
+/ID [ <5BF2C2078CC592E0D65291800BCC4704> <5BF2C2078CC592E0D65291800BCC4704> ]
+>>
+startxref
+15040
+%%EOF

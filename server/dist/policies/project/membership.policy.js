@@ -16,7 +16,7 @@ class MembershipPolicy {
     /**
      * Check if user can invite a member.
      */
-    static async canInviteMember(user, project, inviteeUsername, roleToInvite) {
+    static async canInviteMember(user, project, inviteeUsername, _roleToInvite) {
         if (!user)
             return false;
         const isOwner = project.ownerId === user.userId;
@@ -76,7 +76,7 @@ class MembershipPolicy {
      * Check if user can reject invitation.
      */
     static canRejectInvitation(user, invitation) {
-        return this.canAcceptInvitation(user, invitation);
+        return MembershipPolicy.canAcceptInvitation(user, invitation);
     }
     /**
      * Check if user can remove a member.
@@ -97,7 +97,7 @@ class MembershipPolicy {
      * Check if user can change project role of a member.
      * Prevents changing own role or granting elevated permissions.
      */
-    static canChangeProjectRole(user, project, memberId, newRole) {
+    static canChangeProjectRole(user, project, memberId, _newRole) {
         if (!user)
             return false;
         // Cannot change project owner's role
@@ -105,6 +105,21 @@ class MembershipPolicy {
             return false;
         }
         // Cannot change own project role (prevents self-elevation)
+        if (user.role === 'Admin')
+            return true;
+        return project.ownerId === user.userId;
+    }
+    /**
+     * Check if user can update permission level of a member.
+     */
+    static canUpdatePermissionLevel(user, project, memberId) {
+        if (!user)
+            return false;
+        // Cannot change project owner's permissions
+        if (project.ownerId === memberId) {
+            return false;
+        }
+        // Cannot change own permissions (prevents self-elevation)
         if (user.userId === memberId && user.role !== 'Admin') {
             return false;
         }

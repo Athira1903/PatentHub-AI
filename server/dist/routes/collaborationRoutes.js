@@ -48,4 +48,5 @@ router.put('/notifications/:id/read', (0, authorize_1.authorize)(async (user, re
         return false;
     return notification.userId === user.userId;
 }), collaborationController_1.markNotificationAsRead);
+router.put('/projects/:projectId/members/:memberId/permission', collaborationController_1.updateMemberPermission);
 exports.default = router;

@@ -46,7 +46,7 @@ export class ReportPolicy {
    */
   static canGenerateReadinessReport(user: any, project: any): boolean {
     // 1. User check
-    const hasSummaryAccess = this.canGenerateSummary(user, project);
+    const hasSummaryAccess = ReportPolicy.canGenerateSummary(user, project);
     if (!hasSummaryAccess) return false;
 
     // 2. Innovation completed check
@@ -74,7 +74,7 @@ export class ReportPolicy {
    */
   static canGenerateFinalReport(user: any, project: any): boolean {
     // 1. Check readiness report conditions
-    const isReadinessOk = this.canGenerateReadinessReport(user, project);
+    const isReadinessOk = ReportPolicy.canGenerateReadinessReport(user, project);
     if (!isReadinessOk) return false;
 
     // 2. Guide approval completed check

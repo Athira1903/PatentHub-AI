@@ -1,8 +1,9 @@
 import { Response } from 'express';
 import { prisma } from '../config/db';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
-import { ProjectRole } from '@prisma/client';
+import { ProjectRole, PermissionLevel } from '@prisma/client';
 import { MailService } from '../services/mailService';
+import { MembershipPolicy } from '../policies/project/membership.policy';
 
 export const inviteMember = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -12,7 +13,7 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
-    const { projectId, username, identifier, role } = req.body; // role: 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
+    const { projectId, username, identifier, role, permissionLevel } = req.body; // role: 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
     const targetQuery = (identifier || username || '').trim();
 
     if (!projectId || !targetQuery || !role) {
@@ -24,6 +25,11 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
       res.status(400).json({ message: `Invalid project role: ${role}` });
       return;
     }
+
+    const validPermissionLevel: PermissionLevel =
+      permissionLevel && Object.values(PermissionLevel).includes(permissionLevel as PermissionLevel)
+        ? (permissionLevel as PermissionLevel)
+        : 'EDIT';
 
     const project = await prisma.patentProject.findUnique({
       where: { id: projectId },
@@ -91,6 +97,7 @@ export const inviteMember = async (req: AuthenticatedRequest, res: Response): Pr
         senderId,
         receiverId: receiver.id,
         role: role as ProjectRole,
+        permissionLevel: validPermissionLevel,
         status: 'PENDING',
       },
     });
@@ -216,6 +223,7 @@ export const respondToInvitation = async (req: AuthenticatedRequest, res: Respon
             projectId: invitation.projectId,
             userId: receiverId,
             role: invitation.role,
+            permissionLevel: invitation.permissionLevel || 'EDIT',
           },
         });
       }
@@ -417,5 +425,72 @@ export const markAllNotificationsAsRead = async (req: AuthenticatedRequest, res:
     res.status(200).json({ message: 'All notifications marked as read.', count: result.count });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to mark all notifications as read.' });
+  }
+};
+
+export const updateMemberPermission = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized.' });
+      return;
+    }
+
+    const projectId = req.params.projectId as string;
+    const memberId = req.params.memberId as string;
+    const { permissionLevel } = req.body;
+
+    if (!permissionLevel || !Object.values(PermissionLevel).includes(permissionLevel as PermissionLevel)) {
+      res.status(400).json({ message: 'Valid permissionLevel (VIEW, EDIT, SUBMIT) is required.' });
+      return;
+    }
+
+    const project = await prisma.patentProject.findUnique({
+      where: { id: projectId },
+      include: { members: true },
+    });
+
+    if (!project) {
+      res.status(404).json({ message: 'Project not found.' });
+      return;
+    }
+
+    const canUpdate = MembershipPolicy.canUpdatePermissionLevel(req.user, project, memberId);
+    if (!canUpdate) {
+      res.status(403).json({ message: 'Access denied. Only project owners and administrators can adjust member permissions.' });
+      return;
+    }
+
+    const updatedMember = await prisma.projectMember.update({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId: memberId,
+        },
+      },
+      data: {
+        permissionLevel: permissionLevel as PermissionLevel,
+      },
+      include: {
+        user: { select: { id: true, fullName: true, username: true } },
+      },
+    });
+
+    // Log Activity
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        projectId,
+        action: `Updated permission level for ${updatedMember.user.fullName} to ${permissionLevel}.`,
+        type: 'MEMBERSHIP',
+      },
+    });
+
+    res.status(200).json({
+      message: `Permission level updated to ${permissionLevel} for ${updatedMember.user.fullName}.`,
+      member: updatedMember,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to update member permission.' });
   }
 };

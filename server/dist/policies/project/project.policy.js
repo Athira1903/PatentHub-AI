@@ -54,7 +54,7 @@ class ProjectPolicy {
      * Determine if the user can restore (unarchive) a project.
      */
     static canRestoreProject(user, project) {
-        return this.canArchiveProject(user, project);
+        return ProjectPolicy.canArchiveProject(user, project);
     }
     /**
      * Determine if the user can assign/invite a guide on a project.
@@ -74,25 +74,25 @@ class ProjectPolicy {
             return false;
         if (user.role === 'Admin')
             return true;
-        const isOwner = project.ownerId === user.userId;
-        const isMember = project.members?.some((m) => m.userId === user.userId);
-        return isOwner || isMember;
+        if (project.ownerId === user.userId)
+            return true;
+        const member = project.members?.find((m) => m.userId === user.userId);
+        if (!member)
+            return false;
+        // VIEW permission cannot create tasks
+        return member.permissionLevel === 'EDIT' || member.permissionLevel === 'SUBMIT' || !member.permissionLevel;
     }
     /**
      * Determine if a user can update a task.
      */
     static canUpdateTask(user, project) {
-        return this.canCreateTask(user, project);
+        return ProjectPolicy.canCreateTask(user, project);
     }
     /**
      * Determine if a user can delete a task.
      */
     static canDeleteTask(user, project) {
-        if (!user)
-            return false;
-        if (user.role === 'Admin')
-            return true;
-        return project.ownerId === user.userId;
+        return ProjectPolicy.canCreateTask(user, project);
     }
     /**
      * Determine if a user can leave the project.

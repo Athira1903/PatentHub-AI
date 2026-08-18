@@ -18,7 +18,7 @@ export class MembershipPolicy {
     user: any,
     project: any,
     inviteeUsername: string,
-    roleToInvite: ProjectRole
+    _roleToInvite: ProjectRole
   ): Promise<boolean> {
     if (!user) return false;
 
@@ -85,7 +85,7 @@ export class MembershipPolicy {
    * Check if user can reject invitation.
    */
   static canRejectInvitation(user: any, invitation: any): boolean {
-    return this.canAcceptInvitation(user, invitation);
+    return MembershipPolicy.canAcceptInvitation(user, invitation);
   }
 
   /**
@@ -112,7 +112,7 @@ export class MembershipPolicy {
     user: any,
     project: any,
     memberId: string,
-    newRole: ProjectRole
+    _newRole: ProjectRole
   ): boolean {
     if (!user) return false;
 
@@ -122,6 +122,26 @@ export class MembershipPolicy {
     }
 
     // Cannot change own project role (prevents self-elevation)
+    if (user.role === 'Admin') return true;
+    return project.ownerId === user.userId;
+  }
+
+  /**
+   * Check if user can update permission level of a member.
+   */
+  static canUpdatePermissionLevel(
+    user: any,
+    project: any,
+    memberId: string
+  ): boolean {
+    if (!user) return false;
+
+    // Cannot change project owner's permissions
+    if (project.ownerId === memberId) {
+      return false;
+    }
+
+    // Cannot change own permissions (prevents self-elevation)
     if (user.userId === memberId && user.role !== 'Admin') {
       return false;
     }

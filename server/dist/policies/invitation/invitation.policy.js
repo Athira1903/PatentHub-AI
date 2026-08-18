@@ -7,7 +7,7 @@ class InvitationPolicy {
      * Determine if user can invite another user to a project.
      * Validates sender rights, existence of invitee, duplicate invitations, existing membership, and role compatibility.
      */
-    static async canInvite(user, project, inviteeUsername, roleToInvite) {
+    static async canInvite(user, project, inviteeUsername, _roleToInvite) {
         if (!user)
             return false;
         // Only Project Owner, Guide of the project, or Admin can invite users.
@@ -80,13 +80,13 @@ class InvitationPolicy {
      * Determine if user can reject a project invitation.
      */
     static canReject(user, invitation) {
-        return this.canAccept(user, invitation);
+        return InvitationPolicy.canAccept(user, invitation);
     }
     /**
      * Determine if user can remove a member from the project.
      * Only owner or admin can remove.
      */
-    static canRemoveMember(user, project, memberId) {
+    static canRemoveMember(user, project, _memberId) {
         if (!user)
             return false;
         if (user.role === 'Admin')
