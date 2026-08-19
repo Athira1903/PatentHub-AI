@@ -61,7 +61,9 @@ class PatentFormPolicy {
             return true;
         const isOwner = project.ownerId === user.userId;
         const isMember = project.members?.some((m) => m.userId === user.userId);
-        return isOwner || isMember;
+        const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+        const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+        return isOwner || isMember || isGuide || isExpert;
     }
     /**
      * Check if the user can edit a form.
@@ -95,10 +97,12 @@ class PatentFormPolicy {
             return true;
         const projectMember = project.members?.find((m) => m.userId === user.userId);
         const projectRole = projectMember?.role;
-        if (projectRole === 'GUIDE') {
+        const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+        const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+        if (projectRole === 'GUIDE' || isGuide) {
             return PatentFormPolicy.areMandatoryFormsComplete(project);
         }
-        if (projectRole === 'PATENT_EXPERT') {
+        if (projectRole === 'PATENT_EXPERT' || isExpert) {
             return PatentFormPolicy.areMandatoryFormsComplete(project);
         }
         return false;

@@ -287,11 +287,11 @@ export class AnalyticsService {
       where: isGlobalAdmin
         ? {}
         : {
-            OR: [
-              { ownerId: userId },
-              { members: { some: { userId } } }
-            ]
-          },
+          OR: [
+            { ownerId: userId },
+            { members: { some: { userId } } }
+          ]
+        },
       include: {
         patentReferences: { select: { id: true } },
         prototypes: { select: { id: true } },

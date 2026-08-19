@@ -55,6 +55,9 @@ export class WorkflowPolicy {
     const isOwner = project.ownerId === user.userId;
     const projectMember = project.members?.find((m: any) => m.userId === user.userId);
     const projectRole = projectMember?.role;
+    const isGlobalGuide = user.role === 'Guide' || user.role === 'GUIDE';
+    const isGlobalExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+
     const isInventor = projectRole === 'INVENTOR' || projectRole === 'CO_INVENTOR';
     const canEdit = isOwner || (isInventor && (projectMember?.permissionLevel === 'EDIT' || projectMember?.permissionLevel === 'SUBMIT' || !projectMember?.permissionLevel));
     const canSubmit = isOwner || (isInventor && projectMember?.permissionLevel === 'SUBMIT');
@@ -64,6 +67,9 @@ export class WorkflowPolicy {
       case 'PROTOTYPE':
       case 'DOCUMENTATION':
       case 'FORMS_PREPARATION':
+        if (nextStage === 'DOCUMENTATION' && (projectRole === 'GUIDE' || projectRole === 'PATENT_EXPERT' || isGlobalGuide || isGlobalExpert)) {
+          return true;
+        }
         // Project Owner or Co-inventor with EDIT/SUBMIT can progress early stages
         return isOwner || canEdit;
 
@@ -73,24 +79,24 @@ export class WorkflowPolicy {
 
       case 'PATENT_EXPERT_REVIEW':
         // Guide approves guide review. Owner/Inventors cannot approve.
-        if (isOwner || projectRole === 'INVENTOR' || projectRole === 'CO_INVENTOR') {
+        if (isOwner || isInventor) {
           return false;
         }
-        return projectRole === 'GUIDE';
+        return projectRole === 'GUIDE' || isGlobalGuide;
 
       case 'FILING_READY':
         // Patent Expert approves expert review. Owner/Inventors cannot approve.
-        if (isOwner || projectRole === 'INVENTOR' || projectRole === 'CO_INVENTOR') {
+        if (isOwner || isInventor) {
           return false;
         }
-        return projectRole === 'PATENT_EXPERT';
+        return projectRole === 'PATENT_EXPERT' || isGlobalExpert;
 
       case 'FILED':
         // Patent Expert files. Owner/Inventors cannot approve.
-        if (isOwner || projectRole === 'INVENTOR' || projectRole === 'CO_INVENTOR') {
+        if (isOwner || isInventor) {
           return false;
         }
-        return projectRole === 'PATENT_EXPERT';
+        return projectRole === 'PATENT_EXPERT' || isGlobalExpert;
 
       default:
         return false;

@@ -14,8 +14,13 @@ class PatentReferencePolicy {
         if (project.ownerId === user.userId)
             return 'OWNER';
         const member = project.members?.find((m) => m.userId === user.userId);
-        if (!member)
+        if (!member) {
+            const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+            const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+            if (isGuide || isExpert)
+                return 'VIEWER';
             return null;
+        }
         if (member.role === client_1.ProjectRole.INVENTOR || member.role === client_1.ProjectRole.CO_INVENTOR) {
             return 'EDITOR';
         }

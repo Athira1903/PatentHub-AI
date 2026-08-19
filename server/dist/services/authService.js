@@ -142,7 +142,6 @@ class AuthService {
                 role: user.role.name,
             },
             emailSent,
-            activationOtp: otp,
         };
     }
     static async resendActivationOtp(identifier) {
@@ -183,7 +182,6 @@ class AuthService {
             message: 'New activation code generated and sent successfully.',
             username: user.username,
             email: user.email,
-            otp,
             emailSent,
         };
     }
@@ -420,6 +418,20 @@ class AuthService {
                 },
                 include: { role: true },
             });
+        }
+        else {
+            // If user exists but is not active (due to standard registration pending activation), activate them automatically
+            if (!user.isActive) {
+                user = await db_1.prisma.user.update({
+                    where: { id: user.id },
+                    data: {
+                        isActive: true,
+                        activationOtp: null,
+                        activationOtpExpires: null,
+                    },
+                    include: { role: true },
+                });
+            }
         }
         const token = jsonwebtoken_1.default.sign({ userId: user.id, username: user.username, role: user.role.name }, process.env.JWT_SECRET || 'patenthub_secret', { expiresIn: '7d' });
         const requireUsernameSelection = user.username.startsWith('temp_');

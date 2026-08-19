@@ -65,7 +65,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
   };
 
   const handleRequestChanges = (projectId: string) => {
-    navigate(`/dashboard/projects/${projectId}/reviews`);
+    navigate(`/dashboard/projects/${projectId}?tab=Reviews`);
   };
 
   // Time-aware greeting
@@ -557,7 +557,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
                       <td className="py-3.5 pr-2 text-slate-500 font-medium">{item.dueDate}</td>
                       <td className="py-3.5 text-right">
                         <button
-                          onClick={() => navigate(`/dashboard/projects/${item.projectId}/reviews`)}
+                          onClick={() => navigate(`/dashboard/projects/${item.projectId}?tab=Reviews`)}
                           className="px-3.5 py-1 bg-[#004d40] hover:bg-[#00382e] text-white rounded-xl text-[11px] font-bold transition shadow-3xs cursor-pointer"
                         >
                           Review
@@ -630,7 +630,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
               </button>
               <button
                 onClick={() => {
-                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}/claims`);
+                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Claims%20Studio`);
                 }}
                 className="py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
               >
@@ -754,7 +754,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
           <div className="space-y-3">
             <div
               onClick={() => {
-                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}/claims`);
+                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Claims%20Studio`);
               }}
               className="p-3 bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/70 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition"
             >
@@ -780,7 +780,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
 
             <div
               onClick={() => {
-                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}/reviews`);
+                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Reviews`);
               }}
               className="p-3 bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/70 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition"
             >
@@ -806,7 +806,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
 
             <div
               onClick={() => {
-                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}/documents`);
+                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Documents`);
               }}
               className="p-3 bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/70 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition"
             >
@@ -878,7 +878,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
 
               <button
                 onClick={() => {
-                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}/reviews`);
+                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Reviews`);
                   else navigate('/dashboard/projects');
                 }}
                 className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold flex items-center gap-2 transition cursor-pointer"
@@ -889,7 +889,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
 
               <button
                 onClick={() => {
-                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}/claims`);
+                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Claims%20Studio`);
                   else navigate('/dashboard/claims');
                 }}
                 className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold flex items-center gap-2 transition cursor-pointer"
@@ -916,7 +916,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
 
               <button
                 onClick={() => {
-                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}/forms`);
+                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Forms%20&%20Filing`);
                   else navigate('/dashboard/projects');
                 }}
                 className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold flex items-center gap-2 transition cursor-pointer"

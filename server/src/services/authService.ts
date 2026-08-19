@@ -167,7 +167,6 @@ export class AuthService {
         role: user.role.name,
       },
       emailSent,
-      activationOtp: otp,
     };
   }
 
@@ -216,7 +215,6 @@ export class AuthService {
       message: 'New activation code generated and sent successfully.',
       username: user.username,
       email: user.email,
-      otp,
       emailSent,
     };
   }
@@ -502,6 +500,19 @@ export class AuthService {
         },
         include: { role: true },
       });
+    } else {
+      // If user exists but is not active (due to standard registration pending activation), activate them automatically
+      if (!user.isActive) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            isActive: true,
+            activationOtp: null,
+            activationOtpExpires: null,
+          },
+          include: { role: true },
+        });
+      }
     }
 
     const token = jwt.sign(

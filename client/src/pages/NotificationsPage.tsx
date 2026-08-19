@@ -165,19 +165,18 @@ export const NotificationsPage: React.FC = () => {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  activeTab === tab
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === tab
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 {tab === 'ALL'
                   ? 'All Alerts'
                   : tab === 'UNREAD'
-                  ? 'Unread'
-                  : tab === 'INVITATIONS'
-                  ? 'Invitations'
-                  : 'Tasks'}
+                    ? 'Unread'
+                    : tab === 'INVITATIONS'
+                      ? 'Invitations'
+                      : 'Tasks'}
               </button>
             ))}
           </div>
@@ -248,11 +247,10 @@ export const NotificationsPage: React.FC = () => {
                       </div>
                     ) : (
                       <span
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                          invite.status === 'ACCEPTED'
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold ${invite.status === 'ACCEPTED'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                             : 'bg-slate-100 text-slate-500'
-                        }`}
+                          }`}
                       >
                         {invite.status}
                       </span>
@@ -266,11 +264,10 @@ export const NotificationsPage: React.FC = () => {
               return (
                 <div
                   key={item.feedId}
-                  className={`p-4 border rounded-2xl flex items-start justify-between gap-4 transition shadow-3xs ${
-                    notif.isRead
+                  className={`p-4 border rounded-2xl flex items-start justify-between gap-4 transition shadow-3xs ${notif.isRead
                       ? 'bg-white border-slate-200/80 text-slate-600'
                       : 'bg-blue-50/30 border-blue-200/80 text-slate-900'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="p-2 rounded-xl bg-blue-50 text-blue-600 shrink-0 mt-0.5">

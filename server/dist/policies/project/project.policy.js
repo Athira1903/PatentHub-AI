@@ -18,7 +18,9 @@ class ProjectPolicy {
             return true;
         const isOwner = project.ownerId === user.userId;
         const isMember = project.members?.some((m) => m.userId === user.userId);
-        return isOwner || isMember;
+        const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+        const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+        return isOwner || isMember || isGuide || isExpert;
     }
     /**
      * Determine if the user can edit a project.
@@ -75,6 +77,10 @@ class ProjectPolicy {
         if (user.role === 'Admin')
             return true;
         if (project.ownerId === user.userId)
+            return true;
+        const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+        const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+        if (isGuide || isExpert)
             return true;
         const member = project.members?.find((m) => m.userId === user.userId);
         if (!member)

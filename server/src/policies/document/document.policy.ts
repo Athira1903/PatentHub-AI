@@ -8,7 +8,12 @@ export class DocumentPolicy {
     if (project.ownerId === user.userId) return 'OWNER';
 
     const member = project.members?.find((m: any) => m.userId === user.userId);
-    if (!member) return null;
+    if (!member) {
+      const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+      const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+      if (isGuide || isExpert) return 'COMMENTER';
+      return null;
+    }
 
     if (member.role === 'INVENTOR' || member.role === 'CO_INVENTOR') {
       if (member.permissionLevel === 'VIEW') {

@@ -107,14 +107,19 @@ export const ProjectDetailsPage: React.FC = () => {
     if (!currentUser) {
       api.get('/auth/profile')
         .then((res) => setCurrentUser(res.data.user))
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [currentUser]);
 
   const user = currentUser;
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const projectMemberRecord = project?.members?.find((m: any) => m.user?.id === user?.id || m.user?.id === user?.userId || m.userId === user?.id || m.userId === user?.userId);
-  const userProjectRole = projectMemberRecord?.role; // 'INVENTOR' | 'CO_INVENTOR' | 'GUIDE' | 'PATENT_EXPERT'
+  
+  const isGlobalGuide = user?.role === 'Guide' || user?.role === 'GUIDE';
+  const isGlobalExpert = user?.role === 'PatentExpert' || user?.role === 'Patent Expert' || user?.role === 'PATENT_EXPERT';
+
+  const userProjectRole = projectMemberRecord?.role || 
+    (isGlobalGuide ? 'GUIDE' : isGlobalExpert ? 'PATENT_EXPERT' : undefined);
   const isOwner = !!(project?.isOwner || (project?.owner && (project.owner.id === user?.id || project.owner.id === user?.userId)) || (project?.ownerId && (project.ownerId === user?.id || project.ownerId === user?.userId)) || user?.role === 'Admin');
   const permissionLevel: 'VIEW' | 'EDIT' | 'SUBMIT' = isOwner ? 'SUBMIT' : (projectMemberRecord as any)?.permissionLevel || 'EDIT';
   const canEdit = isOwner || permissionLevel === 'EDIT' || permissionLevel === 'SUBMIT';
@@ -737,7 +742,7 @@ export const ProjectDetailsPage: React.FC = () => {
       }
       doc.setFont('helvetica', isHeader ? 'bold' : 'normal');
       doc.setFontSize(isHeader ? 10 : 9);
-      
+
       if (label) {
         doc.setFont('helvetica', 'bold');
         doc.text(`${label}:`, 15, yPos);
@@ -981,12 +986,12 @@ export const ProjectDetailsPage: React.FC = () => {
 
   const filingScore = analyticsSummary?.scores?.filingReadinessScore ?? (
     project?.stage === 'FILED' ? 100 :
-    project?.stage === 'FILING_READY' ? 95 :
-    project?.stage === 'PATENT_EXPERT_REVIEW' ? 80 :
-    project?.stage === 'GUIDE_REVIEW' ? 65 :
-    project?.stage === 'FORMS_PREPARATION' ? 50 :
-    project?.stage === 'DOCUMENTATION' ? 35 :
-    project?.stage === 'LITERATURE_REVIEW' ? 20 : 10
+      project?.stage === 'FILING_READY' ? 95 :
+        project?.stage === 'PATENT_EXPERT_REVIEW' ? 80 :
+          project?.stage === 'GUIDE_REVIEW' ? 65 :
+            project?.stage === 'FORMS_PREPARATION' ? 50 :
+              project?.stage === 'DOCUMENTATION' ? 35 :
+                project?.stage === 'LITERATURE_REVIEW' ? 20 : 10
   );
 
   return (
@@ -1012,11 +1017,10 @@ export const ProjectDetailsPage: React.FC = () => {
                   <button
                     key={link.label}
                     onClick={() => handleSelectTab(link.tab)}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all text-left cursor-pointer ${
-                      isActive
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all text-left cursor-pointer ${isActive
                         ? 'bg-blue-900 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                     <span>{link.label}</span>
@@ -1118,11 +1122,10 @@ export const ProjectDetailsPage: React.FC = () => {
                 {assistantHistory.map((msg, idx) => (
                   <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      className={`max-w-2xl p-4 rounded-2xl text-xs leading-relaxed ${
-                        msg.role === 'user'
+                      className={`max-w-2xl p-4 rounded-2xl text-xs leading-relaxed ${msg.role === 'user'
                           ? 'bg-indigo-600 text-white rounded-br-none shadow-xs font-semibold'
                           : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-3xs'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-4 mb-1.5 opacity-75 text-[10px] font-mono">
                         <span className="font-bold uppercase">{msg.role === 'user' ? 'You' : 'PatentHub-AI'}</span>
@@ -1238,478 +1241,576 @@ export const ProjectDetailsPage: React.FC = () => {
             />
           )}
 
-        {/* T2: INNOVATION */}
-        {(activeTab === 'Innovation Details' || activeTab === 'Innovation Workspace') && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200/50">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                    <span>Innovation Draft Spec Editor</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowTips(!showTips)}
-                      className="px-2 py-0.5 text-[8px] font-bold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-750 rounded transition-all cursor-pointer"
-                    >
-                      {showTips ? 'Hide Drafting Tips' : 'Show Drafting Tips'}
-                    </button>
-                  </h3>
-                  {editMode && (
-                    <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold">
-                      {isAutosaving ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />
-                          <span className="text-indigo-650">Autosaving specifications draft...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                          <span className="text-emerald-600">Draft changes autosaved to database</span>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditMode(!editMode)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${editMode ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                >
-                  {editMode ? 'Disable Autosave' : 'Enable Live Edit'}
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveDetails} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Patent Title</label>
-                  {showTips && (
-                    <p className="text-[10px] text-indigo-650 font-bold mb-1 bg-indigo-50/40 p-2 rounded-lg border border-indigo-100/50">
-                      💡 Tip: Use a clear, technical description of the system or method. Avoid proprietary or brand names.
-                    </p>
-                  )}
-                  <input
-                    type="text"
-                    disabled={!editMode}
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-600"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Technology Domain</label>
-                    <input
-                      type="text"
-                      disabled={!editMode}
-                      value={formData.technicalDomain}
-                      onChange={(e) => setFormData({ ...formData, technicalDomain: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Category</label>
-                    <input
-                      type="text"
-                      disabled={!editMode}
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Innovation Description / Abstract</label>
-                  <textarea
-                    rows={4}
-                    disabled={!editMode}
-                    value={formData.innovationIdea}
-                    onChange={(e) => setFormData({ ...formData, innovationIdea: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Problem Statement</label>
-                    <textarea
-                      rows={3}
-                      disabled={!editMode}
-                      value={formData.problemStatement}
-                      onChange={(e) => setFormData({ ...formData, problemStatement: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Proposed Technical Solution</label>
-                    <textarea
-                      rows={3}
-                      disabled={!editMode}
-                      value={formData.proposedSolution}
-                      onChange={(e) => setFormData({ ...formData, proposedSolution: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Existing Solutions Mapped</label>
-                    <textarea
-                      rows={3}
-                      disabled={!editMode}
-                      value={formData.existingSolutions}
-                      onChange={(e) => setFormData({ ...formData, existingSolutions: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Existing Drawbacks & Infringements</label>
-                    <textarea
-                      rows={3}
-                      disabled={!editMode}
-                      value={formData.drawbacks}
-                      onChange={(e) => setFormData({ ...formData, drawbacks: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Objectives</label>
-                    <textarea
-                      rows={2}
-                      disabled={!editMode}
-                      value={formData.objectives}
-                      onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Novel Features Mapped</label>
-                    <textarea
-                      rows={2}
-                      disabled={!editMode}
-                      value={formData.novelFeatures}
-                      onChange={(e) => setFormData({ ...formData, novelFeatures: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Keywords (Comma separated)</label>
-                  <input
-                    type="text"
-                    disabled={!editMode}
-                    value={formData.keywords}
-                    onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                  />
-                </div>
-
-                {editMode && (
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
-                    >
-                      Save Specifications Now
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditMode(false)}
-                      className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                    >
-                      Finish Editing
-                    </button>
-                  </div>
-                )}
-              </form>
-            </div>
-
-            {/* AI Assistant recommendations column */}
-            <div className="lg:col-span-1 space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs">
-                <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-                  <Sparkles className="w-4.5 h-4.5 text-indigo-600 animate-pulse" /> AI Innovation Optimizers
-                </h4>
-                <p className="text-[11px] text-slate-500 leading-normal font-semibold">
-                  Select a module to automatically review and enhance your patent specifications copy:
-                </p>
-
-                <div className="space-y-2 pt-2">
-                  <button
-                    type="button"
-                    disabled={!!aiLoading}
-                    onClick={() => triggerAiInnovation('title')}
-                    className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {aiLoading === 'title' ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Optimize Title
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!!aiLoading}
-                    onClick={() => triggerAiInnovation('abstract')}
-                    className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {aiLoading === 'abstract' ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Generate Better Abstract
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!!aiLoading}
-                    onClick={() => triggerAiInnovation('description')}
-                    className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {aiLoading === 'description' ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Improve Specification
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!!aiLoading}
-                    onClick={() => triggerAiInnovation('keywords')}
-                    className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {aiLoading === 'keywords' ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Suggest Patent Keywords
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* T3: PROTOTYPE MODULE */}
-        {(activeTab === 'Drawings' || activeTab === 'Prototype Module') && (
-          <div className="space-y-6">
+          {/* T2: INNOVATION */}
+          {(activeTab === 'Innovation Details' || activeTab === 'Innovation Workspace') && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-6">
-                <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-2xl space-y-4">
-                  <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Cpu className="w-4.5 h-4.5 text-indigo-650" /> Upload Prototype Artifacts
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-semibold leading-normal">
-                    Maintain engineering blueprints, cad structures, electrical circuit sheets, test logs, and demonstrator videos. Files are versioned automatically.
-                  </p>
+                <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200/50">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                      <span>Innovation Draft Spec Editor</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowTips(!showTips)}
+                        className="px-2 py-0.5 text-[8px] font-bold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-750 rounded transition-all cursor-pointer"
+                      >
+                        {showTips ? 'Hide Drafting Tips' : 'Show Drafting Tips'}
+                      </button>
+                    </h3>
+                    {editMode && (
+                      <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold">
+                        {isAutosaving ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />
+                            <span className="text-indigo-650">Autosaving specifications draft...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                            <span className="text-emerald-600">Draft changes autosaved to database</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode(!editMode)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${editMode ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                  >
+                    {editMode ? 'Disable Autosave' : 'Enable Live Edit'}
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveDetails} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Patent Title</label>
+                    {showTips && (
+                      <p className="text-[10px] text-indigo-650 font-bold mb-1 bg-indigo-50/40 p-2 rounded-lg border border-indigo-100/50">
+                        💡 Tip: Use a clear, technical description of the system or method. Avoid proprietary or brand names.
+                      </p>
+                    )}
+                    <input
+                      type="text"
+                      disabled={!editMode}
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-600"
+                    />
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5">Asset Classification</label>
-                      <select
-                        id="prototypeCategorySelector"
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-250 rounded-xl text-xs font-semibold focus:outline-none"
-                        defaultValue="PROTOTYPE_CAD"
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Technology Domain</label>
+                      <input
+                        type="text"
+                        disabled={!editMode}
+                        value={formData.technicalDomain}
+                        onChange={(e) => setFormData({ ...formData, technicalDomain: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Category</label>
+                      <input
+                        type="text"
+                        disabled={!editMode}
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Innovation Description / Abstract</label>
+                    <textarea
+                      rows={4}
+                      disabled={!editMode}
+                      value={formData.innovationIdea}
+                      onChange={(e) => setFormData({ ...formData, innovationIdea: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Problem Statement</label>
+                      <textarea
+                        rows={3}
+                        disabled={!editMode}
+                        value={formData.problemStatement}
+                        onChange={(e) => setFormData({ ...formData, problemStatement: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Proposed Technical Solution</label>
+                      <textarea
+                        rows={3}
+                        disabled={!editMode}
+                        value={formData.proposedSolution}
+                        onChange={(e) => setFormData({ ...formData, proposedSolution: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Existing Solutions Mapped</label>
+                      <textarea
+                        rows={3}
+                        disabled={!editMode}
+                        value={formData.existingSolutions}
+                        onChange={(e) => setFormData({ ...formData, existingSolutions: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Existing Drawbacks & Infringements</label>
+                      <textarea
+                        rows={3}
+                        disabled={!editMode}
+                        value={formData.drawbacks}
+                        onChange={(e) => setFormData({ ...formData, drawbacks: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Objectives</label>
+                      <textarea
+                        rows={2}
+                        disabled={!editMode}
+                        value={formData.objectives}
+                        onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Novel Features Mapped</label>
+                      <textarea
+                        rows={2}
+                        disabled={!editMode}
+                        value={formData.novelFeatures}
+                        onChange={(e) => setFormData({ ...formData, novelFeatures: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Keywords (Comma separated)</label>
+                    <input
+                      type="text"
+                      disabled={!editMode}
+                      value={formData.keywords}
+                      onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+
+                  {editMode && (
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
                       >
-                        <option value="PROTOTYPE_CAD">CAD File (.step, .dwg, .f3d)</option>
-                        <option value="PROTOTYPE_CIRCUIT">Circuit Diagram / Schematic (.pdf, .png)</option>
-                        <option value="PROTOTYPE_IMAGE">Prototype Photo / Rendering (.png, .jpg)</option>
-                        <option value="PROTOTYPE_VIDEO">Demonstration Video (.mp4)</option>
-                        <option value="PROTOTYPE_TEST_LOG">Testing & Performance Logs (.txt, .pdf)</option>
-                      </select>
+                        Save Specifications Now
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditMode(false)}
+                        className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Finish Editing
+                      </button>
+                    </div>
+                  )}
+                </form>
+              </div>
+
+              {/* AI Assistant recommendations column */}
+              <div className="lg:col-span-1 space-y-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs">
+                  <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Sparkles className="w-4.5 h-4.5 text-indigo-600 animate-pulse" /> AI Innovation Optimizers
+                  </h4>
+                  <p className="text-[11px] text-slate-500 leading-normal font-semibold">
+                    Select a module to automatically review and enhance your patent specifications copy:
+                  </p>
+
+                  <div className="space-y-2 pt-2">
+                    <button
+                      type="button"
+                      disabled={!!aiLoading}
+                      onClick={() => triggerAiInnovation('title')}
+                      className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {aiLoading === 'title' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Optimize Title
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!!aiLoading}
+                      onClick={() => triggerAiInnovation('abstract')}
+                      className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {aiLoading === 'abstract' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Generate Better Abstract
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!!aiLoading}
+                      onClick={() => triggerAiInnovation('description')}
+                      className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {aiLoading === 'description' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Improve Specification
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!!aiLoading}
+                      onClick={() => triggerAiInnovation('keywords')}
+                      className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {aiLoading === 'keywords' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Suggest Patent Keywords
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* T3: PROTOTYPE MODULE */}
+          {(activeTab === 'Drawings' || activeTab === 'Prototype Module') && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-2xl space-y-4">
+                    <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
+                      <Cpu className="w-4.5 h-4.5 text-indigo-650" /> Upload Prototype Artifacts
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-semibold leading-normal">
+                      Maintain engineering blueprints, cad structures, electrical circuit sheets, test logs, and demonstrator videos. Files are versioned automatically.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5">Asset Classification</label>
+                        <select
+                          id="prototypeCategorySelector"
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-250 rounded-xl text-xs font-semibold focus:outline-none"
+                          defaultValue="PROTOTYPE_CAD"
+                        >
+                          <option value="PROTOTYPE_CAD">CAD File (.step, .dwg, .f3d)</option>
+                          <option value="PROTOTYPE_CIRCUIT">Circuit Diagram / Schematic (.pdf, .png)</option>
+                          <option value="PROTOTYPE_IMAGE">Prototype Photo / Rendering (.png, .jpg)</option>
+                          <option value="PROTOTYPE_VIDEO">Demonstration Video (.mp4)</option>
+                          <option value="PROTOTYPE_TEST_LOG">Testing & Performance Logs (.txt, .pdf)</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col justify-end">
+                        <label className="w-full py-2.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Select & Upload File</span>
+                          <input
+                            type="file"
+                            disabled={uploadingDoc}
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                const selector = document.getElementById('prototypeCategorySelector') as HTMLSelectElement;
+                                handleUploadDocument(e.target.files[0], selector.value);
+                              }
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Uploaded Blueprints & Prototypes</h4>
+
+                    {project.documents.filter(d => d.category.startsWith('PROTOTYPE_')).length === 0 ? (
+                      <div className="p-12 text-center border border-slate-200 rounded-2xl bg-white text-slate-400 text-xs font-medium space-y-2">
+                        <Cpu className="w-8 h-8 mx-auto text-slate-300" />
+                        <p>No prototype blueprints or log sheets uploaded yet.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {project.documents.filter(d => d.category.startsWith('PROTOTYPE_')).map((doc) => (
+                          <div key={doc.id} className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-3xs flex flex-col justify-between hover:border-indigo-400 transition-colors">
+                            <div className="space-y-1">
+                              <span className="inline-block px-2 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-[8px] font-bold text-indigo-700 uppercase tracking-wider">
+                                {doc.category.replace('PROTOTYPE_', '').replace('_', ' ')}
+                              </span>
+                              <h5 className="font-extrabold text-xs text-slate-900 truncate" title={doc.name}>{doc.name}</h5>
+                              <p className="text-[9px] text-slate-400 font-semibold">
+                                Uploaded: {new Date(doc.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                              <span className="text-[9px] font-bold text-slate-400 font-mono">VER: {doc.version || 1}</span>
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={doc.fileUrl.startsWith('http') ? doc.fileUrl : `http://localhost:5000${doc.fileUrl}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-2.5 py-1.5 border border-slate-250 hover:bg-slate-50 rounded-lg text-[10px] font-bold text-slate-655"
+                                >
+                                  View File
+                                </a>
+                                <button
+                                  onClick={() => handleDeleteDocument(doc.id)}
+                                  className="p-1 text-slate-450 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete Prototype"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vector blueprint mock helper panel */}
+                <div className="lg:col-span-1 space-y-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs">
+                    <h4 className="text-xs font-extrabold text-indigo-950 uppercase tracking-widest flex items-center gap-1.5">
+                      <Sparkles className="w-4.5 h-4.5 text-indigo-650 animate-pulse" /> AI Blueprint Engine
+                    </h4>
+                    <p className="text-[11px] text-slate-500 leading-normal font-semibold">
+                      Convert hand-drawn drafts or diagrams into USPTO/IPO compliant 2D line schematics:
+                    </p>
+
+                    <div className="space-y-3">
+                      <label className="block w-full border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-4 text-center cursor-pointer bg-white transition-all">
+                        <Upload className="w-5 h-5 mx-auto text-slate-400 mb-1" />
+                        <span className="text-[10px] text-slate-550 font-bold block">
+                          {selectedFile ? selectedFile.name : 'Upload draft sketch'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {previewUrl && (
+                        <div className="border border-slate-200 rounded-xl overflow-hidden bg-white p-2">
+                          <img src={previewUrl} alt="Preview" className="w-full h-24 object-contain rounded-lg" />
+                        </div>
+                      )}
+
+                      {previewUrl && (
+                        <button
+                          onClick={triggerGenerateDrawing}
+                          disabled={isProcessingDrawing}
+                          className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          {isProcessingDrawing ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Cpu className="w-3.5 h-3.5" /> Convert to Schematic
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
 
-                    <div className="flex flex-col justify-end">
-                      <label className="w-full py-2.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                    {drawingVersions.length > 0 && (
+                      <div className="space-y-3 border-t border-slate-200 pt-4">
+                        <h5 className="text-[10px] font-bold text-slate-900 uppercase">Conversion History</h5>
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                          {drawingVersions.map((d, idx) => (
+                            <div key={idx} className="bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
+                              <div className="flex justify-between items-center text-[9px] font-bold text-slate-400">
+                                <span>VERSION {d.version}</span>
+                                <span>{d.date}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <span className="text-[8px] text-slate-400 font-bold block mb-1">ORIGINAL</span>
+                                  <img src={d.original} alt="Original" className="w-full h-16 object-contain border rounded" />
+                                </div>
+                                <div>
+                                  <span className="text-[8px] text-indigo-500 font-bold block mb-1">COMPLIANT SCHEMA</span>
+                                  <img src={d.drawing} alt="Patent Drawing" className="w-full h-16 object-contain border rounded border-indigo-200" />
+                                </div>
+                              </div>
+                              <p className="text-[9px] text-slate-500 italic leading-normal">
+                                {d.metadata}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* T4: DOCUMENT MANAGER */}
+          {(activeTab === 'Documents' || activeTab === 'Document Manager') && (
+            <div className="space-y-6">
+              {!activeFolder ? (
+                <div className="space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/70">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-900">Project Document Repository</h3>
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        Select a category directory to view or upload reference documents, drafts, and compliance files.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <label className="px-4 py-2 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/15 flex items-center gap-1.5 cursor-pointer transition">
                         <Upload className="w-3.5 h-3.5" />
-                        <span>Select & Upload File</span>
+                        <span>{uploadingDoc ? 'Uploading...' : 'Quick Upload File'}</span>
                         <input
                           type="file"
                           disabled={uploadingDoc}
                           onChange={(e) => {
                             if (e.target.files && e.target.files[0]) {
-                              const selector = document.getElementById('prototypeCategorySelector') as HTMLSelectElement;
-                              handleUploadDocument(e.target.files[0], selector.value);
+                              handleUploadDocument(e.target.files[0], 'SUPPORTING');
                             }
                           }}
                           className="hidden"
+                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
                         />
                       </label>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-4">
-                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Uploaded Blueprints & Prototypes</h4>
-
-                  {project.documents.filter(d => d.category.startsWith('PROTOTYPE_')).length === 0 ? (
-                    <div className="p-12 text-center border border-slate-200 rounded-2xl bg-white text-slate-400 text-xs font-medium space-y-2">
-                      <Cpu className="w-8 h-8 mx-auto text-slate-300" />
-                      <p>No prototype blueprints or log sheets uploaded yet.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {project.documents.filter(d => d.category.startsWith('PROTOTYPE_')).map((doc) => (
-                        <div key={doc.id} className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-3xs flex flex-col justify-between hover:border-indigo-400 transition-colors">
-                          <div className="space-y-1">
-                            <span className="inline-block px-2 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-[8px] font-bold text-indigo-700 uppercase tracking-wider">
-                              {doc.category.replace('PROTOTYPE_', '').replace('_', ' ')}
-                            </span>
-                            <h5 className="font-extrabold text-xs text-slate-900 truncate" title={doc.name}>{doc.name}</h5>
-                            <p className="text-[9px] text-slate-400 font-semibold">
-                              Uploaded: {new Date(doc.createdAt).toLocaleDateString()}
-                            </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {[
+                      { key: 'RESEARCH_PAPER', label: 'Research Papers', desc: 'Reference publications & academic papers' },
+                      { key: 'LITERATURE_REVIEW', label: 'Literature Review', desc: 'Prior-art reference summaries & audits' },
+                      { key: 'PATENT_DRAFT', label: 'Patent Drafts', desc: 'Complete specifications draft sheets' },
+                      { key: 'PROTOTYPE_DOCS', label: 'Prototype Documents', desc: 'Engineering designs, schematics & blueprints' },
+                      { key: 'TESTING', label: 'Testing Logs', desc: 'Lab validation, benchmarking & safety reports' },
+                      { key: 'SUPPORTING', label: 'Supporting Documents', desc: 'Forms drafts, disclosures & legal briefs' },
+                    ].map((folder) => {
+                      const count = (project.documents || []).filter((d: any) => d.category === folder.key).length;
+                      return (
+                        <div
+                          key={folder.key}
+                          className="p-5 bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-blue-400 rounded-3xl text-left transition-all space-y-3 shadow-3xs flex flex-col justify-between group"
+                        >
+                          <div
+                            onClick={() => setActiveFolder(folder.key)}
+                            className="cursor-pointer space-y-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="p-3 bg-blue-50 text-blue-900 rounded-2xl group-hover:scale-105 transition-transform">
+                                <Folder className="w-6 h-6" />
+                              </div>
+                              <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full border border-slate-200/60">
+                                {count} {count === 1 ? 'file' : 'files'}
+                              </span>
+                            </div>
+                            <div>
+                              <h4 className="font-extrabold text-xs text-slate-900 group-hover:text-blue-900 transition-colors">
+                                {folder.label}
+                              </h4>
+                              <p className="text-[11px] text-slate-400 font-medium mt-0.5">{folder.desc}</p>
+                            </div>
                           </div>
 
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                            <span className="text-[9px] font-bold text-slate-400 font-mono">VER: {doc.version || 1}</span>
-                            <div className="flex items-center gap-2">
-                              <a
-                                href={doc.fileUrl.startsWith('http') ? doc.fileUrl : `http://localhost:5000${doc.fileUrl}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="px-2.5 py-1.5 border border-slate-250 hover:bg-slate-50 rounded-lg text-[10px] font-bold text-slate-655"
-                              >
-                                View File
-                              </a>
-                              <button
-                                onClick={() => handleDeleteDocument(doc.id)}
-                                className="p-1 text-slate-450 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                title="Delete Prototype"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                          <div className="pt-2 border-t border-slate-150 flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setActiveFolder(folder.key)}
+                              className="text-xs font-bold text-blue-900 hover:text-blue-950 cursor-pointer"
+                            >
+                              Open folder →
+                            </button>
+
+                            <label className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-900 rounded-lg text-xs font-bold cursor-pointer transition flex items-center gap-1" title="Upload directly to this folder">
+                              <Upload className="w-3.5 h-3.5" />
+                              <span className="text-[10px]">Add File</span>
+                              <input
+                                type="file"
+                                disabled={uploadingDoc}
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    handleUploadDocument(e.target.files[0], folder.key);
+                                  }
+                                }}
+                                className="hidden"
+                                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                              />
+                            </label>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-
-              {/* Vector blueprint mock helper panel */}
-              <div className="lg:col-span-1 space-y-4">
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs">
-                  <h4 className="text-xs font-extrabold text-indigo-950 uppercase tracking-widest flex items-center gap-1.5">
-                    <Sparkles className="w-4.5 h-4.5 text-indigo-650 animate-pulse" /> AI Blueprint Engine
-                  </h4>
-                  <p className="text-[11px] text-slate-500 leading-normal font-semibold">
-                    Convert hand-drawn drafts or diagrams into USPTO/IPO compliant 2D line schematics:
-                  </p>
-
-                  <div className="space-y-3">
-                    <label className="block w-full border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-4 text-center cursor-pointer bg-white transition-all">
-                      <Upload className="w-5 h-5 mx-auto text-slate-400 mb-1" />
-                      <span className="text-[10px] text-slate-550 font-bold block">
-                        {selectedFile ? selectedFile.name : 'Upload draft sketch'}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                    </label>
-
-                    {previewUrl && (
-                      <div className="border border-slate-200 rounded-xl overflow-hidden bg-white p-2">
-                        <img src={previewUrl} alt="Preview" className="w-full h-24 object-contain rounded-lg" />
-                      </div>
-                    )}
-
-                    {previewUrl && (
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl flex-col sm:flex-row border border-slate-200/50 gap-4">
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={triggerGenerateDrawing}
-                        disabled={isProcessingDrawing}
-                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                        onClick={() => setActiveFolder(null)}
+                        className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1.5 transition shadow-3xs"
                       >
-                        {isProcessingDrawing ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...
-                          </>
-                        ) : (
-                          <>
-                            <Cpu className="w-3.5 h-3.5" /> Convert to Schematic
-                          </>
-                        )}
+                        ← Back to Directories
                       </button>
-                    )}
-                  </div>
-
-                  {drawingVersions.length > 0 && (
-                    <div className="space-y-3 border-t border-slate-200 pt-4">
-                      <h5 className="text-[10px] font-bold text-slate-900 uppercase">Conversion History</h5>
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {drawingVersions.map((d, idx) => (
-                          <div key={idx} className="bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
-                            <div className="flex justify-between items-center text-[9px] font-bold text-slate-400">
-                              <span>VERSION {d.version}</span>
-                              <span>{d.date}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <span className="text-[8px] text-slate-400 font-bold block mb-1">ORIGINAL</span>
-                                <img src={d.original} alt="Original" className="w-full h-16 object-contain border rounded" />
-                              </div>
-                              <div>
-                                <span className="text-[8px] text-indigo-500 font-bold block mb-1">COMPLIANT SCHEMA</span>
-                                <img src={d.drawing} alt="Patent Drawing" className="w-full h-16 object-contain border rounded border-indigo-200" />
-                              </div>
-                            </div>
-                            <p className="text-[9px] text-slate-500 italic leading-normal">
-                              {d.metadata}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                      <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wider ml-2">
+                        📁 {activeFolder.replace('_', ' ')}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* T4: DOCUMENT MANAGER */}
-        {(activeTab === 'Documents' || activeTab === 'Document Manager') && (
-          <div className="space-y-6">
-            {!activeFolder ? (
-              <div className="space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/70">
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-900">Project Document Repository</h3>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      Select a category directory to view or upload reference documents, drafts, and compliance files.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
                     <label className="px-4 py-2 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/15 flex items-center gap-1.5 cursor-pointer transition">
                       <Upload className="w-3.5 h-3.5" />
-                      <span>{uploadingDoc ? 'Uploading...' : 'Quick Upload File'}</span>
+                      <span>{uploadingDoc ? 'Uploading...' : 'Upload to Folder'}</span>
                       <input
                         type="file"
                         disabled={uploadingDoc}
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
-                            handleUploadDocument(e.target.files[0], 'SUPPORTING');
+                            handleUploadDocument(e.target.files[0], activeFolder);
                           }
                         }}
                         className="hidden"
@@ -1717,1377 +1818,1280 @@ export const ProjectDetailsPage: React.FC = () => {
                       />
                     </label>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {[
-                    { key: 'RESEARCH_PAPER', label: 'Research Papers', desc: 'Reference publications & academic papers' },
-                    { key: 'LITERATURE_REVIEW', label: 'Literature Review', desc: 'Prior-art reference summaries & audits' },
-                    { key: 'PATENT_DRAFT', label: 'Patent Drafts', desc: 'Complete specifications draft sheets' },
-                    { key: 'PROTOTYPE_DOCS', label: 'Prototype Documents', desc: 'Engineering designs, schematics & blueprints' },
-                    { key: 'TESTING', label: 'Testing Logs', desc: 'Lab validation, benchmarking & safety reports' },
-                    { key: 'SUPPORTING', label: 'Supporting Documents', desc: 'Forms drafts, disclosures & legal briefs' },
-                  ].map((folder) => {
-                    const count = (project.documents || []).filter((d: any) => d.category === folder.key).length;
-                    return (
-                      <div
-                        key={folder.key}
-                        className="p-5 bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-blue-400 rounded-3xl text-left transition-all space-y-3 shadow-3xs flex flex-col justify-between group"
-                      >
-                        <div
-                          onClick={() => setActiveFolder(folder.key)}
-                          className="cursor-pointer space-y-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="p-3 bg-blue-50 text-blue-900 rounded-2xl group-hover:scale-105 transition-transform">
-                              <Folder className="w-6 h-6" />
-                            </div>
-                            <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full border border-slate-200/60">
-                              {count} {count === 1 ? 'file' : 'files'}
-                            </span>
-                          </div>
-                          <div>
-                            <h4 className="font-extrabold text-xs text-slate-900 group-hover:text-blue-900 transition-colors">
-                              {folder.label}
-                            </h4>
-                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">{folder.desc}</p>
-                          </div>
-                        </div>
-
-                        <div className="pt-2 border-t border-slate-150 flex items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setActiveFolder(folder.key)}
-                            className="text-xs font-bold text-blue-900 hover:text-blue-950 cursor-pointer"
-                          >
-                            Open folder →
-                          </button>
-
-                          <label className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-900 rounded-lg text-xs font-bold cursor-pointer transition flex items-center gap-1" title="Upload directly to this folder">
-                            <Upload className="w-3.5 h-3.5" />
-                            <span className="text-[10px]">Add File</span>
-                            <input
-                              type="file"
-                              disabled={uploadingDoc}
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                  handleUploadDocument(e.target.files[0], folder.key);
-                                }
-                              }}
-                              className="hidden"
-                              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl flex-col sm:flex-row border border-slate-200/50 gap-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setActiveFolder(null)}
-                      className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1.5 transition shadow-3xs"
-                    >
-                      ← Back to Directories
-                    </button>
-                    <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wider ml-2">
-                      📁 {activeFolder.replace('_', ' ')}
-                    </span>
-                  </div>
-
-                  <label className="px-4 py-2 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/15 flex items-center gap-1.5 cursor-pointer transition">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>{uploadingDoc ? 'Uploading...' : 'Upload to Folder'}</span>
-                    <input
-                      type="file"
-                      disabled={uploadingDoc}
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleUploadDocument(e.target.files[0], activeFolder);
-                        }
-                      }}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
-                    />
-                  </label>
-                </div>
-
-                {/* Drag and Drop Box */}
-                <div
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                      handleUploadDocument(e.dataTransfer.files[0], activeFolder);
-                    }
-                  }}
-                  className="p-8 border-2 border-dashed border-slate-250 hover:border-blue-400 rounded-3xl bg-slate-50/50 flex flex-col items-center justify-center text-center space-y-2 transition cursor-pointer"
-                >
-                  <FolderOpen className="w-8 h-8 text-blue-900/60" />
-                  <p className="text-xs font-bold text-slate-700">Drag and drop files here to upload</p>
-                  <p className="text-[10px] text-slate-400 font-medium">Supports PDF, DOCX, TXT, PNG, JPG (up to 25MB)</p>
-                </div>
-
-                <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-150 bg-white shadow-3xs">
-                  {(project.documents || []).filter((d: any) => d.category === activeFolder).length === 0 ? (
-                    <div className="p-12 text-center text-slate-400 text-xs font-medium space-y-2">
-                      <FolderOpen className="w-10 h-10 mx-auto text-slate-300" />
-                      <p>No documents uploaded in this directory category yet.</p>
-                    </div>
-                  ) : (
-                    (project.documents || [])
-                      .filter((d: any) => d.category === activeFolder)
-                      .map((doc: any) => (
-                        <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 bg-white">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-blue-50 text-blue-900 rounded-xl">
-                              <FileText className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-xs text-slate-800">{doc.name}</p>
-                              <p className="text-[10px] text-slate-400 font-medium">
-                                Uploaded on: {new Date(doc.createdAt).toLocaleDateString()} {doc.fileSize ? `• ${(doc.fileSize / 1024).toFixed(1)} KB` : ''}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={doc.fileUrl.startsWith('http') ? doc.fileUrl : `http://localhost:5000${doc.fileUrl}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 transition"
-                            >
-                              Download
-                            </a>
-                            <label className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1 transition">
-                              <span>Replace</span>
-                              <input
-                                type="file"
-                                disabled={uploadingDoc}
-                                onChange={async (e) => {
-                                  if (e.target.files && e.target.files[0]) {
-                                    await api.delete(`/documents/${doc.id}`);
-                                    await handleUploadDocument(e.target.files[0], activeFolder);
-                                  }
-                                }}
-                                className="hidden"
-                                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
-                              />
-                            </label>
-                            <button
-                              onClick={() => handleDeleteDocument(doc.id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-                              title="Delete Document"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* T5: SPECIFICATION DRAFTING COMPANION */}
-        {(activeTab === 'AI Workspace' || activeTab === 'AI Analysis') && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse" /> Context-Aware Specification Companion
-                </h3>
-                <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                  Initialized with: <strong className="text-slate-700">"{project.title}"</strong> ({project.category})
-                </p>
-              </div>
-            </div>
-
-            {/* Chatbox messages scroll view */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 h-80 overflow-y-auto space-y-4">
-              {chatMessages.map((msg, index) => (
-                <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  {/* Drag and Drop Box */}
                   <div
-                    className={`max-w-md p-4 rounded-2xl text-xs leading-relaxed font-semibold ${msg.sender === 'user'
-                        ? 'bg-indigo-600 text-white rounded-br-none shadow-2xs'
-                        : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-3xs'
-                      }`}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        handleUploadDocument(e.dataTransfer.files[0], activeFolder);
+                      }
+                    }}
+                    className="p-8 border-2 border-dashed border-slate-250 hover:border-blue-400 rounded-3xl bg-slate-50/50 flex flex-col items-center justify-center text-center space-y-2 transition cursor-pointer"
                   >
-                    {msg.text.split('\n').map((line, lidx) => (
-                      <p key={lidx} className="mt-1">
-                        {line}
-                      </p>
-                    ))}
+                    <FolderOpen className="w-8 h-8 text-blue-900/60" />
+                    <p className="text-xs font-bold text-slate-700">Drag and drop files here to upload</p>
+                    <p className="text-[10px] text-slate-400 font-medium">Supports PDF, DOCX, TXT, PNG, JPG (up to 25MB)</p>
                   </div>
-                </div>
-              ))}
-              {chatLoading && (
-                <div className="flex justify-start">
-                  <div className="p-3 bg-white border border-slate-200 rounded-2xl rounded-bl-none shadow-3xs text-xs font-semibold flex items-center gap-2 text-slate-500">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                    <span>Analyzing specification context...</span>
+
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-150 bg-white shadow-3xs">
+                    {(project.documents || []).filter((d: any) => d.category === activeFolder).length === 0 ? (
+                      <div className="p-12 text-center text-slate-400 text-xs font-medium space-y-2">
+                        <FolderOpen className="w-10 h-10 mx-auto text-slate-300" />
+                        <p>No documents uploaded in this directory category yet.</p>
+                      </div>
+                    ) : (
+                      (project.documents || [])
+                        .filter((d: any) => d.category === activeFolder)
+                        .map((doc: any) => (
+                          <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 bg-white">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2.5 bg-blue-50 text-blue-900 rounded-xl">
+                                <FileText className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-xs text-slate-800">{doc.name}</p>
+                                <p className="text-[10px] text-slate-400 font-medium">
+                                  Uploaded on: {new Date(doc.createdAt).toLocaleDateString()} {doc.fileSize ? `• ${(doc.fileSize / 1024).toFixed(1)} KB` : ''}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={doc.fileUrl.startsWith('http') ? doc.fileUrl : `http://localhost:5000${doc.fileUrl}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 transition"
+                              >
+                                Download
+                              </a>
+                              <label className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer flex items-center gap-1 transition">
+                                <span>Replace</span>
+                                <input
+                                  type="file"
+                                  disabled={uploadingDoc}
+                                  onChange={async (e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                      await api.delete(`/documents/${doc.id}`);
+                                      await handleUploadDocument(e.target.files[0], activeFolder);
+                                    }
+                                  }}
+                                  className="hidden"
+                                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                                />
+                              </label>
+                              <button
+                                onClick={() => handleDeleteDocument(doc.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                                title="Delete Document"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                    )}
                   </div>
                 </div>
               )}
             </div>
+          )}
 
-            {/* Prompt Helper Chips */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Quick Actions:</span>
-              <button
-                onClick={() => handleChipClick('Improve my innovation abstract description')}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-150 rounded-full text-[10px] font-bold transition-all"
-              >
-                Improve Abstract
-              </button>
-              <button
-                onClick={() => handleChipClick('Explain requirements for Form 2 Specification')}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-150 rounded-full text-[10px] font-bold transition-all"
-              >
-                Explain Form 2
-              </button>
-              <button
-                onClick={() => handleChipClick('Suggest patent claims based on this project')}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-150 rounded-full text-[10px] font-bold transition-all"
-              >
-                Suggest Claims
-              </button>
-            </div>
-
-            {/* Send bar */}
-            <form onSubmit={handleSendMessage} className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Ask drafting companion (e.g. 'suggest independent claims structure')"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-250 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-650"
-              />
-              <button
-                type="submit"
-                disabled={chatLoading}
-                className="px-4.5 bg-indigo-600 hover:bg-indigo-755 text-white rounded-xl flex items-center justify-center cursor-pointer shadow-md disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
-          </div>
-        )}
-        {/* T6: EXPERT AUDIT & FTO ANALYSIS */}
-        {(activeTab === 'Expert Audit' || activeTab === 'FTO Analysis') && (
-          <div className="space-y-8">
-            <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-              Search the public patent database to link relevant prior art documents to your project, then run AI diagnostics to audit similarity and novelty strength.
-            </p>
-
-            {/* PATENT EXPLORER & REFERENCES MANAGER */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-3xs space-y-6">
-              <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+          {/* T5: SPECIFICATION DRAFTING COMPANION */}
+          {(activeTab === 'AI Workspace' || activeTab === 'AI Analysis') && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <div>
-                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                    🔍 Verified Patent Explorer & References Manager
-                  </h4>
-                  <p className="text-[10px] text-slate-450 font-semibold mt-0.5">
-                    Search public patent registries and link relevant prior-art documents as context for AI diagnostics.
+                  <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse" /> Context-Aware Specification Companion
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                    Initialized with: <strong className="text-slate-700">"{project.title}"</strong> ({project.category})
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Search Panel */}
-                <div className="space-y-4">
-                  <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                    <span>Registry Search</span>
-                  </h5>
-                  <form onSubmit={handlePatentSearch} className="flex gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        placeholder="Search by keywords, patent number, or assignee..."
-                        value={patentSearchQuery}
-                        onChange={(e) => setPatentSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-650"
-                      />
-                      <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={loadingPatentSearch}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-1"
-                    >
-                      {loadingPatentSearch ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin" /> Searching...
-                        </>
-                      ) : (
-                        'Search'
-                      )}
-                    </button>
-                  </form>
-
-                  {patentSearchError && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-semibold leading-normal flex items-center gap-1.5">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{patentSearchError}</span>
-                    </div>
-                  )}
-
-                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                    {patentSearchResults.length === 0 ? (
-                      <div className="py-12 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                        {loadingPatentSearch ? 'Fetching records...' : 'Enter keywords above to search patent registries.'}
-                      </div>
-                    ) : (
-                      patentSearchResults.map((pat) => {
-                        const isSaved = savedReferences.some(r => r.patentNumber === pat.patentNumber);
-                        const isMock = pat.source === 'MOCK';
-
-                        return (
-                          <div key={pat.patentNumber} className="p-3 bg-white border border-slate-200 rounded-2xl shadow-3xs space-y-2 hover:border-slate-350 transition-all">
-                            <div className="flex justify-between items-start gap-2">
-                              <div>
-                                <span className={`inline-block px-2 py-0.5 rounded text-[8px] font-bold border uppercase ${
-                                  isMock
-                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                }`}>
-                                  {isMock ? 'Mock / Offline Data' : 'Verified USPTO Patent'}
-                                </span>
-                                <h6 className="font-extrabold text-[10px] text-slate-900 mt-1">{pat.patentNumber}</h6>
-                              </div>
-
-                              {canManageReferences && (
-                                <button
-                                  onClick={() => handleSaveReference(pat)}
-                                  disabled={isSaved}
-                                  className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold border cursor-pointer transition-all flex items-center gap-1 ${
-                                    isSaved
-                                      ? 'bg-slate-50 border-slate-200 text-slate-450'
-                                      : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                                  }`}
-                                >
-                                  {isSaved ? 'Linked ✓' : <><Plus className="w-2.5 h-2.5" /> Link Reference</>}
-                                </button>
-                              )}
-                            </div>
-                            <h6 className="font-bold text-[11px] text-slate-800 leading-snug">{pat.title}</h6>
-                            {pat.abstract && (
-                              <p className="text-[10px] text-slate-500 leading-normal line-clamp-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                {pat.abstract}
-                              </p>
-                            )}
-                            <div className="flex gap-4 text-[9px] text-slate-400 font-semibold">
-                              {pat.inventors && <span>👤 {pat.inventors}</span>}
-                              {pat.publishDate && <span>📅 {pat.publishDate}</span>}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                {/* Saved References Panel */}
-                <div className="space-y-4">
-                  <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span>Saved Project References ({savedReferences.length})</span>
-                  </h5>
-
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                    {loadingReferences ? (
-                      <div className="py-12 text-center text-slate-400 text-xs font-medium">
-                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600 mb-2" />
-                        Loading references...
-                      </div>
-                    ) : savedReferences.length === 0 ? (
-                      <div className="py-12 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                        No references linked to this project yet. Use the explorer search panel to link patents.
-                      </div>
-                    ) : (
-                      savedReferences.map((ref) => {
-                        const isMock = ref.source === 'MOCK';
-                        return (
-                          <div key={ref.id} className="p-3 bg-indigo-50/20 border border-indigo-200/60 rounded-2xl shadow-3xs space-y-1.5 relative">
-                            <div className="flex justify-between items-start gap-2">
-                              <div>
-                                <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold border uppercase ${
-                                  isMock
-                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                }`}>
-                                  {isMock ? 'Offline Reference' : 'Verified Patent'}
-                                </span>
-                                <h6 className="font-extrabold text-[10px] text-indigo-800 mt-1">{ref.patentNumber}</h6>
-                              </div>
-
-                              {canManageReferences && (
-                                <button
-                                  onClick={() => handleDeleteReference(ref.id)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                                  title="Delete Reference"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                            <h6 className="font-bold text-[11px] text-slate-900 leading-snug">{ref.title}</h6>
-                            {ref.abstract && (
-                              <p className="text-[10px] text-slate-655 leading-normal italic line-clamp-2 bg-white p-2 rounded border border-slate-150">
-                                {ref.abstract}
-                              </p>
-                            )}
-                            <div className="flex items-center justify-between text-[9px] pt-1">
-                              <span className="text-slate-400 font-semibold">
-                                {ref.publishDate && `Published: ${new Date(ref.publishDate).toLocaleDateString()}`}
-                              </span>
-                              {ref.url && (
-                                <a
-                                  href={ref.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-indigo-650 hover:underline font-bold flex items-center gap-0.5"
-                                >
-                                  Registry link →
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Prior Art / Similarity Panel */}
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-3xs">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <div>
-                    <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      🕵️ Prior Art & Similarity Check
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-semibold">Registry overlap analysis</p>
-                  </div>
-                  <button
-                    onClick={runSimilarityCheck}
-                    disabled={loadingSimilarity}
-                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-extrabold flex items-center gap-1 shadow-md cursor-pointer disabled:opacity-50"
-                  >
-                    {loadingSimilarity ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" /> Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3 h-3" /> Audit Registry
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {similarityError ? (
-                  <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-bold leading-normal">
-                    ❌ {similarityError}
-                  </div>
-                ) : !similarityData ? (
-                  <div className="py-12 text-center text-slate-400 text-xs font-semibold">
-                    Click "Audit Registry" to inspect database matches.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
-                      <div className="relative inline-flex items-center justify-center shrink-0">
-                        <svg className="w-20 h-20 transform -rotate-90">
-                          <circle cx="40" cy="40" r="34" stroke="#e2e8f0" strokeWidth="6" fill="transparent" />
-                          <circle
-                            cx="40"
-                            cy="40"
-                            r="34"
-                            stroke="#10b981"
-                            strokeWidth="6"
-                            fill="transparent"
-                            strokeDasharray={213}
-                            strokeDashoffset={213 - (213 * similarityData.similarityScore) / 100}
-                          />
-                        </svg>
-                        <span className="absolute text-xs font-extrabold text-emerald-600 font-mono">{similarityData.similarityScore}%</span>
-                      </div>
-                      <div className="space-y-1">
-                        <h5 className="font-extrabold text-xs text-slate-800">Similarity Match Index</h5>
-                        <p className="text-[9px] text-slate-450 font-semibold leading-normal">
-                          Matches below 30% are highly safe. Current risk status:
-                        </p>
-                        <span className="inline-block px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                          {similarityData.riskLevel} Risk
-                        </span>
-                      </div>
-                    </div>
-
-                    {similarityData.matches && similarityData.matches.length > 0 && (
-                      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                        {similarityData.matches.map((m: any, idx: number) => {
-                          const isExpanded = expandedMatchIndex === idx;
-                          return (
-                            <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
-                              <div className="flex justify-between items-center">
-                                <span className="font-extrabold text-[10px] text-indigo-700">{m.patentId}</span>
-                                <span className="text-[9px] font-bold text-slate-450 font-mono">{m.similarityPercent}% match</span>
-                              </div>
-                              <h6 className="font-bold text-[11px] text-slate-900">{m.title}</h6>
-                              <p className="text-[10px] text-slate-500 leading-normal italic bg-white p-2 rounded border border-slate-150">
-                                {m.drawbackOverlap}
-                              </p>
-                              <div className="flex items-center justify-between pt-1">
-                                <a href={m.url} target="_blank" rel="noreferrer" className="text-[9px] text-indigo-650 font-bold hover:underline">
-                                  Registry entry →
-                                </a>
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedMatchIndex(isExpanded ? null : idx)}
-                                  className="text-[9px] text-indigo-700 font-extrabold hover:underline"
-                                >
-                                  {isExpanded ? 'Hide strategy' : 'Bypass strategy'}
-                                </button>
-                              </div>
-                              {isExpanded && (
-                                <p className="p-2.5 bg-indigo-50 border border-indigo-200 rounded text-[10px] leading-relaxed text-indigo-950 font-semibold mt-1">
-                                  💡 Claim modification strategy populated in specifications drafter companion workspace.
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {similarityData.explanation && (
-                      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                        <h6 className="font-extrabold text-[10px] text-slate-800 uppercase tracking-wider">AI Comparison Explanation:</h6>
-                        <p className="text-[10px] text-slate-600 leading-relaxed font-semibold">{similarityData.explanation}</p>
-                      </div>
-                    )}
-
-                    {similarityData.disclaimer && (
-                      <div className="text-[9px] text-slate-450 italic font-bold leading-normal">
-                        ⚠ {similarityData.disclaimer}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Claims Strength / Novelty Panel */}
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-3xs">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <div>
-                    <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      ⚖ Novelty & Claims Auditor
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-semibold">Novelty strength evaluator</p>
-                  </div>
-                  <button
-                    onClick={runNoveltyAssessment}
-                    disabled={loadingNovelty}
-                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-extrabold flex items-center gap-1 shadow-md cursor-pointer disabled:opacity-50"
-                  >
-                    {loadingNovelty ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" /> Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3 h-3" /> Audit Claims
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {noveltyError ? (
-                  <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-bold leading-normal">
-                    ❌ {noveltyError}
-                  </div>
-                ) : !noveltyData ? (
-                  <div className="py-12 text-center text-slate-400 text-xs font-semibold">
-                    Click "Audit Claims" to evaluate non-obviousness metrics.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
-                      <div className="relative inline-flex items-center justify-center shrink-0">
-                        <svg className="w-20 h-20 transform -rotate-90">
-                          <circle cx="40" cy="40" r="34" stroke="#e2e8f0" strokeWidth="6" fill="transparent" />
-                          <circle
-                            cx="40"
-                            cy="40"
-                            r="34"
-                            stroke="#4f46e5"
-                            strokeWidth="6"
-                            fill="transparent"
-                            strokeDasharray={213}
-                            strokeDashoffset={213 - (213 * noveltyData.noveltyScore) / 100}
-                          />
-                        </svg>
-                        <span className="absolute text-xs font-extrabold text-indigo-600 font-mono">{noveltyData.noveltyScore}%</span>
-                      </div>
-                      <div className="space-y-1">
-                        <h5 className="font-extrabold text-xs text-slate-800">Novelty Strength Score</h5>
-                        <p className="text-[9px] text-slate-450 font-semibold leading-normal">
-                          Patent eligibility strength rating:
-                        </p>
-                        <span className="inline-block px-2.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                          {noveltyData.strength} Eligible
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-emerald-50/20 border border-emerald-200 rounded-xl space-y-1">
-                        <h6 className="font-bold text-[10px] text-emerald-950 uppercase">Strong Area claims:</h6>
-                        <ul className="list-disc pl-4 text-[9px] text-slate-655 leading-relaxed font-semibold">
-                          {noveltyData.strongAreas.slice(0, 2).map((sa: string, si: number) => (
-                            <li key={si}>{sa}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="p-3 bg-rose-50/20 border border-rose-200 rounded-xl space-y-1">
-                        <h6 className="font-bold text-[10px] text-rose-950 uppercase">Weak Area claims:</h6>
-                        <ul className="list-disc pl-4 text-[9px] text-slate-655 leading-relaxed font-semibold">
-                          {noveltyData.weakAreas.slice(0, 2).map((wa: string, wi: number) => (
-                            <li key={wi}>{wa}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    {noveltyData.explanation && (
-                      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                        <h6 className="font-extrabold text-[10px] text-slate-800 uppercase tracking-wider">AI Novelty Explanation:</h6>
-                        <p className="text-[10px] text-slate-600 leading-relaxed font-semibold">{noveltyData.explanation}</p>
-                      </div>
-                    )}
-
-                    {noveltyData.recommendations && noveltyData.recommendations.length > 0 && (
-                      <div className="p-3.5 bg-indigo-50/30 border border-indigo-150 rounded-2xl space-y-1">
-                        <h6 className="font-extrabold text-[10px] text-indigo-950 uppercase tracking-wider">Recommendations:</h6>
-                        <ul className="list-disc pl-4 text-[9px] text-slate-600 leading-relaxed font-bold">
-                          {noveltyData.recommendations.map((rec: string, ri: number) => (
-                            <li key={ri}>{rec}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {noveltyData.disclaimer && (
-                      <div className="text-[9px] text-slate-450 italic font-bold leading-normal">
-                        ⚠ {noveltyData.disclaimer}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* T8: PATENT FORMS */}
-        {activeTab === 'Patent Forms' && (
-          <div className="space-y-6">
-            <h3 className="text-base font-extrabold text-slate-900">IPO Patent Forms Checklist Wizard</h3>
-            <p className="text-xs text-slate-500 font-semibold leading-normal">
-              Below are the standard forms required to file your patent request in India. Click to fill out credentials or preview the generated documents.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Form selection column */}
-              <div className="md:col-span-1 space-y-2.5">
-                {[
-                  { id: '1', title: 'Form 1 (Application for Patent)', desc: 'General applicant metadata registration details' },
-                  { id: '2', title: 'Form 2 (Specifications & Claims)', desc: 'Detailed description, abstract, and drawings list' },
-                  { id: '3', title: 'Form 3 (Statement & Undertaking)', desc: 'State declaration of prior filings outside India' },
-                  { id: '5', title: 'Form 5 (Declaration of Inventorship)', desc: 'Inventor details declaration of credentials' },
-                  { id: '26', title: 'Form 26 (Power of Attorney)', desc: 'Assign filing duties to a Patent Agent' },
-                ].map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => setActiveFormIndex(f.id)}
-                    className={`w-full p-4 text-left border rounded-2xl flex items-center justify-between transition-all cursor-pointer ${activeFormIndex === f.id
-                        ? 'bg-indigo-50 border-indigo-400 text-indigo-950 shadow-2xs font-bold'
-                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                      }`}
-                  >
-                    <div className="space-y-0.5">
-                      <span className="text-[11px] uppercase tracking-wider block font-bold">Form {f.id}</span>
-                      <p className="text-xs font-semibold">{f.title}</p>
-                    </div>
-                    <FileCheck2 className={`w-4 h-4 shrink-0 ${activeFormIndex === f.id ? 'text-indigo-600' : 'text-slate-350'}`} />
-                  </button>
-                ))}
-              </div>
-
-              {/* Form editing wizard column */}
-              <div className="md:col-span-2 bg-slate-50 border border-slate-200 p-6 rounded-3xl min-h-[300px] flex flex-col justify-between">
-                {!activeFormIndex ? (
-                  <div className="m-auto text-center text-slate-400 text-xs font-medium space-y-2">
-                    <FileCode className="w-10 h-10 mx-auto text-slate-300" />
-                    <p>Select an IPO Form from the left to start compiling your draft.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6 w-full">
-                    <div className="border-b border-slate-200 pb-3 flex justify-between items-center">
-                      <h4 className="font-extrabold text-sm text-slate-900">Form {activeFormIndex} Wizard</h4>
-                      <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-150">Pre-filled with metadata</span>
-                    </div>
-
-                    <div className="space-y-4">
-                      {activeFormIndex === '1' && (
-                        <>
-                          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-950 font-bold">
-                            📝 <strong>About Form 1 (Application for Patent):</strong> This registers applicant details, signatures, and inventorship designations to legally open your filing docket at the Indian Patent Office (IPO).
-                          </div>
-                          <div className="bg-white p-4 rounded-xl border border-slate-150 text-[11px] leading-relaxed text-slate-650 font-medium">
-                            <strong>THE PATENT ACT 1970</strong> (39 of 1970) & THE PATENTS RULES, 2003 <br />
-                            <strong>APPLICATION FOR GRANT OF PATENT</strong> (Section 7, 54 & 135) <br /><br />
-                            APPLICANT NAME: <span className="text-slate-900 font-bold">{project.owner.fullName}</span> <br />
-                            INSTITUTION: <span className="text-slate-900 font-bold">{project.owner.email.split('@')[1] || 'Institutions Registry'}</span> <br />
-                            TITLE OF INVENTION: <span className="text-slate-900 font-bold">{project.title}</span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">State / Province</label>
-                              <input
-                                type="text"
-                                value={formField1}
-                                onChange={(e) => setFormField1(e.target.value)}
-                                placeholder="e.g. Kerala"
-                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Applicant Type</label>
-                              <input
-                                type="text"
-                                value={formField2}
-                                onChange={(e) => setFormField2(e.target.value)}
-                                placeholder="e.g. Natural Person"
-                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs"
-                              />
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {activeFormIndex === '2' && (
-                        <>
-                          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-950 font-bold">
-                            📝 <strong>About Form 2 (Specifications & Claims):</strong> This is the most critical document. It describes the background of the invention, visual assembly drawings details, and lists your legal 'Claims' which define the boundary of your technology.
-                          </div>
-                          <div className="bg-white p-4 rounded-xl border border-slate-150 text-[11px] leading-relaxed text-slate-650 font-medium space-y-2">
-                            <strong>FORM 2: SPECIFICATION</strong> (Section 10; Rule 13) <br /><br />
-                            <p><strong>1. TITLE OF THE INVENTION:</strong> {project.title}</p>
-                            <p><strong>2. APPLICANTS:</strong> {project.owner.fullName} (Student/Inventor)</p>
-                            <p><strong>3. PREAMBLE TO DESCRIPTION:</strong> The following specification particularly describes the invention and the manner in which it is to be performed.</p>
-                            <p><strong>4. DESCRIPTION (Abstract):</strong> {project.innovationIdea}</p>
-                          </div>
-                          <div>
-                            <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Scope Claims Count</label>
-                            <input
-                              type="number"
-                              value={formField1}
-                              onChange={(e) => setFormField1(e.target.value)}
-                              placeholder="e.g. 5"
-                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs"
-                            />
-                          </div>
-                        </>
-                      )}
-
-                      {(activeFormIndex === '3' || activeFormIndex === '5' || activeFormIndex === '26') && (
-                        <div className="space-y-3">
-                          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-950 font-bold">
-                            {activeFormIndex === '3' && "📝 About Form 3 (Statement & Undertaking): Declares details of corresponding patent filings registered outside India."}
-                            {activeFormIndex === '5' && "📝 About Form 5 (Declaration of Inventorship): Formal confirmation stating who the true inventors and creators are."}
-                            {activeFormIndex === '26' && "📝 About Form 26 (Power of Attorney): Assigns filing and representation privileges to a registered Patent Agent/attorney."}
-                          </div>
-                          <div className="bg-white p-4 rounded-xl border border-slate-150 text-[11px] leading-relaxed text-slate-650 font-medium">
-                            <strong>FORM {activeFormIndex} REGISTRATIONS</strong> <br />
-                            Pre-populated draft file generation is ready. Generates legal claims bindings utilizing username <strong>@{project.owner.username}</strong> and institution details.
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 justify-end pt-4 border-t border-slate-200">
-                      <button
-                        onClick={() => {
-                          generateIpoFormPdf(activeFormIndex);
-                          setActiveFormIndex(null);
-                        }}
-                        className="px-4 py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                      >
-                        Download generated PDF
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* T9: TEAM & TASKS */}
-        {activeTab === 'Collaboration' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Task column */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-base font-extrabold text-slate-900">Project Tasks</h3>
-                <span className="text-xs text-slate-400 font-semibold">{project.tasks.length} total tasks</span>
-              </div>
-
-              {/* Tasks List */}
-              <div className="space-y-2">
-                {project.tasks.length === 0 ? (
-                  <div className="p-12 text-center text-slate-400 text-xs font-medium space-y-2">
-                    <CheckIcon className="w-10 h-10 mx-auto text-slate-300" />
-                    <p>No active tasks assigned yet.</p>
-                  </div>
-                ) : (
-                  project.tasks.map((task) => (
+              {/* Chatbox messages scroll view */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 h-80 overflow-y-auto space-y-4">
+                {chatMessages.map((msg, index) => (
+                  <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      key={task.id}
-                      className="p-4 border border-slate-200 rounded-2xl flex items-center justify-between gap-4 bg-slate-50/50 hover:bg-white transition-all shadow-2xs hover:shadow-xs group"
+                      className={`max-w-md p-4 rounded-2xl text-xs leading-relaxed font-semibold ${msg.sender === 'user'
+                        ? 'bg-indigo-600 text-white rounded-br-none shadow-2xs'
+                        : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-3xs'
+                        }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => handleToggleTaskStatus(task.id, task.status)}
-                          className="w-5 h-5 border-2 border-slate-350 hover:border-indigo-600 rounded-lg flex items-center justify-center transition-colors bg-white cursor-pointer"
-                        >
-                          {task.status === 'COMPLETED' && <CheckCircle2 className="w-4 h-4 text-indigo-650" />}
-                        </button>
-                        <div>
-                          <p className={`font-bold text-xs ${task.status === 'COMPLETED' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                            {task.title}
-                          </p>
-                          {task.description && <p className="text-[10px] text-slate-500 font-medium mt-0.5">{task.description}</p>}
-                          {task.assignedTo && (
-                            <p className="text-[9px] text-indigo-600 font-semibold mt-1">Assigned to: @{task.assignedTo.username}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded ${task.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-250'
-                            }`}
-                        >
-                          {task.status}
-                        </span>
-                        {project.isOwner && (
-                          <button
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="p-1.5 text-slate-450 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                      {msg.text.split('\n').map((line, lidx) => (
+                        <p key={lidx} className="mt-1">
+                          {line}
+                        </p>
+                      ))}
                     </div>
-                  ))
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex justify-start">
+                    <div className="p-3 bg-white border border-slate-200 rounded-2xl rounded-bl-none shadow-3xs text-xs font-semibold flex items-center gap-2 text-slate-500">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                      <span>Analyzing specification context...</span>
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {/* Task assign form */}
-              {project.isOwner && (
-                <form onSubmit={handleCreateTask} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
-                  <h4 className="font-extrabold text-xs text-slate-900 uppercase">Create Task</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      placeholder="Task title (e.g. Draft claim 1)"
-                      required
-                      value={taskTitle}
-                      onChange={(e) => setTaskTitle(e.target.value)}
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Assignee username (optional)"
-                      value={taskAssignee}
-                      onChange={(e) => setTaskAssignee(e.target.value)}
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs"
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Short description (optional)"
-                    value={taskDesc}
-                    onChange={(e) => setTaskDesc(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs"
-                  />
-                  <button
-                    type="submit"
-                    disabled={creatingTask}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-750 text-white rounded-xl text-xs font-bold shadow-2xs"
-                  >
-                    {creatingTask ? 'Assigning...' : 'Assign Task'}
-                  </button>
-                </form>
-              )}
-            </div>
+              {/* Prompt Helper Chips */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Quick Actions:</span>
+                <button
+                  onClick={() => handleChipClick('Improve my innovation abstract description')}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-150 rounded-full text-[10px] font-bold transition-all"
+                >
+                  Improve Abstract
+                </button>
+                <button
+                  onClick={() => handleChipClick('Explain requirements for Form 2 Specification')}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-150 rounded-full text-[10px] font-bold transition-all"
+                >
+                  Explain Form 2
+                </button>
+                <button
+                  onClick={() => handleChipClick('Suggest patent claims based on this project')}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-150 rounded-full text-[10px] font-bold transition-all"
+                >
+                  Suggest Claims
+                </button>
+              </div>
 
-            {/* Team members & invite column */}
-            <div className="lg:col-span-1 space-y-6">
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Collaborators</h4>
+              {/* Send bar */}
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Ask drafting companion (e.g. 'suggest independent claims structure')"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-250 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-650"
+                />
+                <button
+                  type="submit"
+                  disabled={chatLoading}
+                  className="px-4.5 bg-indigo-600 hover:bg-indigo-755 text-white rounded-xl flex items-center justify-center cursor-pointer shadow-md disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          )}
+          {/* T6: EXPERT AUDIT & FTO ANALYSIS */}
+          {(activeTab === 'Expert Audit' || activeTab === 'FTO Analysis') && (
+            <div className="space-y-8">
+              <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                Search the public patent database to link relevant prior art documents to your project, then run AI diagnostics to audit similarity and novelty strength.
+              </p>
+
+              {/* PATENT EXPLORER & REFERENCES MANAGER */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-3xs space-y-6">
+                <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      🔍 Verified Patent Explorer & References Manager
+                    </h4>
+                    <p className="text-[10px] text-slate-450 font-semibold mt-0.5">
+                      Search public patent registries and link relevant prior-art documents as context for AI diagnostics.
+                    </p>
+                  </div>
                 </div>
 
-                {project.isOwner && (
-                  <form onSubmit={handleInviteMember} className="flex flex-col gap-2 relative">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={inviteUsername}
-                        onChange={(e) => setInviteUsername(e.target.value)}
-                        placeholder="Search student or guide username..."
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-indigo-600"
-                      />
-                      {searchResults.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
-                          {searchResults.map((u) => (
-                            <button
-                              type="button"
-                              key={u.id}
-                              onClick={() => {
-                                setInviteUsername(u.username);
-                                setSearchResults([]);
-                              }}
-                              className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors text-xs flex flex-col cursor-pointer"
-                            >
-                              <span className="font-bold text-slate-800">{u.fullName}</span>
-                              <span className="text-[10px] text-slate-500">@{u.username} • {u.role}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <select
-                        value={inviteRole}
-                        onChange={(e) => setInviteRole(e.target.value as any)}
-                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs cursor-pointer font-bold"
-                      >
-                        <option value="CO_INVENTOR">Co-Inventor</option>
-                        <option value="GUIDE">Faculty Guide</option>
-                        <option value="PATENT_EXPERT">Patent Expert</option>
-                      </select>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Search Panel */}
+                  <div className="space-y-4">
+                    <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>Registry Search</span>
+                    </h5>
+                    <form onSubmit={handlePatentSearch} className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          placeholder="Search by keywords, patent number, or assignee..."
+                          value={patentSearchQuery}
+                          onChange={(e) => setPatentSearchQuery(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-650"
+                        />
+                        <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                      </div>
                       <button
                         type="submit"
-                        disabled={inviting}
-                        className="py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs"
+                        disabled={loadingPatentSearch}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-1"
                       >
-                        <UserPlus className="w-3.5 h-3.5" /> Invite
+                        {loadingPatentSearch ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" /> Searching...
+                          </>
+                        ) : (
+                          'Search'
+                        )}
                       </button>
-                    </div>
-                  </form>
-                )}
+                    </form>
 
-                <div className="space-y-2 pt-2">
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between shadow-3xs">
-                    <div>
-                      <p className="text-xs font-extrabold text-slate-850">{project.owner.fullName}</p>
-                      <p className="text-[10px] text-slate-450 font-bold">@{project.owner.username}</p>
+                    {patentSearchError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-semibold leading-normal flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{patentSearchError}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                      {patentSearchResults.length === 0 ? (
+                        <div className="py-12 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                          {loadingPatentSearch ? 'Fetching records...' : 'Enter keywords above to search patent registries.'}
+                        </div>
+                      ) : (
+                        patentSearchResults.map((pat) => {
+                          const isSaved = savedReferences.some(r => r.patentNumber === pat.patentNumber);
+                          const isMock = pat.source === 'MOCK';
+
+                          return (
+                            <div key={pat.patentNumber} className="p-3 bg-white border border-slate-200 rounded-2xl shadow-3xs space-y-2 hover:border-slate-350 transition-all">
+                              <div className="flex justify-between items-start gap-2">
+                                <div>
+                                  <span className={`inline-block px-2 py-0.5 rounded text-[8px] font-bold border uppercase ${isMock
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    }`}>
+                                    {isMock ? 'Mock / Offline Data' : 'Verified USPTO Patent'}
+                                  </span>
+                                  <h6 className="font-extrabold text-[10px] text-slate-900 mt-1">{pat.patentNumber}</h6>
+                                </div>
+
+                                {canManageReferences && (
+                                  <button
+                                    onClick={() => handleSaveReference(pat)}
+                                    disabled={isSaved}
+                                    className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold border cursor-pointer transition-all flex items-center gap-1 ${isSaved
+                                        ? 'bg-slate-50 border-slate-200 text-slate-450'
+                                        : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                                      }`}
+                                  >
+                                    {isSaved ? 'Linked ✓' : <><Plus className="w-2.5 h-2.5" /> Link Reference</>}
+                                  </button>
+                                )}
+                              </div>
+                              <h6 className="font-bold text-[11px] text-slate-800 leading-snug">{pat.title}</h6>
+                              {pat.abstract && (
+                                <p className="text-[10px] text-slate-500 leading-normal line-clamp-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                  {pat.abstract}
+                                </p>
+                              )}
+                              <div className="flex gap-4 text-[9px] text-slate-400 font-semibold">
+                                {pat.inventors && <span>👤 {pat.inventors}</span>}
+                                {pat.publishDate && <span>📅 {pat.publishDate}</span>}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
-                    <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
-                      Owner
-                    </span>
                   </div>
 
-                  {project.members &&
-                    project.members.map((m) => (
-                      <div key={m.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between shadow-3xs">
-                        <div>
-                          <p className="text-xs font-extrabold text-slate-850">{m.user.fullName}</p>
-                          <p className="text-[10px] text-slate-450 font-bold">@{m.user.username}</p>
+                  {/* Saved References Panel */}
+                  <div className="space-y-4">
+                    <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>Saved Project References ({savedReferences.length})</span>
+                    </h5>
+
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                      {loadingReferences ? (
+                        <div className="py-12 text-center text-slate-400 text-xs font-medium">
+                          <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600 mb-2" />
+                          Loading references...
                         </div>
-                        <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                          {m.role.replace(/_/g, ' ')}
-                        </span>
+                      ) : savedReferences.length === 0 ? (
+                        <div className="py-12 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                          No references linked to this project yet. Use the explorer search panel to link patents.
+                        </div>
+                      ) : (
+                        savedReferences.map((ref) => {
+                          const isMock = ref.source === 'MOCK';
+                          return (
+                            <div key={ref.id} className="p-3 bg-indigo-50/20 border border-indigo-200/60 rounded-2xl shadow-3xs space-y-1.5 relative">
+                              <div className="flex justify-between items-start gap-2">
+                                <div>
+                                  <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold border uppercase ${isMock
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    }`}>
+                                    {isMock ? 'Offline Reference' : 'Verified Patent'}
+                                  </span>
+                                  <h6 className="font-extrabold text-[10px] text-indigo-800 mt-1">{ref.patentNumber}</h6>
+                                </div>
+
+                                {canManageReferences && (
+                                  <button
+                                    onClick={() => handleDeleteReference(ref.id)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                    title="Delete Reference"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                              <h6 className="font-bold text-[11px] text-slate-900 leading-snug">{ref.title}</h6>
+                              {ref.abstract && (
+                                <p className="text-[10px] text-slate-655 leading-normal italic line-clamp-2 bg-white p-2 rounded border border-slate-150">
+                                  {ref.abstract}
+                                </p>
+                              )}
+                              <div className="flex items-center justify-between text-[9px] pt-1">
+                                <span className="text-slate-400 font-semibold">
+                                  {ref.publishDate && `Published: ${new Date(ref.publishDate).toLocaleDateString()}`}
+                                </span>
+                                {ref.url && (
+                                  <a
+                                    href={ref.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-indigo-650 hover:underline font-bold flex items-center gap-0.5"
+                                  >
+                                    Registry link →
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Prior Art / Similarity Panel */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-3xs">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                        🕵️ Prior Art & Similarity Check
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-semibold">Registry overlap analysis</p>
+                    </div>
+                    <button
+                      onClick={runSimilarityCheck}
+                      disabled={loadingSimilarity}
+                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-extrabold flex items-center gap-1 shadow-md cursor-pointer disabled:opacity-50"
+                    >
+                      {loadingSimilarity ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" /> Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3 h-3" /> Audit Registry
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {similarityError ? (
+                    <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-bold leading-normal">
+                      ❌ {similarityError}
+                    </div>
+                  ) : !similarityData ? (
+                    <div className="py-12 text-center text-slate-400 text-xs font-semibold">
+                      Click "Audit Registry" to inspect database matches.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
+                        <div className="relative inline-flex items-center justify-center shrink-0">
+                          <svg className="w-20 h-20 transform -rotate-90">
+                            <circle cx="40" cy="40" r="34" stroke="#e2e8f0" strokeWidth="6" fill="transparent" />
+                            <circle
+                              cx="40"
+                              cy="40"
+                              r="34"
+                              stroke="#10b981"
+                              strokeWidth="6"
+                              fill="transparent"
+                              strokeDasharray={213}
+                              strokeDashoffset={213 - (213 * similarityData.similarityScore) / 100}
+                            />
+                          </svg>
+                          <span className="absolute text-xs font-extrabold text-emerald-600 font-mono">{similarityData.similarityScore}%</span>
+                        </div>
+                        <div className="space-y-1">
+                          <h5 className="font-extrabold text-xs text-slate-800">Similarity Match Index</h5>
+                          <p className="text-[9px] text-slate-450 font-semibold leading-normal">
+                            Matches below 30% are highly safe. Current risk status:
+                          </p>
+                          <span className="inline-block px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                            {similarityData.riskLevel} Risk
+                          </span>
+                        </div>
                       </div>
-                    ))}
+
+                      {similarityData.matches && similarityData.matches.length > 0 && (
+                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                          {similarityData.matches.map((m: any, idx: number) => {
+                            const isExpanded = expandedMatchIndex === idx;
+                            return (
+                              <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-extrabold text-[10px] text-indigo-700">{m.patentId}</span>
+                                  <span className="text-[9px] font-bold text-slate-450 font-mono">{m.similarityPercent}% match</span>
+                                </div>
+                                <h6 className="font-bold text-[11px] text-slate-900">{m.title}</h6>
+                                <p className="text-[10px] text-slate-500 leading-normal italic bg-white p-2 rounded border border-slate-150">
+                                  {m.drawbackOverlap}
+                                </p>
+                                <div className="flex items-center justify-between pt-1">
+                                  <a href={m.url} target="_blank" rel="noreferrer" className="text-[9px] text-indigo-650 font-bold hover:underline">
+                                    Registry entry →
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedMatchIndex(isExpanded ? null : idx)}
+                                    className="text-[9px] text-indigo-700 font-extrabold hover:underline"
+                                  >
+                                    {isExpanded ? 'Hide strategy' : 'Bypass strategy'}
+                                  </button>
+                                </div>
+                                {isExpanded && (
+                                  <p className="p-2.5 bg-indigo-50 border border-indigo-200 rounded text-[10px] leading-relaxed text-indigo-950 font-semibold mt-1">
+                                    💡 Claim modification strategy populated in specifications drafter companion workspace.
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {similarityData.explanation && (
+                        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+                          <h6 className="font-extrabold text-[10px] text-slate-800 uppercase tracking-wider">AI Comparison Explanation:</h6>
+                          <p className="text-[10px] text-slate-600 leading-relaxed font-semibold">{similarityData.explanation}</p>
+                        </div>
+                      )}
+
+                      {similarityData.disclaimer && (
+                        <div className="text-[9px] text-slate-450 italic font-bold leading-normal">
+                          ⚠ {similarityData.disclaimer}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Claims Strength / Novelty Panel */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-3xs">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                        ⚖ Novelty & Claims Auditor
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-semibold">Novelty strength evaluator</p>
+                    </div>
+                    <button
+                      onClick={runNoveltyAssessment}
+                      disabled={loadingNovelty}
+                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-extrabold flex items-center gap-1 shadow-md cursor-pointer disabled:opacity-50"
+                    >
+                      {loadingNovelty ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" /> Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3 h-3" /> Audit Claims
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {noveltyError ? (
+                    <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-bold leading-normal">
+                      ❌ {noveltyError}
+                    </div>
+                  ) : !noveltyData ? (
+                    <div className="py-12 text-center text-slate-400 text-xs font-semibold">
+                      Click "Audit Claims" to evaluate non-obviousness metrics.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
+                        <div className="relative inline-flex items-center justify-center shrink-0">
+                          <svg className="w-20 h-20 transform -rotate-90">
+                            <circle cx="40" cy="40" r="34" stroke="#e2e8f0" strokeWidth="6" fill="transparent" />
+                            <circle
+                              cx="40"
+                              cy="40"
+                              r="34"
+                              stroke="#4f46e5"
+                              strokeWidth="6"
+                              fill="transparent"
+                              strokeDasharray={213}
+                              strokeDashoffset={213 - (213 * noveltyData.noveltyScore) / 100}
+                            />
+                          </svg>
+                          <span className="absolute text-xs font-extrabold text-indigo-600 font-mono">{noveltyData.noveltyScore}%</span>
+                        </div>
+                        <div className="space-y-1">
+                          <h5 className="font-extrabold text-xs text-slate-800">Novelty Strength Score</h5>
+                          <p className="text-[9px] text-slate-450 font-semibold leading-normal">
+                            Patent eligibility strength rating:
+                          </p>
+                          <span className="inline-block px-2.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                            {noveltyData.strength} Eligible
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-emerald-50/20 border border-emerald-200 rounded-xl space-y-1">
+                          <h6 className="font-bold text-[10px] text-emerald-950 uppercase">Strong Area claims:</h6>
+                          <ul className="list-disc pl-4 text-[9px] text-slate-655 leading-relaxed font-semibold">
+                            {noveltyData.strongAreas.slice(0, 2).map((sa: string, si: number) => (
+                              <li key={si}>{sa}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="p-3 bg-rose-50/20 border border-rose-200 rounded-xl space-y-1">
+                          <h6 className="font-bold text-[10px] text-rose-950 uppercase">Weak Area claims:</h6>
+                          <ul className="list-disc pl-4 text-[9px] text-slate-655 leading-relaxed font-semibold">
+                            {noveltyData.weakAreas.slice(0, 2).map((wa: string, wi: number) => (
+                              <li key={wi}>{wa}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      {noveltyData.explanation && (
+                        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+                          <h6 className="font-extrabold text-[10px] text-slate-800 uppercase tracking-wider">AI Novelty Explanation:</h6>
+                          <p className="text-[10px] text-slate-600 leading-relaxed font-semibold">{noveltyData.explanation}</p>
+                        </div>
+                      )}
+
+                      {noveltyData.recommendations && noveltyData.recommendations.length > 0 && (
+                        <div className="p-3.5 bg-indigo-50/30 border border-indigo-150 rounded-2xl space-y-1">
+                          <h6 className="font-extrabold text-[10px] text-indigo-950 uppercase tracking-wider">Recommendations:</h6>
+                          <ul className="list-disc pl-4 text-[9px] text-slate-600 leading-relaxed font-bold">
+                            {noveltyData.recommendations.map((rec: string, ri: number) => (
+                              <li key={ri}>{rec}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {noveltyData.disclaimer && (
+                        <div className="text-[9px] text-slate-450 italic font-bold leading-normal">
+                          ⚠ {noveltyData.disclaimer}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* T10: GUIDE REVIEW */}
-        {(activeTab === 'Guide Reviews' || activeTab === 'Reviews') && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-extrabold text-slate-900">
-                  {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW') ? 'Patent Expert Legal Review Deck' : 'Faculty Supervisor Review Deck'}
-                </h3>
-                <p className="text-xs text-slate-500 font-semibold mt-0.5">Endorsements, legal checklists, and supervisor sign-offs</p>
-              </div>
-            </div>
+          {/* T8: PATENT FORMS */}
+          {activeTab === 'Patent Forms' && (
+            <div className="space-y-6">
+              <h3 className="text-base font-extrabold text-slate-900">IPO Patent Forms Checklist Wizard</h3>
+              <p className="text-xs text-slate-500 font-semibold leading-normal">
+                Below are the standard forms required to file your patent request in India. Click to fill out credentials or preview the generated documents.
+              </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Left Column Guide/Expert Comment inputs */}
-              <div className="md:col-span-1 space-y-4">
-                {isProjectReviewer ? (
-                  <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl shadow-3xs space-y-4">
-                    <h4 className="text-xs font-bold text-slate-900 uppercase">Review Feedback Actions</h4>
-                    <p className="text-[11px] text-slate-500 leading-normal font-semibold">
-                      {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW')
-                        ? 'Log legal observations, approve applications, or reject drafts.'
-                        : 'Submit guidance reviews and optionally advance workflow stage nodes.'}
-                    </p>
-
-                    <form onSubmit={(e) => handleSubmitReviewComment(e, 'COMMENT')} className="space-y-3 pt-2">
-                      <textarea
-                        rows={3}
-                        required
-                        placeholder="Enter review comments, drawbacks, or validation instructions..."
-                        value={reviewComment}
-                        onChange={(e) => setReviewComment(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
-                      />
-
-                      <div className="flex flex-col gap-2">
-                        {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW') ? (
-                          <>
-                            <button
-                              type="submit"
-                              disabled={submittingReview}
-                              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                            >
-                              Submit Legal Observation
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => handleSubmitReviewComment(e, 'EXPERT_APPROVE')}
-                              disabled={submittingReview}
-                              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                            >
-                              Approve & Mark Filing Ready
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => handleSubmitReviewComment(e, 'EXPERT_FILED')}
-                              disabled={submittingReview}
-                              className="w-full py-2 bg-blue-600 hover:bg-blue-755 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                            >
-                              Approve & Mark Filed
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => handleSubmitReviewComment(e, 'EXPERT_REJECT')}
-                              disabled={submittingReview}
-                              className="w-full py-2 bg-rose-650 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                            >
-                              Reject & Request Revision
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              type="submit"
-                              disabled={submittingReview}
-                              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                            >
-                              Submit Feedback Comment
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => handleSubmitReviewComment(e, 'APPROVE')}
-                              disabled={submittingReview}
-                              className="w-full py-2 border border-emerald-500 hover:bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                            >
-                              Approve & Advance Stage
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => handleSubmitReviewComment(e, 'REJECT')}
-                              disabled={submittingReview}
-                              className="w-full py-2 border border-rose-500 hover:bg-rose-50 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                            >
-                              Request Revision
-                            </button>
-                          </>
-                        )}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Form selection column */}
+                <div className="md:col-span-1 space-y-2.5">
+                  {[
+                    { id: '1', title: 'Form 1 (Application for Patent)', desc: 'General applicant metadata registration details' },
+                    { id: '2', title: 'Form 2 (Specifications & Claims)', desc: 'Detailed description, abstract, and drawings list' },
+                    { id: '3', title: 'Form 3 (Statement & Undertaking)', desc: 'State declaration of prior filings outside India' },
+                    { id: '5', title: 'Form 5 (Declaration of Inventorship)', desc: 'Inventor details declaration of credentials' },
+                    { id: '26', title: 'Form 26 (Power of Attorney)', desc: 'Assign filing duties to a Patent Agent' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setActiveFormIndex(f.id)}
+                      className={`w-full p-4 text-left border rounded-2xl flex items-center justify-between transition-all cursor-pointer ${activeFormIndex === f.id
+                        ? 'bg-indigo-50 border-indigo-400 text-indigo-950 shadow-2xs font-bold'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                    >
+                      <div className="space-y-0.5">
+                        <span className="text-[11px] uppercase tracking-wider block font-bold">Form {f.id}</span>
+                        <p className="text-xs font-semibold">{f.title}</p>
                       </div>
-                    </form>
-                  </div>
-                ) : (
-                  <div className="p-5 bg-indigo-50/20 border border-indigo-150 rounded-2xl shadow-3xs text-center space-y-2">
-                    <BookOpen className="w-8 h-8 text-indigo-600 mx-auto" />
-                    <h4 className="text-xs font-bold text-slate-800 uppercase">Supervisor Space</h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">
-                      This panel is reserved for your Faculty Guide and Patent Expert supervisors to submit check-off endorsements.
-                    </p>
-                  </div>
-                )}
-              </div>
+                      <FileCheck2 className={`w-4 h-4 shrink-0 ${activeFormIndex === f.id ? 'text-indigo-600' : 'text-slate-350'}`} />
+                    </button>
+                  ))}
+                </div>
 
-              {/* Right Column: Review comments logs history */}
-              <div className="md:col-span-2 space-y-4">
-                <h4 className="text-xs font-extrabold text-slate-900">Review Comments Audit Log</h4>
-                <div className="space-y-3">
-                  {project.comments && project.comments.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                      No review comments logged for this project yet.
+                {/* Form editing wizard column */}
+                <div className="md:col-span-2 bg-slate-50 border border-slate-200 p-6 rounded-3xl min-h-[300px] flex flex-col justify-between">
+                  {!activeFormIndex ? (
+                    <div className="m-auto text-center text-slate-400 text-xs font-medium space-y-2">
+                      <FileCode className="w-10 h-10 mx-auto text-slate-300" />
+                      <p>Select an IPO Form from the left to start compiling your draft.</p>
                     </div>
                   ) : (
-                    project.comments &&
-                    project.comments.map((c) => (
-                      <div key={c.id} className="p-4 bg-white border border-slate-200 rounded-xl space-y-2">
-                        <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
-                          <div>
-                            <span className="font-extrabold text-xs text-slate-800">{c.user.fullName}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase ml-2 bg-slate-100 px-1.5 py-0.5 rounded">
-                              {c.user.role}
-                            </span>
+                    <div className="space-y-6 w-full">
+                      <div className="border-b border-slate-200 pb-3 flex justify-between items-center">
+                        <h4 className="font-extrabold text-sm text-slate-900">Form {activeFormIndex} Wizard</h4>
+                        <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-150">Pre-filled with metadata</span>
+                      </div>
+
+                      <div className="space-y-4">
+                        {activeFormIndex === '1' && (
+                          <>
+                            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-950 font-bold">
+                              📝 <strong>About Form 1 (Application for Patent):</strong> This registers applicant details, signatures, and inventorship designations to legally open your filing docket at the Indian Patent Office (IPO).
+                            </div>
+                            <div className="bg-white p-4 rounded-xl border border-slate-150 text-[11px] leading-relaxed text-slate-650 font-medium">
+                              <strong>THE PATENT ACT 1970</strong> (39 of 1970) & THE PATENTS RULES, 2003 <br />
+                              <strong>APPLICATION FOR GRANT OF PATENT</strong> (Section 7, 54 & 135) <br /><br />
+                              APPLICANT NAME: <span className="text-slate-900 font-bold">{project.owner.fullName}</span> <br />
+                              INSTITUTION: <span className="text-slate-900 font-bold">{project.owner.email.split('@')[1] || 'Institutions Registry'}</span> <br />
+                              TITLE OF INVENTION: <span className="text-slate-900 font-bold">{project.title}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">State / Province</label>
+                                <input
+                                  type="text"
+                                  value={formField1}
+                                  onChange={(e) => setFormField1(e.target.value)}
+                                  placeholder="e.g. Kerala"
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Applicant Type</label>
+                                <input
+                                  type="text"
+                                  value={formField2}
+                                  onChange={(e) => setFormField2(e.target.value)}
+                                  placeholder="e.g. Natural Person"
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs"
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {activeFormIndex === '2' && (
+                          <>
+                            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-950 font-bold">
+                              📝 <strong>About Form 2 (Specifications & Claims):</strong> This is the most critical document. It describes the background of the invention, visual assembly drawings details, and lists your legal 'Claims' which define the boundary of your technology.
+                            </div>
+                            <div className="bg-white p-4 rounded-xl border border-slate-150 text-[11px] leading-relaxed text-slate-650 font-medium space-y-2">
+                              <strong>FORM 2: SPECIFICATION</strong> (Section 10; Rule 13) <br /><br />
+                              <p><strong>1. TITLE OF THE INVENTION:</strong> {project.title}</p>
+                              <p><strong>2. APPLICANTS:</strong> {project.owner.fullName} (Student/Inventor)</p>
+                              <p><strong>3. PREAMBLE TO DESCRIPTION:</strong> The following specification particularly describes the invention and the manner in which it is to be performed.</p>
+                              <p><strong>4. DESCRIPTION (Abstract):</strong> {project.innovationIdea}</p>
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Scope Claims Count</label>
+                              <input
+                                type="number"
+                                value={formField1}
+                                onChange={(e) => setFormField1(e.target.value)}
+                                placeholder="e.g. 5"
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {(activeFormIndex === '3' || activeFormIndex === '5' || activeFormIndex === '26') && (
+                          <div className="space-y-3">
+                            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-950 font-bold">
+                              {activeFormIndex === '3' && "📝 About Form 3 (Statement & Undertaking): Declares details of corresponding patent filings registered outside India."}
+                              {activeFormIndex === '5' && "📝 About Form 5 (Declaration of Inventorship): Formal confirmation stating who the true inventors and creators are."}
+                              {activeFormIndex === '26' && "📝 About Form 26 (Power of Attorney): Assigns filing and representation privileges to a registered Patent Agent/attorney."}
+                            </div>
+                            <div className="bg-white p-4 rounded-xl border border-slate-150 text-[11px] leading-relaxed text-slate-650 font-medium">
+                              <strong>FORM {activeFormIndex} REGISTRATIONS</strong> <br />
+                              Pre-populated draft file generation is ready. Generates legal claims bindings utilizing username <strong>@{project.owner.username}</strong> and institution details.
+                            </div>
                           </div>
-                          <span className="text-[10px] text-slate-400 font-medium">
-                            {new Date(c.createdAt).toLocaleDateString()}
-                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 justify-end pt-4 border-t border-slate-200">
+                        <button
+                          onClick={() => {
+                            generateIpoFormPdf(activeFormIndex);
+                            setActiveFormIndex(null);
+                          }}
+                          className="px-4 py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
+                        >
+                          Download generated PDF
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* T9: TEAM & TASKS */}
+          {activeTab === 'Collaboration' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Task column */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-base font-extrabold text-slate-900">Project Tasks</h3>
+                  <span className="text-xs text-slate-400 font-semibold">{project.tasks.length} total tasks</span>
+                </div>
+
+                {/* Tasks List */}
+                <div className="space-y-2">
+                  {project.tasks.length === 0 ? (
+                    <div className="p-12 text-center text-slate-400 text-xs font-medium space-y-2">
+                      <CheckIcon className="w-10 h-10 mx-auto text-slate-300" />
+                      <p>No active tasks assigned yet.</p>
+                    </div>
+                  ) : (
+                    project.tasks.map((task) => (
+                      <div
+                        key={task.id}
+                        className="p-4 border border-slate-200 rounded-2xl flex items-center justify-between gap-4 bg-slate-50/50 hover:bg-white transition-all shadow-2xs hover:shadow-xs group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                            className="w-5 h-5 border-2 border-slate-350 hover:border-indigo-600 rounded-lg flex items-center justify-center transition-colors bg-white cursor-pointer"
+                          >
+                            {task.status === 'COMPLETED' && <CheckCircle2 className="w-4 h-4 text-indigo-650" />}
+                          </button>
+                          <div>
+                            <p className={`font-bold text-xs ${task.status === 'COMPLETED' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                              {task.title}
+                            </p>
+                            {task.description && <p className="text-[10px] text-slate-500 font-medium mt-0.5">{task.description}</p>}
+                            {task.assignedTo && (
+                              <p className="text-[9px] text-indigo-600 font-semibold mt-1">Assigned to: @{task.assignedTo.username}</p>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-650 italic font-semibold leading-relaxed">
-                          "{c.content}"
-                        </p>
+
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`text-[9px] font-bold px-2 py-0.5 rounded ${task.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-250'
+                              }`}
+                          >
+                            {task.status}
+                          </span>
+                          {project.isOwner && (
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="p-1.5 text-slate-450 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* T_TASKS: PROJECT ACTION ITEMS & TASKS */}
-        {activeTab === 'Tasks' && (
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-black text-slate-900">Project Action Items & Tasks</h3>
-                <p className="text-xs text-slate-500 font-medium">Manage project milestones and assign tasks to collaborators</p>
-              </div>
-            </div>
-
-            {/* Task Creation Form */}
-            <form onSubmit={handleCreateTask} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Create New Project Task</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="Task title (e.g. Draft dependent claims 2-5)..."
-                  value={taskTitle}
-                  onChange={(e) => setTaskTitle(e.target.value)}
-                  required
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
-                />
-                <select
-                  value={taskAssignee}
-                  onChange={(e) => setTaskAssignee(e.target.value)}
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
-                >
-                  <option value="">Assign to (Optional)...</option>
-                  {project.members && project.members.map(m => (
-                    <option key={m.user.id} value={m.user.id}>
-                      {m.user.fullName} ({m.role.replace(/_/g, ' ')})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <input
-                type="text"
-                placeholder="Task details or description (optional)..."
-                value={taskDesc}
-                onChange={(e) => setTaskDesc(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
-              />
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={creatingTask || !taskTitle.trim()}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {creatingTask ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                  <span>Add Task</span>
-                </button>
-              </div>
-            </form>
-
-            {/* Task List */}
-            <div className="space-y-3">
-              {project.tasks && project.tasks.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-                  No tasks created for this project yet. Use the form above to add one.
-                </div>
-              ) : (
-                project.tasks && project.tasks.map((t) => {
-                  const isDone = t.status === 'COMPLETED';
-                  return (
-                    <div
-                      key={t.id}
-                      className={`p-4 rounded-2xl border flex items-center justify-between gap-4 transition ${
-                        isDone ? 'bg-slate-50/70 border-slate-200 opacity-75' : 'bg-white border-slate-200 hover:border-slate-300 shadow-3xs'
-                      }`}
+                {/* Task assign form */}
+                {project.isOwner && (
+                  <form onSubmit={handleCreateTask} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+                    <h4 className="font-extrabold text-xs text-slate-900 uppercase">Create Task</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Task title (e.g. Draft claim 1)"
+                        required
+                        value={taskTitle}
+                        onChange={(e) => setTaskTitle(e.target.value)}
+                        className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Assignee username (optional)"
+                        value={taskAssignee}
+                        onChange={(e) => setTaskAssignee(e.target.value)}
+                        className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Short description (optional)"
+                      value={taskDesc}
+                      onChange={(e) => setTaskDesc(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs"
+                    />
+                    <button
+                      type="submit"
+                      disabled={creatingTask}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-750 text-white rounded-xl text-xs font-bold shadow-2xs"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleTaskStatus(t.id, t.status)}
-                          className={`w-5 h-5 rounded-lg border flex items-center justify-center cursor-pointer transition ${
-                            isDone ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 hover:border-indigo-600 bg-white'
-                          }`}
-                        >
-                          {isDone && <CheckIcon className="w-3.5 h-3.5 stroke-[3]" />}
-                        </button>
-                        <div className="min-w-0">
-                          <h5 className={`text-xs font-bold truncate ${isDone ? 'line-through text-slate-500' : 'text-slate-900'}`}>
-                            {t.title}
-                          </h5>
-                          {t.description && (
-                            <p className="text-[11px] text-slate-500 truncate">{t.description}</p>
-                          )}
-                          <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-0.5">
-                            {t.assignedTo && <span>👤 {t.assignedTo.fullName}</span>}
-                            <span>Created {new Date(t.createdAt).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                      </div>
+                      {creatingTask ? 'Assigning...' : 'Assign Task'}
+                    </button>
+                  </form>
+                )}
+              </div>
 
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                        isDone ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                      }`}>
-                        {t.status}
+              {/* Team members & invite column */}
+              <div className="lg:col-span-1 space-y-6">
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-widest">Collaborators</h4>
+                  </div>
+
+                  {project.isOwner && (
+                    <form onSubmit={handleInviteMember} className="flex flex-col gap-2 relative">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={inviteUsername}
+                          onChange={(e) => setInviteUsername(e.target.value)}
+                          placeholder="Search student or guide username..."
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-indigo-600"
+                        />
+                        {searchResults.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                            {searchResults.map((u) => (
+                              <button
+                                type="button"
+                                key={u.id}
+                                onClick={() => {
+                                  setInviteUsername(u.username);
+                                  setSearchResults([]);
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors text-xs flex flex-col cursor-pointer"
+                              >
+                                <span className="font-bold text-slate-800">{u.fullName}</span>
+                                <span className="text-[10px] text-slate-500">@{u.username} • {u.role}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={inviteRole}
+                          onChange={(e) => setInviteRole(e.target.value as any)}
+                          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs cursor-pointer font-bold"
+                        >
+                          <option value="CO_INVENTOR">Co-Inventor</option>
+                          <option value="GUIDE">Faculty Guide</option>
+                          <option value="PATENT_EXPERT">Patent Expert</option>
+                        </select>
+                        <button
+                          type="submit"
+                          disabled={inviting}
+                          className="py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-2xs"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" /> Invite
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  <div className="space-y-2 pt-2">
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between shadow-3xs">
+                      <div>
+                        <p className="text-xs font-extrabold text-slate-850">{project.owner.fullName}</p>
+                        <p className="text-[10px] text-slate-450 font-bold">@{project.owner.username}</p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
+                        Owner
                       </span>
                     </div>
-                  );
-                })
-              )}
+
+                    {project.members &&
+                      project.members.map((m) => (
+                        <div key={m.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between shadow-3xs">
+                          <div>
+                            <p className="text-xs font-extrabold text-slate-850">{m.user.fullName}</p>
+                            <p className="text-[10px] text-slate-450 font-bold">@{m.user.username}</p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            {m.role.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* T11: TIMELINE */}
-        {(activeTab === 'Filing Timeline' || activeTab === 'Activity Timeline') && (
-          <div className="space-y-6">
-            <h3 className="text-base font-extrabold text-slate-900"> Chronological Progression Track</h3>
-            <p className="text-xs text-slate-500 font-semibold leading-normal">
-              A checklist representation indicating pipeline accomplishments:
-            </p>
+          {/* T10: GUIDE REVIEW */}
+          {(activeTab === 'Guide Reviews' || activeTab === 'Reviews') && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW') ? 'Patent Expert Legal Review Deck' : 'Faculty Supervisor Review Deck'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5">Endorsements, legal checklists, and supervisor sign-offs</p>
+                </div>
+              </div>
 
-            <div className="max-w-md mx-auto space-y-6 relative pl-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-              {STAGES.map((s, index) => {
-                const isCompleted = index <= currentStageIndex;
-                return (
-                  <div key={s.key} className="relative flex gap-4 items-start">
-                    <span
-                      className={`absolute -left-6 top-1 w-4 h-4 rounded-full border-2 flex items-center justify-center ${isCompleted ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'
-                        }`}
-                    >
-                      {isCompleted && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                    </span>
-                    <div>
-                      <h4 className={`text-xs font-extrabold ${isCompleted ? 'text-slate-900' : 'text-slate-400'}`}>{s.label}</h4>
-                      <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                        {isCompleted ? 'Completed and verified.' : 'Awaiting dependencies.'}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Left Column Guide/Expert Comment inputs */}
+                <div className="md:col-span-1 space-y-4">
+                  {isProjectReviewer ? (
+                    <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl shadow-3xs space-y-4">
+                      <h4 className="text-xs font-bold text-slate-900 uppercase">Review Feedback Actions</h4>
+                      <p className="text-[11px] text-slate-500 leading-normal font-semibold">
+                        {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW')
+                          ? 'Log legal observations, approve applications, or reject drafts.'
+                          : 'Submit guidance reviews and optionally advance workflow stage nodes.'}
+                      </p>
+
+                      <form onSubmit={(e) => handleSubmitReviewComment(e, 'COMMENT')} className="space-y-3 pt-2">
+                        <textarea
+                          rows={3}
+                          required
+                          placeholder="Enter review comments, drawbacks, or validation instructions..."
+                          value={reviewComment}
+                          onChange={(e) => setReviewComment(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+                        />
+
+                        <div className="flex flex-col gap-2">
+                          {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW') ? (
+                            <>
+                              <button
+                                type="submit"
+                                disabled={submittingReview}
+                                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
+                              >
+                                Submit Legal Observation
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleSubmitReviewComment(e, 'EXPERT_APPROVE')}
+                                disabled={submittingReview}
+                                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
+                              >
+                                Approve & Mark Filing Ready
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleSubmitReviewComment(e, 'EXPERT_FILED')}
+                                disabled={submittingReview}
+                                className="w-full py-2 bg-blue-600 hover:bg-blue-755 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
+                              >
+                                Approve & Mark Filed
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleSubmitReviewComment(e, 'EXPERT_REJECT')}
+                                disabled={submittingReview}
+                                className="w-full py-2 bg-rose-650 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
+                              >
+                                Reject & Request Revision
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="submit"
+                                disabled={submittingReview}
+                                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
+                              >
+                                Submit Feedback Comment
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleSubmitReviewComment(e, 'APPROVE')}
+                                disabled={submittingReview}
+                                className="w-full py-2 border border-emerald-500 hover:bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Approve & Advance Stage
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleSubmitReviewComment(e, 'REJECT')}
+                                disabled={submittingReview}
+                                className="w-full py-2 border border-rose-500 hover:bg-rose-50 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Request Revision
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </form>
+                    </div>
+                  ) : (
+                    <div className="p-5 bg-indigo-50/20 border border-indigo-150 rounded-2xl shadow-3xs text-center space-y-2">
+                      <BookOpen className="w-8 h-8 text-indigo-600 mx-auto" />
+                      <h4 className="text-xs font-bold text-slate-800 uppercase">Supervisor Space</h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">
+                        This panel is reserved for your Faculty Guide and Patent Expert supervisors to submit check-off endorsements.
                       </p>
                     </div>
+                  )}
+                </div>
+
+                {/* Right Column: Review comments logs history */}
+                <div className="md:col-span-2 space-y-4">
+                  <h4 className="text-xs font-extrabold text-slate-900">Review Comments Audit Log</h4>
+                  <div className="space-y-3">
+                    {project.comments && project.comments.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                        No review comments logged for this project yet.
+                      </div>
+                    ) : (
+                      project.comments &&
+                      project.comments.map((c) => (
+                        <div key={c.id} className="p-4 bg-white border border-slate-200 rounded-xl space-y-2">
+                          <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
+                            <div>
+                              <span className="font-extrabold text-xs text-slate-800">{c.user.fullName}</span>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase ml-2 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {c.user.role}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {new Date(c.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-650 italic font-semibold leading-relaxed">
+                            "{c.content}"
+                          </p>
+                        </div>
+                      ))
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* T_CLAIMS: CLAIMS ENGINEERING & PRELIMINARY FTO STUDIO */}
-        {activeTab === 'Claims Engineering' && (
-          <ClaimsEngineeringStudio
-            projectId={project.id}
-            isOwnerOrMember={project.isOwner || Boolean(projectMemberRecord)}
-            onRefreshDocuments={fetchProject}
-          />
-        )}
-
-        {/* T12: REPORTS */}
-        {activeTab === 'Reports Center' && (
-          <div className="space-y-6">
-            <h3 className="text-base font-extrabold text-slate-900">Compile & Export Filing Bundles</h3>
-            <p className="text-xs text-slate-500 font-semibold leading-normal">
-              Download automated claims evaluations, AI suggestions digests, and compiled readiness checklists:
-            </p>
-
-            {/* Task 8: Master Patent Intelligence Report PDF Banner Card */}
-            <div className="p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-              <div className="space-y-1.5 max-w-xl">
-                <span className="px-2.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 tracking-wider">
-                  ✦ Comprehensive Audit Dossier
-                </span>
-                <h4 className="text-lg font-black tracking-tight text-white">Master Patent Intelligence Report PDF</h4>
-                <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                  Generates an executive 6-page filing dossier combining Invention Specifications, Prior Art Citations, AI Novelty Evaluation, 2D Figure Legends, IPO Form Approvals, Supervisor Review Audit Logs, and Filing Readiness Certification.
-                </p>
+                </div>
               </div>
-              <button
-                onClick={handleGenerateMasterReport}
-                disabled={generatingMasterReport}
-                className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-indigo-500/25 shrink-0 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
-              >
-                {generatingMasterReport ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Compiling Master Report...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-indigo-200" /> Compile Master Report PDF
-                  </>
-                )}
-              </button>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                { name: 'Patent Summary Report', desc: 'Consolidated abstract, specs list, and keywords' },
-                { name: 'AI Innovation Audit Digest', desc: 'Rewriting suggestions and claims modifications logs' },
-                { name: 'Similarity diagnostics report', desc: 'Risk evaluation index, USPTO matching patents citations list' },
-                { name: 'Novelty assessment score compilation', desc: 'Novelty score dial matching indicators' },
-                { name: 'Guide endorsement sign-off report', desc: 'Audit reviews logs and supervisor signatures' },
-                { name: 'Filing readiness final checklist', desc: 'Step-by-step checklist of Forms 1, 2, 3, 5, 26' },
-              ].map((rep, index) => (
-                <div key={index} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3">
-                  <div>
-                    <h4 className="font-extrabold text-xs text-slate-800">{rep.name}</h4>
-                    <p className="text-[10px] text-slate-500 font-semibold mt-1 leading-normal">{rep.desc}</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      generatePdfReport(rep.name);
-                    }}
-                    className="w-full py-2 border border-indigo-200 hover:border-indigo-500 rounded-xl text-xs font-bold text-indigo-700 bg-white transition-all cursor-pointer text-center"
+          {/* T_TASKS: PROJECT ACTION ITEMS & TASKS */}
+          {activeTab === 'Tasks' && (
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Project Action Items & Tasks</h3>
+                  <p className="text-xs text-slate-500 font-medium">Manage project milestones and assign tasks to collaborators</p>
+                </div>
+              </div>
+
+              {/* Task Creation Form */}
+              <form onSubmit={handleCreateTask} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Create New Project Task</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Task title (e.g. Draft dependent claims 2-5)..."
+                    value={taskTitle}
+                    onChange={(e) => setTaskTitle(e.target.value)}
+                    required
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+                  />
+                  <select
+                    value={taskAssignee}
+                    onChange={(e) => setTaskAssignee(e.target.value)}
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
                   >
-                    Compile PDF Report
+                    <option value="">Assign to (Optional)...</option>
+                    {project.owner && (
+                      <option key={project.owner.id} value={project.owner.username}>
+                        {project.owner.fullName} (OWNER / INVENTOR)
+                      </option>
+                    )}
+                    {project.members && project.members.map(m => (
+                      m.user.id !== project.owner?.id && (
+                        <option key={m.user.id} value={m.user.username}>
+                          {m.user.fullName} ({m.role.replace(/_/g, ' ')})
+                        </option>
+                      )
+                    ))}
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Task details or description (optional)..."
+                  value={taskDesc}
+                  onChange={(e) => setTaskDesc(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={creatingTask || !taskTitle.trim()}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {creatingTask ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    <span>Add Task</span>
                   </button>
                 </div>
-              ))}
+              </form>
+
+              {/* Task List */}
+              <div className="space-y-3">
+                {project.tasks && project.tasks.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                    No tasks created for this project yet. Use the form above to add one.
+                  </div>
+                ) : (
+                  project.tasks && project.tasks.map((t) => {
+                    const isDone = t.status === 'COMPLETED';
+                    return (
+                      <div
+                        key={t.id}
+                        className={`p-4 rounded-2xl border flex items-center justify-between gap-4 transition ${isDone ? 'bg-slate-50/70 border-slate-200 opacity-75' : 'bg-white border-slate-200 hover:border-slate-300 shadow-3xs'
+                          }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTaskStatus(t.id, t.status)}
+                            className={`w-5 h-5 rounded-lg border flex items-center justify-center cursor-pointer transition ${isDone ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 hover:border-indigo-600 bg-white'
+                              }`}
+                          >
+                            {isDone && <CheckIcon className="w-3.5 h-3.5 stroke-[3]" />}
+                          </button>
+                          <div className="min-w-0">
+                            <h5 className={`text-xs font-bold truncate ${isDone ? 'line-through text-slate-500' : 'text-slate-900'}`}>
+                              {t.title}
+                            </h5>
+                            {t.description && (
+                              <p className="text-[11px] text-slate-500 truncate">{t.description}</p>
+                            )}
+                            <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-0.5">
+                              {t.assignedTo && <span>👤 {t.assignedTo.fullName}</span>}
+                              <span>Created {new Date(t.createdAt).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${isDone ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                          }`}>
+                          {t.status}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* T11: TIMELINE */}
+          {(activeTab === 'Filing Timeline' || activeTab === 'Activity Timeline') && (
+            <div className="space-y-6">
+              <h3 className="text-base font-extrabold text-slate-900"> Chronological Progression Track</h3>
+              <p className="text-xs text-slate-500 font-semibold leading-normal">
+                A checklist representation indicating pipeline accomplishments:
+              </p>
+
+              <div className="max-w-md mx-auto space-y-6 relative pl-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                {STAGES.map((s, index) => {
+                  const isCompleted = index <= currentStageIndex;
+                  return (
+                    <div key={s.key} className="relative flex gap-4 items-start">
+                      <span
+                        className={`absolute -left-6 top-1 w-4 h-4 rounded-full border-2 flex items-center justify-center ${isCompleted ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'
+                          }`}
+                      >
+                        {isCompleted && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                      </span>
+                      <div>
+                        <h4 className={`text-xs font-extrabold ${isCompleted ? 'text-slate-900' : 'text-slate-400'}`}>{s.label}</h4>
+                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                          {isCompleted ? 'Completed and verified.' : 'Awaiting dependencies.'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* T_CLAIMS: CLAIMS ENGINEERING & PRELIMINARY FTO STUDIO */}
+          {activeTab === 'Claims Engineering' && (
+            <ClaimsEngineeringStudio
+              projectId={project.id}
+              isOwnerOrMember={project.isOwner || Boolean(projectMemberRecord)}
+              onRefreshDocuments={fetchProject}
+            />
+          )}
+
+          {/* T12: REPORTS */}
+          {activeTab === 'Reports Center' && (
+            <div className="space-y-6">
+              <h3 className="text-base font-extrabold text-slate-900">Compile & Export Filing Bundles</h3>
+              <p className="text-xs text-slate-500 font-semibold leading-normal">
+                Download automated claims evaluations, AI suggestions digests, and compiled readiness checklists:
+              </p>
+
+              {/* Task 8: Master Patent Intelligence Report PDF Banner Card */}
+              <div className="p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-1.5 max-w-xl">
+                  <span className="px-2.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 tracking-wider">
+                    ✦ Comprehensive Audit Dossier
+                  </span>
+                  <h4 className="text-lg font-black tracking-tight text-white">Master Patent Intelligence Report PDF</h4>
+                  <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                    Generates an executive 6-page filing dossier combining Invention Specifications, Prior Art Citations, AI Novelty Evaluation, 2D Figure Legends, IPO Form Approvals, Supervisor Review Audit Logs, and Filing Readiness Certification.
+                  </p>
+                </div>
+                <button
+                  onClick={handleGenerateMasterReport}
+                  disabled={generatingMasterReport}
+                  className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-indigo-500/25 shrink-0 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
+                >
+                  {generatingMasterReport ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Compiling Master Report...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-indigo-200" /> Compile Master Report PDF
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { name: 'Patent Summary Report', desc: 'Consolidated abstract, specs list, and keywords' },
+                  { name: 'AI Innovation Audit Digest', desc: 'Rewriting suggestions and claims modifications logs' },
+                  { name: 'Similarity diagnostics report', desc: 'Risk evaluation index, USPTO matching patents citations list' },
+                  { name: 'Novelty assessment score compilation', desc: 'Novelty score dial matching indicators' },
+                  { name: 'Guide endorsement sign-off report', desc: 'Audit reviews logs and supervisor signatures' },
+                  { name: 'Filing readiness final checklist', desc: 'Step-by-step checklist of Forms 1, 2, 3, 5, 26' },
+                ].map((rep, index) => (
+                  <div key={index} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div>
+                      <h4 className="font-extrabold text-xs text-slate-800">{rep.name}</h4>
+                      <p className="text-[10px] text-slate-500 font-semibold mt-1 leading-normal">{rep.desc}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        generatePdfReport(rep.name);
+                      }}
+                      className="w-full py-2 border border-indigo-200 hover:border-indigo-500 rounded-xl text-xs font-bold text-indigo-700 bg-white transition-all cursor-pointer text-center"
+                    >
+                      Compile PDF Report
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
 
-      </div>
+        </div>
       </div>
     </div>
   );

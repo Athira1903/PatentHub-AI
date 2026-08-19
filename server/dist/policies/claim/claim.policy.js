@@ -13,8 +13,13 @@ class ClaimPolicy {
         if (project.ownerId === user.userId)
             return 'OWNER';
         const member = project.members?.find((m) => m.userId === user.userId);
-        if (!member)
+        if (!member) {
+            const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+            const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+            if (isGuide || isExpert)
+                return 'VIEWER';
             return null;
+        }
         if (member.role === 'INVENTOR' || member.role === 'CO_INVENTOR') {
             return 'MEMBER';
         }

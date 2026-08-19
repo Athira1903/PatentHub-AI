@@ -62,8 +62,10 @@ export class PatentFormPolicy {
 
     const isOwner = project.ownerId === user.userId;
     const isMember = project.members?.some((m: any) => m.userId === user.userId);
+    const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+    const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
 
-    return isOwner || isMember;
+    return isOwner || isMember || isGuide || isExpert;
   }
 
   /**
@@ -99,12 +101,14 @@ export class PatentFormPolicy {
 
     const projectMember = project.members?.find((m: any) => m.userId === user.userId);
     const projectRole = projectMember?.role;
+    const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+    const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
 
-    if (projectRole === 'GUIDE') {
+    if (projectRole === 'GUIDE' || isGuide) {
       return PatentFormPolicy.areMandatoryFormsComplete(project);
     }
 
-    if (projectRole === 'PATENT_EXPERT') {
+    if (projectRole === 'PATENT_EXPERT' || isExpert) {
       return PatentFormPolicy.areMandatoryFormsComplete(project);
     }
 

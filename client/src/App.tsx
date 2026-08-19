@@ -17,6 +17,8 @@ import { ProfilePage } from './pages/ProfilePage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { ActivatePage } from './pages/ActivatePage';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
+import { ReviewsPage } from './pages/ReviewsPage';
+import { ProjectSelectionPage } from './pages/ProjectSelectionPage';
 
 export const App: React.FC = () => {
   return (
@@ -78,6 +80,13 @@ export const App: React.FC = () => {
             <Route path="tasks" element={<TasksPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="reviews" element={<ReviewsPage />} />
+            <Route path="claims" element={<ProjectSelectionPage />} />
+            <Route path="documents" element={<ProjectSelectionPage />} />
+            <Route path="prior-art" element={<ProjectSelectionPage />} />
+            <Route path="fto-analysis" element={<ProjectSelectionPage />} />
+            <Route path="team" element={<ProjectSelectionPage />} />
+            <Route path="activity" element={<ProjectSelectionPage />} />
           </Route>
 
           {/* Direct Shortcuts */}

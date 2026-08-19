@@ -285,19 +285,17 @@ export const GuideDashboard: React.FC<GuideDashboardProps> = ({
                 return (
                   <div
                     key={proj.id || idx}
-                    className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                      isHigh ? 'bg-rose-50/30 border-rose-100' : 'bg-slate-50/60 border-slate-200/70'
-                    }`}
+                    className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isHigh ? 'bg-rose-50/30 border-rose-100' : 'bg-slate-50/60 border-slate-200/70'
+                      }`}
                   >
                     <div className="flex items-start gap-3 min-w-0">
                       <div
-                        className={`p-2 rounded-xl shrink-0 mt-0.5 ${
-                          idx === 0
+                        className={`p-2 rounded-xl shrink-0 mt-0.5 ${idx === 0
                             ? 'bg-purple-50 text-purple-600'
                             : idx === 1
-                            ? 'bg-emerald-50 text-emerald-600'
-                            : 'bg-indigo-50 text-indigo-600'
-                        }`}
+                              ? 'bg-emerald-50 text-emerald-600'
+                              : 'bg-indigo-50 text-indigo-600'
+                          }`}
                       >
                         <FolderKanban className="w-4 h-4" />
                       </div>
@@ -305,9 +303,8 @@ export const GuideDashboard: React.FC<GuideDashboardProps> = ({
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="text-xs font-extrabold text-slate-900 truncate">{proj.title}</h4>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                              isHigh ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                            }`}
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${isHigh ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                              }`}
                           >
                             {proj.severity}
                           </span>
@@ -329,11 +326,10 @@ export const GuideDashboard: React.FC<GuideDashboardProps> = ({
                     <div className="shrink-0 self-end sm:self-center">
                       <button
                         onClick={() => navigate(`/dashboard/projects/${proj.id}`)}
-                        className={`px-4 py-1.5 rounded-xl text-xs font-bold transition shadow-3xs cursor-pointer ${
-                          isHigh
+                        className={`px-4 py-1.5 rounded-xl text-xs font-bold transition shadow-3xs cursor-pointer ${isHigh
                             ? 'bg-[#004d40] hover:bg-[#00382e] text-white'
                             : 'bg-white hover:bg-slate-100 border border-slate-200 text-slate-800'
-                        }`}
+                          }`}
                       >
                         {proj.actionText}
                       </button>
@@ -361,9 +357,8 @@ export const GuideDashboard: React.FC<GuideDashboardProps> = ({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`p-2 rounded-xl shrink-0 ${
-                            idx === 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'
-                          }`}
+                          className={`p-2 rounded-xl shrink-0 ${idx === 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'
+                            }`}
                         >
                           <FolderKanban className="w-4 h-4" />
                         </div>
@@ -407,13 +402,12 @@ export const GuideDashboard: React.FC<GuideDashboardProps> = ({
                         return (
                           <React.Fragment key={st}>
                             <span
-                              className={`${
-                                isCurrent
+                              className={`${isCurrent
                                   ? 'text-emerald-700 font-black'
                                   : isPastOrCurrent
-                                  ? 'text-slate-800 font-bold'
-                                  : 'text-slate-300'
-                              }`}
+                                    ? 'text-slate-800 font-bold'
+                                    : 'text-slate-300'
+                                }`}
                             >
                               {st}
                             </span>
@@ -445,9 +439,8 @@ export const GuideDashboard: React.FC<GuideDashboardProps> = ({
                 <button
                   key={tab}
                   onClick={() => setQueueTab(tab)}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    queueTab === tab ? 'bg-emerald-800 text-white shadow-3xs' : 'bg-slate-50 text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${queueTab === tab ? 'bg-emerald-800 text-white shadow-3xs' : 'bg-slate-50 text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   {tab}
                 </button>
@@ -479,7 +472,7 @@ export const GuideDashboard: React.FC<GuideDashboardProps> = ({
                     </span>
                     <button
                       onClick={() => {
-                        if (item.projectId) navigate(`/dashboard/projects/${item.projectId}/reviews`);
+                        if (item.projectId) navigate(`/dashboard/projects/${item.projectId}?tab=Reviews`);
                         else navigate('/dashboard/reviews');
                       }}
                       className="px-3 py-1 bg-[#004d40] hover:bg-[#00382e] text-white rounded-xl text-[11px] font-bold transition shadow-3xs cursor-pointer"

@@ -80,12 +80,12 @@ export class ProjectService {
       userRole === 'Admin'
         ? baseWhere
         : {
-            ...baseWhere,
-            OR: [
-              { ownerId: userId },
-              { members: { some: { userId } } },
-            ],
-          };
+          ...baseWhere,
+          OR: [
+            { ownerId: userId },
+            { members: { some: { userId } } },
+          ],
+        };
 
     const projects = await prisma.patentProject.findMany({
       where: whereClause,

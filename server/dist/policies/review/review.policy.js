@@ -12,10 +12,15 @@ class ReviewPolicy {
             return false;
         if (user.role === 'Admin')
             return true;
+        const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+        const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
         const projectMember = project.members?.find((m) => m.userId === user.userId);
         const role = projectMember?.role;
-        return (role === 'GUIDE' ||
-            role === 'PATENT_EXPERT');
+        if (role === 'GUIDE' || role === 'PATENT_EXPERT')
+            return true;
+        if (isGuide || isExpert)
+            return true;
+        return false;
     }
     /**
      * Determine if the user can approve a project review stage.
@@ -30,17 +35,19 @@ class ReviewPolicy {
         // Inventors/owners cannot approve their own projects
         if (project.ownerId === user.userId)
             return false;
+        const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+        const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
         const projectMember = project.members?.find((m) => m.userId === user.userId);
         const role = projectMember?.role;
         if (role === 'INVENTOR' || role === 'CO_INVENTOR')
             return false;
         if (project.stage === 'GUIDE_REVIEW') {
-            if (role !== 'GUIDE')
+            if (role !== 'GUIDE' && !isGuide)
                 return false;
             return patent_form_policy_1.PatentFormPolicy.areMandatoryFormsComplete(project);
         }
         if (project.stage === 'PATENT_EXPERT_REVIEW') {
-            if (role !== 'PATENT_EXPERT')
+            if (role !== 'PATENT_EXPERT' && !isExpert)
                 return false;
             return patent_form_policy_1.PatentFormPolicy.areMandatoryFormsComplete(project);
         }
@@ -57,15 +64,17 @@ class ReviewPolicy {
             return true;
         if (project.ownerId === user.userId)
             return false;
+        const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+        const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
         const projectMember = project.members?.find((m) => m.userId === user.userId);
         const role = projectMember?.role;
         if (role === 'INVENTOR' || role === 'CO_INVENTOR')
             return false;
         if (project.stage === 'GUIDE_REVIEW') {
-            return role === 'GUIDE';
+            return role === 'GUIDE' || isGuide;
         }
         if (project.stage === 'PATENT_EXPERT_REVIEW') {
-            return role === 'PATENT_EXPERT';
+            return role === 'PATENT_EXPERT' || isExpert;
         }
         return false;
     }
@@ -86,7 +95,9 @@ class ReviewPolicy {
             return true;
         const isOwner = project.ownerId === user.userId;
         const isMember = project.members?.some((m) => m.userId === user.userId);
-        return isOwner || isMember;
+        const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+        const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+        return isOwner || isMember || isGuide || isExpert;
     }
 }
 exports.ReviewPolicy = ReviewPolicy;

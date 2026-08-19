@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Folder,
   Plus,
@@ -42,6 +42,8 @@ const getStageProgress = (stage: string) => {
 };
 
 export const ProjectsPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const filterType = searchParams.get('type'); // 'owned' or 'supervised' or null
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
@@ -83,11 +85,19 @@ export const ProjectsPage: React.FC = () => {
     }
   };
 
-  const filteredProjects = projects.filter((p) =>
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.technicalDomain.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProjects = projects.filter((p) => {
+    if (filterType === 'owned' && currentUserId && p.ownerId !== currentUserId) {
+      return false;
+    }
+    if (filterType === 'supervised' && currentUserId && p.ownerId === currentUserId) {
+      return false;
+    }
+    return (
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.technicalDomain.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto font-sans py-2 animate-fade-in pb-8">
@@ -95,10 +105,14 @@ export const ProjectsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Patent Projects Workspace
+            {filterType === 'owned' ? 'My Patent Projects' : filterType === 'supervised' ? 'Supervised Patent Projects' : 'Patent Projects Workspace'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-            Manage active patent specifications, claims boundaries, and filing workflows
+            {filterType === 'owned'
+              ? 'Draft, manage and track your own patent specifications and innovation workflows.'
+              : filterType === 'supervised'
+              ? 'Supervise, review and give feedback on inventor patent projects assigned to you.'
+              : 'Manage active patent specifications, claims boundaries, and filing workflows'}
           </p>
         </div>
         <Link

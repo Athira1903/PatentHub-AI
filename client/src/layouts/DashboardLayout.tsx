@@ -3,6 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Folder,
+  FolderKanban,
   CheckSquare,
   Settings,
   Search,
@@ -18,16 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
-  PenTool,
-  FileText,
-  Layers,
-  Scale,
-  Users,
-  Activity,
   Lightbulb,
-  MessageSquare,
-  BarChart3,
-  FileCheck,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -164,93 +156,56 @@ export const DashboardLayout: React.FC = () => {
 
   const navItems = isGuide
     ? [
-        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
-        { label: 'Review Queue', path: '/dashboard/reviews', icon: CheckSquare, badge: '5' },
-        { label: 'Claims', path: '/dashboard/claims', icon: PenTool },
-        { label: 'Prior Art', path: '/dashboard/prior-art', icon: Search },
-        { label: 'Drawings', path: '/dashboard/projects', icon: Layers },
-        { label: 'Documents', path: '/dashboard/documents', icon: FileText },
-      ]
+      { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+      { label: 'My Projects', path: '/dashboard/projects?type=owned', icon: Folder },
+      { label: 'Supervised Projects', path: '/dashboard/projects?type=supervised', icon: FolderKanban },
+      { label: 'Review Queue', path: '/dashboard/reviews', icon: CheckSquare, badge: '5' },
+      { label: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+      { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
+      { label: 'Profile', path: '/dashboard/profile', icon: User },
+      { label: 'Settings', path: '/dashboard/profile', icon: Settings },
+    ]
     : isPatentExpert
-    ? [
+      ? [
         { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
         { label: 'Review Queue', path: '/dashboard/reviews', icon: CheckSquare, badge: '3' },
-        { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
-      ]
-    : isCoInventor
-    ? [
-        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
-        { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
-        { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
-        { label: 'Settings', path: '/dashboard/profile', icon: Settings },
-      ]
-    : [
-        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { label: 'My Inventions', path: '/dashboard/projects', icon: Folder },
-        { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
-        { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
-        { label: 'Settings', path: '/dashboard/profile', icon: Settings },
-        ...(isAdmin ? [{ label: 'Admin Governance', path: '/admin', icon: Shield }] : []),
-      ];
-
-  const intelligenceItems = isPatentExpert
-    ? [
-        { label: 'Prior Art Search', path: '/dashboard/prior-art', icon: Search },
-        { label: 'Claims Engineering', path: '/dashboard/claims', icon: PenTool },
-        { label: 'FTO Analysis', path: '/dashboard/reviews', icon: Scale },
-        { label: 'Patentability Review', path: '/dashboard/reviews', icon: Shield },
-      ]
-    : [];
-
-  const documentItems = isPatentExpert
-    ? [
-        { label: 'Specifications', path: '/dashboard/documents', icon: FileText },
-        { label: 'Forms', path: '/dashboard/projects', icon: FileText },
-        { label: 'Drawings', path: '/dashboard/projects', icon: Layers },
-        { label: 'Reports', path: '/dashboard/projects', icon: FileText },
-      ]
-    : [];
-
-  const supervisionItems = isGuide
-    ? [
-        { label: 'Inventors', path: '/dashboard/team', icon: Users },
-        { label: 'Feedback', path: '/dashboard/reviews', icon: MessageSquare },
-        { label: 'Reviews', path: '/dashboard/reviews', icon: Scale },
-        { label: 'Activity', path: '/dashboard/activity', icon: Activity },
-      ]
-    : [];
-
-  const reportItems = isGuide
-    ? [
-        { label: 'Filing Readiness', path: '/dashboard/projects', icon: FileCheck },
-        { label: 'Project Analytics', path: '/dashboard/projects', icon: BarChart3 },
-        { label: 'Reports', path: '/dashboard/projects', icon: FileText },
-      ]
-    : [];
-
-  const collaborationItems = isPatentExpert
-    ? [
-        { label: 'Inventors', path: '/dashboard/team', icon: Users },
-        { label: 'Guides', path: '/dashboard/team', icon: Users },
-        { label: 'Activity', path: '/dashboard/activity', icon: Activity },
-      ]
-    : [];
-
-  const settingsItems = isPatentExpert || isGuide
-    ? [
         { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
         { label: 'Profile', path: '/dashboard/profile', icon: User },
         { label: 'Settings', path: '/dashboard/profile', icon: Settings },
       ]
-    : [];
+      : isCoInventor
+        ? [
+          { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+          { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
+          { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
+          { label: 'Settings', path: '/dashboard/profile', icon: Settings },
+        ]
+        : [
+          { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+          { label: 'My Inventions', path: '/dashboard/projects', icon: Folder },
+          { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
+          { label: 'Settings', path: '/dashboard/profile', icon: Settings },
+          ...(isAdmin ? [{ label: 'Admin Governance', path: '/admin', icon: Shield }] : []),
+        ];
+
+  const intelligenceItems: any[] = [];
+
+  const documentItems: any[] = [];
+
+  const supervisionItems: any[] = [];
+
+  const reportItems: any[] = [];
+
+  const collaborationItems: any[] = [];
+
+  const settingsItems: any[] = [];
 
   // Helper to determine breadcrumb from route
   const getBreadcrumbs = () => {
     const p = location.pathname;
     if (p === '/admin') return { parent: 'Platform', current: 'Admin Dashboard' };
-    if (p === '/dashboard') return { parent: 'Workspace', current: isGuide ? 'Patent Development Platform' : isPatentExpert ? 'Patent Intelligence Workspace' : isCoInventor ? 'Co-Inventor Workspace' : 'Inventor Dashboard' };
+    if (p === '/dashboard') return { parent: 'Workspace', current: isGuide ? 'GUIDE WORKSPACE' : isPatentExpert ? 'PATENT EXPERT WORKSPACE' : isCoInventor ? 'Co-Inventor Workspace' : 'Inventor Dashboard' };
     if (p.includes('/dashboard/projects/')) return { parent: 'Projects', current: 'Project Overview' };
     if (p.includes('/dashboard/projects')) return { parent: 'Workspace', current: isCoInventor || isPatentExpert || isGuide ? 'My Projects' : 'My Inventions' };
     if (p.includes('/dashboard/tasks')) return { parent: 'Workspace', current: 'Tasks' };
@@ -268,9 +223,8 @@ export const DashboardLayout: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
         <aside
-          className={`${
-            collapsed ? 'w-20' : 'w-64'
-          } bg-white border-r border-slate-200/90 flex flex-col h-screen sticky top-0 shrink-0 z-40 transition-all duration-300 shadow-[1px_0_4px_rgba(0,0,0,0.02)] hidden md:flex`}
+          className={`${collapsed ? 'w-20' : 'w-64'
+            } bg-white border-r border-slate-200/90 flex flex-col h-screen sticky top-0 shrink-0 z-40 transition-all duration-300 shadow-[1px_0_4px_rgba(0,0,0,0.02)] hidden md:flex`}
         >
           {/* Logo Header */}
           <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100">
@@ -284,7 +238,7 @@ export const DashboardLayout: React.FC = () => {
                     PatentHub-AI
                   </span>
                   <span className="text-[9px] text-emerald-700 font-bold uppercase tracking-wider block mt-0.5">
-                    {isGuide ? 'Patent Development Platform' : isPatentExpert ? 'Patent Intelligence Workspace' : isCoInventor ? 'Co-Inventor Workspace' : `${user?.role || 'Inventor'} Workspace`}
+                    {isGuide ? 'GUIDE WORKSPACE' : isPatentExpert ? 'PATENT EXPERT WORKSPACE' : isCoInventor ? 'Co-Inventor Workspace' : `${user?.role || 'Inventor'} Workspace`}
                   </span>
                 </div>
               )}
@@ -295,27 +249,32 @@ export const DashboardLayout: React.FC = () => {
           <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive =
-                item.path === '/dashboard'
+              const [itemBaseUrl, itemQuery] = item.path.split('?');
+              const isBaseActive =
+                itemBaseUrl === '/dashboard'
                   ? location.pathname === '/dashboard'
-                  : location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path + '/'));
+                  : location.pathname === itemBaseUrl || (itemBaseUrl !== '/dashboard' && location.pathname.startsWith(itemBaseUrl + '/'));
+              
+              const isQueryActive = itemQuery 
+                ? new URLSearchParams(location.search).get('type') === new URLSearchParams(itemQuery).get('type')
+                : !new URLSearchParams(location.search).get('type');
+              
+              const isActive = isBaseActive && (itemQuery ? isQueryActive : true);
 
               return (
                 <Link
                   key={item.label}
                   to={item.path}
-                  className={`flex items-center justify-between px-3.5 py-2 rounded-2xl text-xs font-bold transition-all ${
-                    isActive
+                  className={`flex items-center justify-between px-3.5 py-2 rounded-2xl text-xs font-bold transition-all ${isActive
                       ? isCoInventor || isPatentExpert || isGuide
                         ? 'bg-[#E6F4EA] text-[#064E3B] font-extrabold shadow-3xs'
                         : 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 shrink-0 ${
-                      isActive ? (isCoInventor || isPatentExpert || isGuide ? 'text-[#064E3B]' : 'text-white') : 'text-slate-400'
-                    }`} />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? (isCoInventor || isPatentExpert || isGuide ? 'text-[#064E3B]' : 'text-white') : 'text-slate-400'
+                      }`} />
                     {!collapsed && <span>{item.label}</span>}
                   </div>
                   {!collapsed && (item as any).badge && (
@@ -584,9 +543,8 @@ export const DashboardLayout: React.FC = () => {
                           return (
                             <div
                               key={n.id}
-                              className={`p-3 space-y-2 text-xs transition ${
-                                n.isRead ? 'bg-white text-slate-600' : 'bg-blue-50/40 text-slate-900 font-medium'
-                              }`}
+                              className={`p-3 space-y-2 text-xs transition ${n.isRead ? 'bg-white text-slate-600' : 'bg-blue-50/40 text-slate-900 font-medium'
+                                }`}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <span className="font-bold text-slate-900 text-xs">{n.title}</span>
@@ -714,22 +672,20 @@ export const DashboardLayout: React.FC = () => {
             <div className="flex border-b border-slate-100 gap-6 shrink-0 text-xs font-bold">
               <button
                 onClick={() => setHelpTab('faq')}
-                className={`pb-3 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                  helpTab === 'faq'
+                className={`pb-3 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${helpTab === 'faq'
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-slate-400 hover:text-slate-700'
-                }`}
+                  }`}
               >
                 <BookOpen className="w-4 h-4" />
                 <span>Statutory Patent FAQ</span>
               </button>
               <button
                 onClick={() => setHelpTab('fees')}
-                className={`pb-3 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                  helpTab === 'fees'
+                className={`pb-3 border-b-2 transition-all flex items-center gap-2 cursor-pointer ${helpTab === 'fees'
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-slate-400 hover:text-slate-700'
-                }`}
+                  }`}
               >
                 <Calculator className="w-4 h-4" />
                 <span>Official IPO Fee Calculator</span>

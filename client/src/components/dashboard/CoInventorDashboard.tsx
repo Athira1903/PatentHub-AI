@@ -325,9 +325,8 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
                   <button
                     key={stage}
                     onClick={() => setStageFilter(stage)}
-                    className={`px-3 py-1 rounded-lg transition cursor-pointer text-[11px] whitespace-nowrap ${
-                      stageFilter === stage ? 'bg-[#315C55] text-white shadow-3xs' : 'hover:text-[#253330]'
-                    }`}
+                    className={`px-3 py-1 rounded-lg transition cursor-pointer text-[11px] whitespace-nowrap ${stageFilter === stage ? 'bg-[#315C55] text-white shadow-3xs' : 'hover:text-[#253330]'
+                      }`}
                   >
                     {stage === 'ALL' ? 'All Stages' : stage.charAt(0) + stage.slice(1).toLowerCase()}
                   </button>
@@ -422,13 +421,12 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
                             <div
                               key={step.key}
                               onClick={() => navigate(`/dashboard/projects/${proj.id}?tab=${encodeURIComponent(step.tab)}`)}
-                              className={`p-2 rounded-xl text-center transition cursor-pointer ${
-                                isActive
+                              className={`p-2 rounded-xl text-center transition cursor-pointer ${isActive
                                   ? 'bg-[#315C55] text-white shadow-3xs'
                                   : isCompleted
-                                  ? 'bg-[#E4F0EC] text-[#315C55] font-bold'
-                                  : 'text-[#8A9B96] hover:bg-white'
-                              }`}
+                                    ? 'bg-[#E4F0EC] text-[#315C55] font-bold'
+                                    : 'text-[#8A9B96] hover:bg-white'
+                                }`}
                               title={`Jump to ${step.label}`}
                             >
                               <div className="text-[9px] font-mono font-bold leading-none">{step.num}</div>
@@ -472,13 +470,12 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                              proj.priorArtRisk === 'HIGH'
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${proj.priorArtRisk === 'HIGH'
                                 ? 'bg-rose-100 text-rose-700 border border-rose-200'
                                 : proj.priorArtRisk === 'MEDIUM'
-                                ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                                : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                            }`}
+                                  ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                  : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                              }`}
                           >
                             {proj.priorArtRisk} RISK
                           </span>
@@ -522,9 +519,8 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
                                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                               )}
                               <span
-                                className={`text-[11px] ${
-                                  crit.completed ? 'text-[#253330] font-bold' : 'text-[#71807C]'
-                                }`}
+                                className={`text-[11px] ${crit.completed ? 'text-[#253330] font-bold' : 'text-[#71807C]'
+                                  }`}
                               >
                                 {crit.label || crit.item}
                               </span>
@@ -774,11 +770,10 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
                       >
                         <div className="flex items-center justify-between">
                           <span
-                            className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                              item.priority === 'HIGH'
+                            className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${item.priority === 'HIGH'
                                 ? 'bg-rose-100 text-rose-700'
                                 : 'bg-amber-100 text-amber-700'
-                            }`}
+                              }`}
                           >
                             {item.priority}
                           </span>
@@ -836,11 +831,10 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span
-                              className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${
-                                task.status === 'COMPLETED'
+                              className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${task.status === 'COMPLETED'
                                   ? 'bg-emerald-100 text-emerald-700'
                                   : 'bg-slate-200 text-slate-700'
-                              }`}
+                                }`}
                             >
                               {task.status}
                             </span>
@@ -849,11 +843,10 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
                             </span>
                           </div>
                           <p
-                            className={`text-xs font-bold truncate ${
-                              task.status === 'COMPLETED'
+                            className={`text-xs font-bold truncate ${task.status === 'COMPLETED'
                                 ? 'line-through text-[#8A9B96]'
                                 : 'text-[#253330]'
-                            }`}
+                              }`}
                           >
                             {task.title}
                           </p>
@@ -866,11 +859,10 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
 
                         <button
                           onClick={() => handleToggleTaskStatus(task.projectId, task.id, task.status)}
-                          className={`p-1.5 rounded-xl border transition cursor-pointer shrink-0 ${
-                            task.status === 'COMPLETED'
+                          className={`p-1.5 rounded-xl border transition cursor-pointer shrink-0 ${task.status === 'COMPLETED'
                               ? 'bg-emerald-600 border-emerald-600 text-white'
                               : 'bg-white border-[#E5EBE8] text-[#71807C] hover:border-[#315C55]'
-                          }`}
+                            }`}
                           title={task.status === 'COMPLETED' ? 'Mark as To-Do' : 'Mark as Completed'}
                         >
                           <Check className="w-3.5 h-3.5" />

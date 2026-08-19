@@ -15,8 +15,10 @@ export class ProjectPolicy {
 
     const isOwner = project.ownerId === user.userId;
     const isMember = project.members?.some((m: any) => m.userId === user.userId);
+    const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+    const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
 
-    return isOwner || isMember;
+    return isOwner || isMember || isGuide || isExpert;
   }
 
   /**
@@ -74,6 +76,10 @@ export class ProjectPolicy {
     if (user.role === 'Admin') return true;
 
     if (project.ownerId === user.userId) return true;
+
+    const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
+    const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+    if (isGuide || isExpert) return true;
 
     const member = project.members?.find((m: any) => m.userId === user.userId);
     if (!member) return false;
