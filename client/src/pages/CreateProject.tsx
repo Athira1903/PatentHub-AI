@@ -12,6 +12,8 @@ const createProjectSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   innovationIdea: z.string().min(10, 'Innovation abstract must be at least 10 characters'),
   problemStatement: z.string().min(10, 'Problem statement must be at least 10 characters'),
+  existingSolutions: z.string().optional(),
+  drawbacks: z.string().optional(),
   proposedSolution: z.string().min(10, 'Proposed solution must be at least 10 characters'),
   objectives: z.string().optional(),
   technicalDomain: z.string().min(2, 'Technical domain is required'),
@@ -38,6 +40,8 @@ export const CreateProject: React.FC = () => {
       title: '',
       innovationIdea: '',
       problemStatement: '',
+      existingSolutions: '',
+      drawbacks: '',
       proposedSolution: '',
       objectives: '',
       technicalDomain: 'Renewable Energy',
@@ -76,6 +80,8 @@ export const CreateProject: React.FC = () => {
 
       const formattedData = {
         ...data,
+        existingSolutions: data.existingSolutions || undefined,
+        drawbacks: data.drawbacks || undefined,
         novelFeatures: formattedFeatures || undefined,
         objectives: data.objectives || undefined,
         keywords: data.keywords || undefined,
@@ -295,9 +301,37 @@ export const CreateProject: React.FC = () => {
           {errors.problemStatement && <p className="mt-1.5 text-xs text-rose-600 font-semibold">{errors.problemStatement.message}</p>}
         </div>
 
-        {/* 3. Proposed Technical Solution */}
+        {/* Existing Solutions & Known Prior Technologies */}
         <div>
-          <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">3. Proposed Technical Solution</label>
+          <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">3. Existing Solutions & Prior Art</label>
+          <div className="relative">
+            <FileText className="w-5 h-5 absolute left-3.5 top-3.5 text-slate-400" />
+            <textarea
+              rows={3}
+              {...register('existingSolutions')}
+              className="w-full pl-11 pr-4 py-3 bg-white hover:bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 text-xs sm:text-sm font-medium transition-all"
+              placeholder="Detail current products, patents, or conventional approaches that attempt to solve this problem..."
+            />
+          </div>
+        </div>
+
+        {/* Limitations & Drawbacks of Existing Solutions */}
+        <div>
+          <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">4. Limitations & Drawbacks of Existing Solutions</label>
+          <div className="relative">
+            <FileText className="w-5 h-5 absolute left-3.5 top-3.5 text-slate-400" />
+            <textarea
+              rows={3}
+              {...register('drawbacks')}
+              className="w-full pl-11 pr-4 py-3 bg-white hover:bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 text-xs sm:text-sm font-medium transition-all"
+              placeholder="What are the specific technical bottlenecks, high costs, inefficiencies, or safety limitations of existing solutions?..."
+            />
+          </div>
+        </div>
+
+        {/* 5. Proposed Technical Solution */}
+        <div>
+          <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">5. Proposed Technical Solution</label>
           <div className="relative">
             <FileText className="w-5 h-5 absolute left-3.5 top-3.5 text-slate-400" />
             <textarea

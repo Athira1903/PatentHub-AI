@@ -45,6 +45,10 @@ export class ReviewService {
       }
     }
 
+    if ((data.decision === 'REJECTED' || data.decision === 'CHANGES_REQUESTED') && (!data.comments || !data.comments.trim())) {
+      throw new Error(`A written reason is required when selecting ${data.decision.replace(/_/g, ' ').toLowerCase()}.`);
+    }
+
     // 2. Stage Transition Calculation
     let nextStage = project.stage;
 
@@ -82,6 +86,21 @@ export class ReviewService {
       }
     });
 
+    // 3b. Also register into project comments for seamless audit trail
+    if (data.comments && data.comments.trim()) {
+      try {
+        await prisma.comment.create({
+          data: {
+            projectId,
+            userId: reviewer.userId || reviewer.id,
+            content: `[${data.reviewType === 'EXPERT_REVIEW' ? 'Patent Expert Review' : 'Guide Review'}: ${data.decision.replace(/_/g, ' ')}] ${data.comments.trim()}`
+          }
+        });
+      } catch (e) {
+        // Non-blocking
+      }
+    }
+
     // 4. Update project stage if changed
     if (nextStage !== project.stage) {
       await prisma.patentProject.update({
@@ -91,23 +110,47 @@ export class ReviewService {
     }
 
     // 5. Activity log & Notifications
+    const reviewerName = reviewer.fullName || reviewer.username || 'Reviewer';
+    let activityAction = `${reviewerName} logged ${data.reviewType} decision: ${data.decision}. Workflow stage set to ${nextStage}.`;
+    if (data.decision === 'CHANGES_REQUESTED') {
+      activityAction = `${reviewerName} requested changes.`;
+    } else if (data.decision === 'APPROVED') {
+      activityAction = `${reviewerName} approved the project (${data.reviewType === 'EXPERT_REVIEW' ? 'Patent Expert Review' : 'Guide Review'}).`;
+    } else if (data.decision === 'REJECTED') {
+      activityAction = `${reviewerName} rejected the review for the project.`;
+    }
+
     await prisma.activityLog.create({
       data: {
         userId: reviewer.userId || reviewer.id,
         projectId,
-        action: `Logged ${data.reviewType} decision: ${data.decision}. Workflow stage set to ${nextStage}.`
+        action: activityAction,
+        type: 'REVIEW'
       }
     });
 
     try {
+      const notifTitle = data.decision === 'CHANGES_REQUESTED'
+        ? 'Changes Requested on Project'
+        : data.decision === 'APPROVED'
+        ? 'Project Review Approved'
+        : 'Project Review Rejected';
+
+      const notifMsg = data.decision === 'CHANGES_REQUESTED'
+        ? `${reviewerName} requested changes for "${project.title}": ${data.comments?.trim() || 'Please review feedback.'}`
+        : data.decision === 'APPROVED'
+        ? `${reviewerName} approved "${project.title}". Workflow stage is now ${nextStage}.`
+        : `${reviewerName} rejected review for "${project.title}": ${data.comments?.trim() || ''}`;
+
       const membersToNotify = project.members.filter(m => m.userId !== (reviewer.userId || reviewer.id));
       const notificationPromises = membersToNotify.map(m =>
         prisma.notification.create({
           data: {
             userId: m.userId,
-            title: `Project Review Update (${data.decision})`,
-            message: `Reviewer ${reviewer.username || 'Reviewer'} logged ${data.decision} for project "${project.title}". Stage: ${nextStage}.`,
-            type: 'STATUS_CHANGE',
+            projectId,
+            title: notifTitle,
+            message: notifMsg,
+            type: 'REVIEW',
             referenceId: projectId
           }
         })
@@ -118,9 +161,10 @@ export class ReviewService {
           prisma.notification.create({
             data: {
               userId: project.ownerId,
-              title: `Project Review Decision: ${data.decision}`,
-              message: `Reviewer logged ${data.decision} for your project "${project.title}". Workflow stage is now ${nextStage}.`,
-              type: 'STATUS_CHANGE',
+              projectId,
+              title: notifTitle,
+              message: notifMsg,
+              type: 'REVIEW',
               referenceId: projectId
             }
           })

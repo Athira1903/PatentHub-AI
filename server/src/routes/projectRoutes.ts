@@ -103,6 +103,7 @@ router.post('/:id/reports/comprehensive-pdf', projectGuard((u, p) => ReportPolic
 router.get('/:id/tasks', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getProjectTasks as any);
 router.post('/:id/tasks', projectGuard((u, p) => ProjectPolicy.canCreateTask(u, p)) as any, createTask as any);
 router.put('/:id/tasks/:taskId', projectGuard((u, p) => ProjectPolicy.canUpdateTask(u, p)) as any, updateTask as any);
+router.put('/:id/tasks/:taskId/status', projectGuard((u, p) => ProjectPolicy.canUpdateTask(u, p)) as any, updateTask as any);
 router.delete('/:id/tasks/:taskId', projectGuard((u, p) => ProjectPolicy.canDeleteTask(u, p)) as any, deleteTask as any);
 
 // Comments Endpoint
@@ -122,7 +123,7 @@ router.post('/:id/forms/:formId/submit', projectGuard((u, p) => PatentFormPolicy
 router.post('/:id/forms/pdf', projectGuard((u, p, req) => PatentFormPolicy.canCreate(u, p, req.body.formType || 'Form 1')) as any, generateFormPdf as any);
 
 // Formal Reviews & Filing Readiness Endpoints (Task 5)
-router.get('/:id/reviews', projectGuard((u, p) => ReviewPolicy.canReview(u, p)) as any, getProjectReviews as any);
+router.get('/:id/reviews', projectGuard((u, p) => ReviewPolicy.canViewReviews(u, p)) as any, getProjectReviews as any);
 router.post('/:id/reviews', projectGuard((u, p) => ReviewPolicy.canReview(u, p)) as any, submitReview as any);
 router.get('/:id/filing-readiness', projectGuard((u, p) => ReportPolicy.canGenerateSummary(u, p)) as any, getFilingReadiness as any);
 router.post('/:id/readiness-report/pdf', projectGuard((u, p) => ReportPolicy.canGenerateReadinessReport(u, p)) as any, generateReadinessReportPdf as any);

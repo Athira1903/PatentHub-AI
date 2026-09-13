@@ -44,6 +44,7 @@ router.post('/:id/reports/comprehensive-pdf', (0, policyGuard_1.projectGuard)((u
 router.get('/:id/tasks', (0, policyGuard_1.projectGuard)((u, p) => project_policy_1.ProjectPolicy.canViewProject(u, p)), projectController_1.getProjectTasks);
 router.post('/:id/tasks', (0, policyGuard_1.projectGuard)((u, p) => project_policy_1.ProjectPolicy.canCreateTask(u, p)), projectController_1.createTask);
 router.put('/:id/tasks/:taskId', (0, policyGuard_1.projectGuard)((u, p) => project_policy_1.ProjectPolicy.canUpdateTask(u, p)), projectController_1.updateTask);
+router.put('/:id/tasks/:taskId/status', (0, policyGuard_1.projectGuard)((u, p) => project_policy_1.ProjectPolicy.canUpdateTask(u, p)), projectController_1.updateTask);
 router.delete('/:id/tasks/:taskId', (0, policyGuard_1.projectGuard)((u, p) => project_policy_1.ProjectPolicy.canDeleteTask(u, p)), projectController_1.deleteTask);
 // Comments Endpoint
 router.post('/:id/comments', (0, policyGuard_1.projectGuard)((u, p) => review_policy_1.ReviewPolicy.canComment(u, p)), projectController_1.createComment);
@@ -59,7 +60,7 @@ router.post('/:id/forms', (0, policyGuard_1.projectGuard)((u, p, req) => patent_
 router.post('/:id/forms/:formId/submit', (0, policyGuard_1.projectGuard)((u, p) => patent_form_policy_1.PatentFormPolicy.canSubmit(u, p, 'Form 1')), formController_1.submitForm);
 router.post('/:id/forms/pdf', (0, policyGuard_1.projectGuard)((u, p, req) => patent_form_policy_1.PatentFormPolicy.canCreate(u, p, req.body.formType || 'Form 1')), formController_1.generateFormPdf);
 // Formal Reviews & Filing Readiness Endpoints (Task 5)
-router.get('/:id/reviews', (0, policyGuard_1.projectGuard)((u, p) => review_policy_1.ReviewPolicy.canReview(u, p)), reviewController_1.getProjectReviews);
+router.get('/:id/reviews', (0, policyGuard_1.projectGuard)((u, p) => review_policy_1.ReviewPolicy.canViewReviews(u, p)), reviewController_1.getProjectReviews);
 router.post('/:id/reviews', (0, policyGuard_1.projectGuard)((u, p) => review_policy_1.ReviewPolicy.canReview(u, p)), reviewController_1.submitReview);
 router.get('/:id/filing-readiness', (0, policyGuard_1.projectGuard)((u, p) => report_policy_1.ReportPolicy.canGenerateSummary(u, p)), reviewController_1.getFilingReadiness);
 router.post('/:id/readiness-report/pdf', (0, policyGuard_1.projectGuard)((u, p) => report_policy_1.ReportPolicy.canGenerateReadinessReport(u, p)), reviewController_1.generateReadinessReportPdf);

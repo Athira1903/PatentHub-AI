@@ -82,7 +82,7 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
     try {
       await api.post(`/collaboration/respond`, {
         invitationId,
-        action: decision === 'ACCEPT' ? 'accept' : 'reject'
+        status: decision === 'ACCEPT' ? 'ACCEPTED' : 'REJECTED'
       });
       toast.success(`Invitation ${decision === 'ACCEPT' ? 'accepted' : 'declined'} successfully`);
       fetchInventorData();

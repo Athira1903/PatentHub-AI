@@ -96,7 +96,7 @@ const updateProject = async (req, res) => {
     try {
         const validatedData = updateProjectSchema.parse(req.body);
         // Validate workflow stage transition if requested
-        if (validatedData.stage) {
+        if (validatedData.stage && validatedData.stage !== req.project.stage) {
             const isAllowed = await workflow_policy_1.WorkflowPolicy.canMoveToStage(req.user, req.project, validatedData.stage);
             if (!isAllowed) {
                 res.status(403).json({ message: `Workflow stage transition to ${validatedData.stage} is not allowed.` });
@@ -104,6 +104,60 @@ const updateProject = async (req, res) => {
             }
         }
         const project = await projectService_1.ProjectService.updateProject(req.project.id, req.user.userId, validatedData);
+        // If workflow stage transitioned, log activity and notify members
+        if (validatedData.stage && validatedData.stage !== req.project.stage) {
+            try {
+                const actorName = req.user.fullName || req.user.username || 'User';
+                const hadChangesRequested = req.project.projectReviews?.some((r) => r.decision === 'CHANGES_REQUESTED');
+                let actionMsg = `${actorName} advanced workflow stage to ${validatedData.stage}.`;
+                if (validatedData.stage === 'GUIDE_REVIEW') {
+                    actionMsg = hadChangesRequested
+                        ? `${actorName} resubmitted the project for Guide Review.`
+                        : `${actorName} submitted the project for Guide Review.`;
+                }
+                await db_1.prisma.activityLog.create({
+                    data: {
+                        userId: req.user.userId,
+                        projectId: req.project.id,
+                        action: actionMsg,
+                        type: 'REVIEW',
+                    },
+                });
+                const title = validatedData.stage === 'GUIDE_REVIEW'
+                    ? (hadChangesRequested ? 'Project Resubmitted for Guide Review' : 'Project Submitted for Guide Review')
+                    : `Project Stage Updated: ${validatedData.stage}`;
+                const message = `${actorName} has ${validatedData.stage === 'GUIDE_REVIEW'
+                    ? (hadChangesRequested ? 'resubmitted' : 'submitted')
+                    : 'advanced'} "${req.project.title}" to ${validatedData.stage}.`;
+                const otherMembers = req.project.members?.filter((m) => m.userId !== req.user.userId) || [];
+                const notifPromises = otherMembers.map((m) => db_1.prisma.notification.create({
+                    data: {
+                        userId: m.userId,
+                        projectId: req.project.id,
+                        title,
+                        message,
+                        type: 'REVIEW',
+                        referenceId: req.project.id,
+                    },
+                }));
+                if (req.project.ownerId !== req.user.userId) {
+                    notifPromises.push(db_1.prisma.notification.create({
+                        data: {
+                            userId: req.project.ownerId,
+                            projectId: req.project.id,
+                            title,
+                            message,
+                            type: 'REVIEW',
+                            referenceId: req.project.id,
+                        },
+                    }));
+                }
+                await Promise.all(notifPromises);
+            }
+            catch (logErr) {
+                console.error('Workflow update activity log / notification error:', logErr);
+            }
+        }
         res.status(200).json({ message: 'Project updated successfully', project });
     }
     catch (error) {

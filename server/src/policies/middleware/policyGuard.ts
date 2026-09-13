@@ -48,6 +48,12 @@ export const projectGuard = (
             },
             orderBy: { createdAt: 'desc' },
           },
+          projectReviews: {
+            include: {
+              reviewer: { select: { id: true, fullName: true, username: true, role: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
           owner: { select: { id: true, fullName: true, username: true, email: true, institution: true } },
         },
       });

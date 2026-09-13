@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const projectRoutes_1 = __importDefault(require("./routes/projectRoutes"));
 const profileRoutes_1 = __importDefault(require("./routes/profileRoutes"));
@@ -18,7 +19,12 @@ const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 // Serve local static uploaded profile pictures and documents
-app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../../public/uploads')));
+const uploadsDir = path_1.default.join(__dirname, '../public/uploads');
+const documentsDir = path_1.default.join(uploadsDir, 'documents');
+if (!fs_1.default.existsSync(documentsDir)) {
+    fs_1.default.mkdirSync(documentsDir, { recursive: true });
+}
+app.use('/uploads', express_1.default.static(uploadsDir));
 // Routes
 app.use('/api/auth', authRoutes_1.default);
 app.use('/api/projects', projectRoutes_1.default);

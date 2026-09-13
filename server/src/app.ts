@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import authRoutes from './routes/authRoutes';
 import projectRoutes from './routes/projectRoutes';
 import profileRoutes from './routes/profileRoutes';
@@ -16,7 +17,12 @@ app.use(cors());
 app.use(express.json());
 
 // Serve local static uploaded profile pictures and documents
-app.use('/uploads', express.static(path.join(__dirname, '../../public/uploads')));
+const uploadsDir = path.join(__dirname, '../public/uploads');
+const documentsDir = path.join(uploadsDir, 'documents');
+if (!fs.existsSync(documentsDir)) {
+  fs.mkdirSync(documentsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
 
 // Routes
 app.use('/api/auth', authRoutes);

@@ -49,4 +49,5 @@ router.put('/notifications/:id/read', (0, authorize_1.authorize)(async (user, re
     return notification.userId === user.userId;
 }), collaborationController_1.markNotificationAsRead);
 router.put('/projects/:projectId/members/:memberId/permission', collaborationController_1.updateMemberPermission);
+router.delete('/projects/:projectId/members/:memberId', collaborationController_1.removeMember);
 exports.default = router;

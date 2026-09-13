@@ -172,3 +172,36 @@ export const deleteDocument = async (req: AuthenticatedRequest, res: Response): 
     res.status(500).json({ message: error.message || 'Failed to delete document.' });
   }
 };
+
+export const downloadDocument = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    if (!id) {
+      res.status(400).json({ message: 'Document ID is required.' });
+      return;
+    }
+
+    const document = await prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!document) {
+      res.status(404).json({ message: 'Document not found.' });
+      return;
+    }
+
+    const relativePath = document.fileUrl.replace('/uploads/documents/', '');
+    const physicalPath = path.join(__dirname, '../../public/uploads/documents', relativePath);
+
+    if (!fs.existsSync(physicalPath)) {
+      res.status(404).json({ message: 'Physical document file not found on server storage.' });
+      return;
+    }
+
+    res.download(physicalPath, document.name);
+  } catch (error: any) {
+    console.error('[Document Download Error]', error);
+    res.status(500).json({ message: error.message || 'Failed to download document.' });
+  }
+};
+

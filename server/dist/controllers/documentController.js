@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteDocument = exports.uploadDocument = void 0;
+exports.downloadDocument = exports.deleteDocument = exports.uploadDocument = void 0;
 const db_1 = require("../config/db");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
@@ -145,3 +145,31 @@ const deleteDocument = async (req, res) => {
     }
 };
 exports.deleteDocument = deleteDocument;
+const downloadDocument = async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!id) {
+            res.status(400).json({ message: 'Document ID is required.' });
+            return;
+        }
+        const document = await db_1.prisma.document.findUnique({
+            where: { id },
+        });
+        if (!document) {
+            res.status(404).json({ message: 'Document not found.' });
+            return;
+        }
+        const relativePath = document.fileUrl.replace('/uploads/documents/', '');
+        const physicalPath = path_1.default.join(__dirname, '../../public/uploads/documents', relativePath);
+        if (!fs_1.default.existsSync(physicalPath)) {
+            res.status(404).json({ message: 'Physical document file not found on server storage.' });
+            return;
+        }
+        res.download(physicalPath, document.name);
+    }
+    catch (error) {
+        console.error('[Document Download Error]', error);
+        res.status(500).json({ message: error.message || 'Failed to download document.' });
+    }
+};
+exports.downloadDocument = downloadDocument;

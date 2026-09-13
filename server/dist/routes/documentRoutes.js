@@ -42,6 +42,18 @@ router.post('/upload', upload.single('document'), (0, authorize_1.authorize)(asy
         return false;
     return document_policy_1.DocumentPolicy.canUpload(user, project);
 }), documentController_1.uploadDocument);
+router.get('/:id/download', (0, authorize_1.authorize)(async (user, req) => {
+    const docId = req.params.id;
+    if (!docId)
+        return false;
+    const doc = await db_1.prisma.document.findUnique({
+        where: { id: docId },
+        include: { project: { include: { members: true } } },
+    });
+    if (!doc)
+        return false;
+    return document_policy_1.DocumentPolicy.canDownload(user, doc.project, doc);
+}), documentController_1.downloadDocument);
 router.delete('/:id', (0, authorize_1.authorize)(async (user, req) => {
     const docId = req.params.id;
     if (!docId)

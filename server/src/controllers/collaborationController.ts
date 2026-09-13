@@ -159,10 +159,13 @@ export const respondToInvitation = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    const { invitationId, status } = req.body; // status: 'ACCEPTED' | 'REJECTED'
+    let { invitationId, status, action } = req.body; // status: 'ACCEPTED' | 'REJECTED'
+    if (!status && action) {
+      status = action.toLowerCase() === 'accept' ? 'ACCEPTED' : action.toLowerCase() === 'reject' ? 'REJECTED' : undefined;
+    }
 
     if (!invitationId || !status || !['ACCEPTED', 'REJECTED'].includes(status)) {
-      res.status(400).json({ message: 'Invitation ID and response status (ACCEPTED/REJECTED) are required.' });
+      res.status(400).json({ message: 'Invitation ID and valid response status (ACCEPTED/REJECTED) are required.' });
       return;
     }
 
@@ -492,5 +495,69 @@ export const updateMemberPermission = async (req: AuthenticatedRequest, res: Res
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to update member permission.' });
+  }
+};
+
+export const removeMember = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized.' });
+      return;
+    }
+
+    const projectId = req.params.projectId as string;
+    const memberId = req.params.memberId as string;
+
+    const project = await prisma.patentProject.findUnique({
+      where: { id: projectId },
+      include: { members: true },
+    });
+
+    if (!project) {
+      res.status(404).json({ message: 'Project not found.' });
+      return;
+    }
+
+    const canRemove = MembershipPolicy.canRemoveMember(req.user, project, memberId);
+    if (!canRemove) {
+      res.status(403).json({ message: 'Access denied. You cannot remove this member.' });
+      return;
+    }
+
+    const existingMember = await prisma.projectMember.findFirst({
+      where: {
+        projectId,
+        OR: [
+          { userId: memberId },
+          { id: memberId }
+        ]
+      },
+      include: { user: { select: { fullName: true, username: true } } },
+    });
+
+    if (!existingMember) {
+      res.status(404).json({ message: 'Member not found on this project.' });
+      return;
+    }
+
+    await prisma.projectMember.delete({
+      where: { id: existingMember.id },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        projectId,
+        action: `Removed collaborator ${existingMember.user.fullName} (@${existingMember.user.username}) from project.`,
+        type: 'MEMBERSHIP',
+      },
+    });
+
+    res.status(200).json({
+      message: `Collaborator ${existingMember.user.fullName} removed successfully.`,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to remove member.' });
   }
 };

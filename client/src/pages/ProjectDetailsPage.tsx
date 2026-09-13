@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useOutletContext, useSearchParams } from 'react-router-dom';
+import { useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Users,
@@ -16,7 +16,6 @@ import {
   CheckSquare as CheckIcon,
   Trash2,
   Loader2,
-  BookOpen,
   Folder,
   FolderOpen,
   Activity,
@@ -32,6 +31,7 @@ import { ClaimsEngineeringStudio } from '../components/claims/ClaimsEngineeringS
 import { ProjectCommandCenter } from '../components/project/ProjectCommandCenter';
 import { FilingReadinessView } from '../components/project/FilingReadinessView';
 import { PriorArtEvidenceView } from '../components/project/PriorArtEvidenceView';
+import { ProjectReviewCenter } from '../components/project/ProjectReviewCenter';
 
 export interface ProjectDetail {
   id: string;
@@ -76,6 +76,14 @@ export interface ProjectDetail {
     action: string;
     createdAt: string;
     user: { fullName: string };
+  }>;
+  projectReviews?: Array<{
+    id: string;
+    reviewType: string;
+    decision: string;
+    comments: string | null;
+    createdAt: string;
+    reviewer: { id: string; fullName: string; username: string; role: string };
   }>;
 }
 
@@ -124,21 +132,39 @@ export const ProjectDetailsPage: React.FC = () => {
   const permissionLevel: 'VIEW' | 'EDIT' | 'SUBMIT' = isOwner ? 'SUBMIT' : (projectMemberRecord as any)?.permissionLevel || 'EDIT';
   const canEdit = isOwner || permissionLevel === 'EDIT' || permissionLevel === 'SUBMIT';
   const canSubmit = isOwner || permissionLevel === 'SUBMIT';
-  const isProjectReviewer = userProjectRole === 'GUIDE' || userProjectRole === 'PATENT_EXPERT' || user?.role === 'Admin';
   const [loading, setLoading] = useState(true);
 
+  const navigate = useNavigate();
+  const location = useLocation();
   const urlTab = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<string>(urlTab || 'Overview');
+  const isReviewsRoute = location.pathname.endsWith('/reviews');
+
+  const computeActiveTab = () => {
+    if (isReviewsRoute) return 'Reviews';
+    if (urlTab) return urlTab;
+    return 'Overview';
+  };
+
+  const [activeTab, setActiveTab] = useState<string>(computeActiveTab());
 
   useEffect(() => {
-    if (urlTab) {
-      setActiveTab(urlTab);
-    }
-  }, [urlTab]);
+    setActiveTab(computeActiveTab());
+  }, [urlTab, location.pathname]);
 
   const handleSelectTab = (tabName: string) => {
     setActiveTab(tabName);
-    setSearchParams({ tab: tabName });
+    const isDashboard = location.pathname.startsWith('/dashboard');
+    const baseProjectUrl = isDashboard ? `/dashboard/projects/${id}` : `/projects/${id}`;
+
+    if (tabName === 'Reviews' || tabName === 'Guide Reviews') {
+      navigate(`${baseProjectUrl}/reviews`);
+    } else if (tabName === 'Overview') {
+      navigate(baseProjectUrl);
+      setSearchParams({});
+    } else {
+      navigate(`${baseProjectUrl}?tab=${encodeURIComponent(tabName)}`);
+      setSearchParams({ tab: tabName });
+    }
   };
 
   // AI Assistant Interactive State
@@ -359,10 +385,6 @@ export const ProjectDetailsPage: React.FC = () => {
   const [formField1, setFormField1] = useState('');
   const [formField2, setFormField2] = useState('');
 
-  // Guide Review States
-  const [reviewComment, setReviewComment] = useState('');
-  const [submittingReview, setSubmittingReview] = useState(false);
-
   // Drafting Tips and match expansion states
   const [showTips, setShowTips] = useState(true);
   const [expandedMatchIndex, setExpandedMatchIndex] = useState<number | null>(null);
@@ -476,16 +498,6 @@ export const ProjectDetailsPage: React.FC = () => {
     const debounce = setTimeout(search, 300);
     return () => clearTimeout(debounce);
   }, [inviteUsername]);
-
-  const handleStageChange = async (newStage: string) => {
-    try {
-      const response = await api.put(`/projects/${id}`, { stage: newStage });
-      setProject((prev) => (prev ? { ...prev, stage: response.data.project.stage } : null));
-      toast.success(`Updated stage to ${newStage.replace(/_/g, ' ')}`);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to update stage');
-    }
-  };
 
   const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -921,36 +933,15 @@ export const ProjectDetailsPage: React.FC = () => {
     }
   };
 
-  // Guide reviews comment submit
-  const handleSubmitReviewComment = async (e: React.FormEvent, stageAction: 'APPROVE' | 'REJECT' | 'COMMENT' | 'EXPERT_APPROVE' | 'EXPERT_REJECT' | 'EXPERT_FILED') => {
-    e.preventDefault();
-    if (!reviewComment.trim()) return;
-    setSubmittingReview(true);
+  // Remove team collaborator
+  const handleRemoveMember = async (memberUserId: string, memberName: string) => {
+    if (!window.confirm(`Are you sure you want to remove ${memberName} from this project?`)) return;
     try {
-      // Add comments via standard comments endpoint
-      await api.post(`/projects/${id}/comments`, { content: reviewComment.trim() });
-
-      if (stageAction === 'APPROVE') {
-        // Increment stage or update status
-        const nextIndex = STAGES.findIndex((s) => s.key === project?.stage) + 1;
-        if (nextIndex < STAGES.length) {
-          await handleStageChange(STAGES[nextIndex].key);
-        }
-      } else if (stageAction === 'EXPERT_APPROVE') {
-        await handleStageChange('FILING_READY');
-      } else if (stageAction === 'EXPERT_FILED') {
-        await handleStageChange('FILED');
-      } else if (stageAction === 'EXPERT_REJECT' || stageAction === 'REJECT') {
-        await handleStageChange('DOCUMENTATION');
-      }
-
-      toast.success('Review comments and action processed successfully!');
-      setReviewComment('');
+      await api.delete(`/collaboration/projects/${id}/members/${memberUserId}`);
+      toast.success(`Removed ${memberName} from project team.`);
       fetchProject();
-    } catch (err) {
-      toast.error('Failed to process review feedback');
-    } finally {
-      setSubmittingReview(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to remove member.');
     }
   };
 
@@ -1012,15 +1003,22 @@ export const ProjectDetailsPage: React.FC = () => {
             <nav className="space-y-1">
               {sidebarLinks.map((link) => {
                 const Icon = link.icon;
-                const isActive = activeTab === link.tab;
+                const isReviewsItem = link.tab === 'Reviews';
+                const isActive =
+                  activeTab === link.tab ||
+                  (isReviewsItem &&
+                    (activeTab === 'Reviews' ||
+                      activeTab === 'Guide Reviews' ||
+                      location.pathname.endsWith('/reviews')));
                 return (
                   <button
                     key={link.label}
                     onClick={() => handleSelectTab(link.tab)}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all text-left cursor-pointer ${isActive
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all text-left cursor-pointer ${
+                      isActive
                         ? 'bg-blue-900 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
-                      }`}
+                    }`}
                   >
                     <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                     <span>{link.label}</span>
@@ -1082,7 +1080,7 @@ export const ProjectDetailsPage: React.FC = () => {
         {/* Right Content Panel (9 cols) */}
         <div className="lg:col-span-9 space-y-6">
           {/* T_COMMAND_CENTER: COMMAND CENTER OVERVIEW */}
-          {(activeTab === 'Overview' || (activeTab as any) === 'Command center') && (
+          {(activeTab === 'Overview' || (activeTab as any) === 'Command center') && !location.pathname.endsWith('/reviews') && (
             <ProjectCommandCenter
               project={project}
               analyticsSummary={analyticsSummary}
@@ -1111,6 +1109,9 @@ export const ProjectDetailsPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200">
+                    S10 Scope • Preview
+                  </span>
                   <span className="px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-full flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Gemini Connected
                   </span>
@@ -1610,9 +1611,14 @@ export const ProjectDetailsPage: React.FC = () => {
                 {/* Vector blueprint mock helper panel */}
                 <div className="lg:col-span-1 space-y-4">
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs">
-                    <h4 className="text-xs font-extrabold text-indigo-950 uppercase tracking-widest flex items-center gap-1.5">
-                      <Sparkles className="w-4.5 h-4.5 text-indigo-650 animate-pulse" /> AI Blueprint Engine
-                    </h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-extrabold text-indigo-950 uppercase tracking-widest flex items-center gap-1.5">
+                        <Sparkles className="w-4.5 h-4.5 text-indigo-650 animate-pulse" /> AI Blueprint Engine
+                      </h4>
+                      <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200">
+                        S10 Scope
+                      </span>
+                    </div>
                     <p className="text-[11px] text-slate-500 leading-normal font-semibold">
                       Convert hand-drawn drafts or diagrams into USPTO/IPO compliant 2D line schematics:
                     </p>
@@ -2171,9 +2177,14 @@ export const ProjectDetailsPage: React.FC = () => {
                 <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-3xs">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                     <div>
-                      <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                        🕵️ Prior Art & Similarity Check
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                          🕵️ Prior Art & Similarity Check
+                        </h4>
+                        <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200">
+                          S10 Scope
+                        </span>
+                      </div>
                       <p className="text-[10px] text-slate-400 font-semibold">Registry overlap analysis</p>
                     </div>
                     <button
@@ -2288,9 +2299,14 @@ export const ProjectDetailsPage: React.FC = () => {
                 <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-3xs">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                     <div>
-                      <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                        ⚖ Novelty & Claims Auditor
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                          ⚖ Novelty & Claims Auditor
+                        </h4>
+                        <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200">
+                          S10 Scope
+                        </span>
+                      </div>
                       <p className="text-[10px] text-slate-400 font-semibold">Novelty strength evaluator</p>
                     </div>
                     <button
@@ -2718,9 +2734,21 @@ export const ProjectDetailsPage: React.FC = () => {
                             <p className="text-xs font-extrabold text-slate-850">{m.user.fullName}</p>
                             <p className="text-[10px] text-slate-450 font-bold">@{m.user.username}</p>
                           </div>
-                          <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                            {m.role.replace(/_/g, ' ')}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              {m.role.replace(/_/g, ' ')}
+                            </span>
+                            {(project.isOwner || isOwner) && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMember(m.user.id, m.user.fullName)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                title="Remove Collaborator"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                   </div>
@@ -2729,149 +2757,17 @@ export const ProjectDetailsPage: React.FC = () => {
             </div>
           )}
 
-          {/* T10: GUIDE REVIEW */}
-          {(activeTab === 'Guide Reviews' || activeTab === 'Reviews') && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">
-                    {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW') ? 'Patent Expert Legal Review Deck' : 'Faculty Supervisor Review Deck'}
-                  </h3>
-                  <p className="text-xs text-slate-500 font-semibold mt-0.5">Endorsements, legal checklists, and supervisor sign-offs</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Left Column Guide/Expert Comment inputs */}
-                <div className="md:col-span-1 space-y-4">
-                  {isProjectReviewer ? (
-                    <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl shadow-3xs space-y-4">
-                      <h4 className="text-xs font-bold text-slate-900 uppercase">Review Feedback Actions</h4>
-                      <p className="text-[11px] text-slate-500 leading-normal font-semibold">
-                        {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW')
-                          ? 'Log legal observations, approve applications, or reject drafts.'
-                          : 'Submit guidance reviews and optionally advance workflow stage nodes.'}
-                      </p>
-
-                      <form onSubmit={(e) => handleSubmitReviewComment(e, 'COMMENT')} className="space-y-3 pt-2">
-                        <textarea
-                          rows={3}
-                          required
-                          placeholder="Enter review comments, drawbacks, or validation instructions..."
-                          value={reviewComment}
-                          onChange={(e) => setReviewComment(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
-                        />
-
-                        <div className="flex flex-col gap-2">
-                          {userProjectRole === 'PATENT_EXPERT' || (user?.role === 'Admin' && project.stage === 'PATENT_EXPERT_REVIEW') ? (
-                            <>
-                              <button
-                                type="submit"
-                                disabled={submittingReview}
-                                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                              >
-                                Submit Legal Observation
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleSubmitReviewComment(e, 'EXPERT_APPROVE')}
-                                disabled={submittingReview}
-                                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                              >
-                                Approve & Mark Filing Ready
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleSubmitReviewComment(e, 'EXPERT_FILED')}
-                                disabled={submittingReview}
-                                className="w-full py-2 bg-blue-600 hover:bg-blue-755 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                              >
-                                Approve & Mark Filed
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleSubmitReviewComment(e, 'EXPERT_REJECT')}
-                                disabled={submittingReview}
-                                className="w-full py-2 bg-rose-650 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                              >
-                                Reject & Request Revision
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="submit"
-                                disabled={submittingReview}
-                                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs cursor-pointer"
-                              >
-                                Submit Feedback Comment
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleSubmitReviewComment(e, 'APPROVE')}
-                                disabled={submittingReview}
-                                className="w-full py-2 border border-emerald-500 hover:bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                              >
-                                Approve & Advance Stage
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleSubmitReviewComment(e, 'REJECT')}
-                                disabled={submittingReview}
-                                className="w-full py-2 border border-rose-500 hover:bg-rose-50 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                              >
-                                Request Revision
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </form>
-                    </div>
-                  ) : (
-                    <div className="p-5 bg-indigo-50/20 border border-indigo-150 rounded-2xl shadow-3xs text-center space-y-2">
-                      <BookOpen className="w-8 h-8 text-indigo-600 mx-auto" />
-                      <h4 className="text-xs font-bold text-slate-800 uppercase">Supervisor Space</h4>
-                      <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">
-                        This panel is reserved for your Faculty Guide and Patent Expert supervisors to submit check-off endorsements.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right Column: Review comments logs history */}
-                <div className="md:col-span-2 space-y-4">
-                  <h4 className="text-xs font-extrabold text-slate-900">Review Comments Audit Log</h4>
-                  <div className="space-y-3">
-                    {project.comments && project.comments.length === 0 ? (
-                      <div className="p-8 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                        No review comments logged for this project yet.
-                      </div>
-                    ) : (
-                      project.comments &&
-                      project.comments.map((c) => (
-                        <div key={c.id} className="p-4 bg-white border border-slate-200 rounded-xl space-y-2">
-                          <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
-                            <div>
-                              <span className="font-extrabold text-xs text-slate-800">{c.user.fullName}</span>
-                              <span className="text-[9px] text-slate-400 font-bold uppercase ml-2 bg-slate-100 px-1.5 py-0.5 rounded">
-                                {c.user.role}
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              {new Date(c.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-650 italic font-semibold leading-relaxed">
-                            "{c.content}"
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* T10: PROJECT REVIEW CENTER */}
+          {(activeTab === 'Guide Reviews' || activeTab === 'Reviews' || location.pathname.endsWith('/reviews')) && (
+            <ProjectReviewCenter
+              projectId={id!}
+              project={project}
+              analyticsSummary={analyticsSummary}
+              currentUser={user}
+              userProjectRole={userProjectRole}
+              onRefreshProject={fetchProject}
+              onNavigateTab={(tab) => handleSelectTab(tab)}
+            />
           )}
 
           {/* T_TASKS: PROJECT ACTION ITEMS & TASKS */}

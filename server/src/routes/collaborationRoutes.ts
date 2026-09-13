@@ -9,6 +9,7 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   updateMemberPermission,
+  removeMember,
 } from '../controllers/collaborationController';
 import { authorize } from '../policies/middleware/authorize';
 import { InvitationPolicy } from '../policies/invitation/invitation.policy';
@@ -69,5 +70,6 @@ router.put(
 );
 
 router.put('/projects/:projectId/members/:memberId/permission', updateMemberPermission as any);
+router.delete('/projects/:projectId/members/:memberId', removeMember as any);
 
 export default router;

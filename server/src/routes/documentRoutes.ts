@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authenticateToken } from '../middleware/authMiddleware';
-import { uploadDocument, deleteDocument } from '../controllers/documentController';
+import { uploadDocument, deleteDocument, downloadDocument } from '../controllers/documentController';
 import { authorize } from '../policies/middleware/authorize';
 import { DocumentPolicy } from '../policies/document/document.policy';
 import { prisma } from '../config/db';
@@ -43,6 +43,21 @@ router.post(
     return DocumentPolicy.canUpload(user, project);
   }) as any,
   uploadDocument as any
+);
+
+router.get(
+  '/:id/download',
+  authorize(async (user, req) => {
+    const docId = req.params.id;
+    if (!docId) return false;
+    const doc = await prisma.document.findUnique({
+      where: { id: docId },
+      include: { project: { include: { members: true } } },
+    });
+    if (!doc) return false;
+    return DocumentPolicy.canDownload(user, doc.project, doc);
+  }) as any,
+  downloadDocument as any
 );
 
 router.delete(

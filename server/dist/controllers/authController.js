@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.googleLogin = exports.verifyOtpReset = exports.sendOtp = exports.getProfile = exports.login = exports.resendActivation = exports.activate = exports.register = void 0;
+exports.changePassword = exports.googleLogin = exports.verifyOtpReset = exports.sendOtp = exports.getProfile = exports.login = exports.resendActivation = exports.activate = exports.register = void 0;
 const zod_1 = require("zod");
 const authService_1 = require("../services/authService");
 const RESERVED_USERNAMES = [
@@ -236,3 +236,39 @@ const googleLogin = async (req, res) => {
     }
 };
 exports.googleLogin = googleLogin;
+const changePasswordSchema = zod_1.z.object({
+    currentPassword: zod_1.z.string().min(1, 'Current password is required'),
+    newPassword: zod_1.z
+        .string()
+        .min(8, 'New password must be at least 8 characters')
+        .max(100, 'Password cannot exceed 100 characters')
+        .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+        .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+        .regex(/[0-9]/, 'Password must contain at least one number')
+        .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character'),
+});
+const changePassword = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized access.' });
+            return;
+        }
+        const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+        const result = await authService_1.AuthService.changePassword(userId, currentPassword, newPassword);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({
+                message: error.errors[0]?.message || 'Validation failed',
+                errors: error.errors,
+            });
+            return;
+        }
+        res.status(400).json({
+            message: error.message || 'Failed to change password',
+        });
+    }
+};
+exports.changePassword = changePassword;

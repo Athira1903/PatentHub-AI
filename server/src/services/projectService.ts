@@ -162,6 +162,12 @@ export class ProjectService {
             user: { select: { fullName: true } }
           },
           orderBy: { createdAt: 'desc' }
+        },
+        projectReviews: {
+          include: {
+            reviewer: { select: { id: true, fullName: true, username: true, role: true } }
+          },
+          orderBy: { createdAt: 'desc' }
         }
       },
     });

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateMemberPermission = exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getUnreadNotificationsCount = exports.listMyNotifications = exports.listMyInvitations = exports.respondToInvitation = exports.inviteMember = void 0;
+exports.removeMember = exports.updateMemberPermission = exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getUnreadNotificationsCount = exports.listMyNotifications = exports.listMyInvitations = exports.respondToInvitation = exports.inviteMember = void 0;
 const db_1 = require("../config/db");
 const client_1 = require("@prisma/client");
 const mailService_1 = require("../services/mailService");
@@ -135,9 +135,12 @@ const respondToInvitation = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized.' });
             return;
         }
-        const { invitationId, status } = req.body; // status: 'ACCEPTED' | 'REJECTED'
+        let { invitationId, status, action } = req.body; // status: 'ACCEPTED' | 'REJECTED'
+        if (!status && action) {
+            status = action.toLowerCase() === 'accept' ? 'ACCEPTED' : action.toLowerCase() === 'reject' ? 'REJECTED' : undefined;
+        }
         if (!invitationId || !status || !['ACCEPTED', 'REJECTED'].includes(status)) {
-            res.status(400).json({ message: 'Invitation ID and response status (ACCEPTED/REJECTED) are required.' });
+            res.status(400).json({ message: 'Invitation ID and valid response status (ACCEPTED/REJECTED) are required.' });
             return;
         }
         const invitation = await db_1.prisma.invitation.findUnique({
@@ -435,3 +438,59 @@ const updateMemberPermission = async (req, res) => {
     }
 };
 exports.updateMemberPermission = updateMemberPermission;
+const removeMember = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized.' });
+            return;
+        }
+        const projectId = req.params.projectId;
+        const memberId = req.params.memberId;
+        const project = await db_1.prisma.patentProject.findUnique({
+            where: { id: projectId },
+            include: { members: true },
+        });
+        if (!project) {
+            res.status(404).json({ message: 'Project not found.' });
+            return;
+        }
+        const canRemove = membership_policy_1.MembershipPolicy.canRemoveMember(req.user, project, memberId);
+        if (!canRemove) {
+            res.status(403).json({ message: 'Access denied. You cannot remove this member.' });
+            return;
+        }
+        const existingMember = await db_1.prisma.projectMember.findFirst({
+            where: {
+                projectId,
+                OR: [
+                    { userId: memberId },
+                    { id: memberId }
+                ]
+            },
+            include: { user: { select: { fullName: true, username: true } } },
+        });
+        if (!existingMember) {
+            res.status(404).json({ message: 'Member not found on this project.' });
+            return;
+        }
+        await db_1.prisma.projectMember.delete({
+            where: { id: existingMember.id },
+        });
+        await db_1.prisma.activityLog.create({
+            data: {
+                userId,
+                projectId,
+                action: `Removed collaborator ${existingMember.user.fullName} (@${existingMember.user.username}) from project.`,
+                type: 'MEMBERSHIP',
+            },
+        });
+        res.status(200).json({
+            message: `Collaborator ${existingMember.user.fullName} removed successfully.`,
+        });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to remove member.' });
+    }
+};
+exports.removeMember = removeMember;

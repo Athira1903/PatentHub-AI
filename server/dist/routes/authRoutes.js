@@ -10,6 +10,7 @@ router.post('/activate', authController_1.activate);
 router.post('/resend-activation', authController_1.resendActivation);
 router.post('/google-login', authController_1.googleLogin);
 router.get('/profile', authMiddleware_1.authenticateToken, authController_1.getProfile);
+router.post('/change-password', authMiddleware_1.authenticateToken, authController_1.changePassword);
 router.post('/send-otp', authController_1.sendOtp);
 router.post('/verify-otp-reset', authController_1.verifyOtpReset);
 exports.default = router;

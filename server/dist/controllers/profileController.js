@@ -203,13 +203,13 @@ const updateProfile = async (req, res) => {
                 profileImage: validatedData.profileImage,
             },
         });
-        // Keep User table synced including role
+        // Keep User table synced (excluding role unless caller is Admin)
         const userUpdateData = {};
         if (validatedData.fullName)
             userUpdateData.fullName = validatedData.fullName;
         if (validatedData.institution)
             userUpdateData.institution = validatedData.institution;
-        if (validatedData.role) {
+        if (validatedData.role && req.user?.role === 'Admin') {
             const dbRoleName = mapRoleNameToDbRole(validatedData.role);
             const roleRecord = await db_1.prisma.role.upsert({
                 where: { name: dbRoleName },

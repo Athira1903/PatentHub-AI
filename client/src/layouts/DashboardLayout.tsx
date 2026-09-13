@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Bell,
   Lightbulb,
+  ClipboardCheck,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -163,7 +164,7 @@ export const DashboardLayout: React.FC = () => {
       { label: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare },
       { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
       { label: 'Profile', path: '/dashboard/profile', icon: User },
-      { label: 'Settings', path: '/dashboard/profile', icon: Settings },
+      { label: 'Settings', path: '/dashboard/settings', icon: Settings },
     ]
     : isPatentExpert
       ? [
@@ -172,20 +173,26 @@ export const DashboardLayout: React.FC = () => {
         { label: 'Review Queue', path: '/dashboard/reviews', icon: CheckSquare, badge: '3' },
         { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
         { label: 'Profile', path: '/dashboard/profile', icon: User },
-        { label: 'Settings', path: '/dashboard/profile', icon: Settings },
+        { label: 'Settings', path: '/dashboard/settings', icon: Settings },
       ]
       : isCoInventor
         ? [
           { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
           { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
+          { label: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+          { label: 'Reviews', path: '/dashboard/reviews', icon: ClipboardCheck },
           { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
-          { label: 'Settings', path: '/dashboard/profile', icon: Settings },
+          { label: 'Profile', path: '/dashboard/profile', icon: User },
+          { label: 'Settings', path: '/dashboard/settings', icon: Settings },
         ]
         : [
           { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
           { label: 'My Inventions', path: '/dashboard/projects', icon: Folder },
+          { label: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+          { label: 'Reviews', path: '/dashboard/reviews', icon: ClipboardCheck },
           { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
-          { label: 'Settings', path: '/dashboard/profile', icon: Settings },
+          { label: 'Profile', path: '/dashboard/profile', icon: User },
+          { label: 'Settings', path: '/dashboard/settings', icon: Settings },
           ...(isAdmin ? [{ label: 'Admin Governance', path: '/admin', icon: Shield }] : []),
         ];
 
@@ -209,10 +216,11 @@ export const DashboardLayout: React.FC = () => {
     if (p.includes('/dashboard/projects/')) return { parent: 'Projects', current: 'Project Overview' };
     if (p.includes('/dashboard/projects')) return { parent: 'Workspace', current: isCoInventor || isPatentExpert || isGuide ? 'My Projects' : 'My Inventions' };
     if (p.includes('/dashboard/tasks')) return { parent: 'Workspace', current: 'Tasks' };
-    if (p.includes('/dashboard/reviews')) return { parent: 'Workspace', current: 'Review Queue' };
+    if (p.includes('/dashboard/reviews')) return { parent: 'Workspace', current: isGuide || isPatentExpert ? 'Review Queue' : 'Project Reviews' };
     if (p.includes('/dashboard/notifications')) return { parent: 'Workspace', current: 'Notifications' };
     if (p.includes('/dashboard/create-project')) return { parent: 'Projects', current: 'Create Invention' };
-    if (p.includes('/dashboard/profile')) return { parent: 'Settings', current: 'Account Profile' };
+    if (p.includes('/dashboard/profile')) return { parent: 'Identity', current: 'Inventor Profile' };
+    if (p.includes('/dashboard/settings')) return { parent: 'Configuration', current: 'Account Settings' };
     return { parent: 'Workspace', current: 'Overview' };
   };
 
@@ -625,11 +633,19 @@ export const DashboardLayout: React.FC = () => {
                       className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-slate-50"
                     >
                       <User className="w-3.5 h-3.5 text-slate-400" />
-                      Profile & Settings
+                      Profile
+                    </Link>
+                    <Link
+                      to="/dashboard/settings"
+                      onClick={() => setShowUserDropdown(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-slate-50"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-slate-400" />
+                      Settings
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 text-left"
+                      className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 text-left cursor-pointer"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       Sign Out

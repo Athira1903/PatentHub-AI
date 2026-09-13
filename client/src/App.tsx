@@ -18,6 +18,7 @@ import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { ActivatePage } from './pages/ActivatePage';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { ReviewsPage } from './pages/ReviewsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { ProjectSelectionPage } from './pages/ProjectSelectionPage';
 
 export const App: React.FC = () => {
@@ -76,10 +77,12 @@ export const App: React.FC = () => {
             <Route index element={<DashboardPage />} />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="projects/:id" element={<ProjectDetailsPage />} />
+            <Route path="projects/:id/reviews" element={<ProjectDetailsPage />} />
             <Route path="create-project" element={<CreateProject />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="settings" element={<SettingsPage />} />
             <Route path="reviews" element={<ReviewsPage />} />
             <Route path="claims" element={<ProjectSelectionPage />} />
             <Route path="documents" element={<ProjectSelectionPage />} />
@@ -91,8 +94,13 @@ export const App: React.FC = () => {
 
           {/* Direct Shortcuts */}
           <Route path="/projects/:id" element={<ProjectDetailsPage />} />
+          <Route path="/projects/:id/reviews" element={<ProjectDetailsPage />} />
           <Route path="/create-project" element={<CreateProject />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/dashbord" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashbord/*" element={<Navigate to="/dashboard" replace />} />
 
