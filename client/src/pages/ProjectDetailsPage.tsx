@@ -1244,270 +1244,399 @@ export const ProjectDetailsPage: React.FC = () => {
 
           {/* T2: INNOVATION */}
           {(activeTab === 'Innovation Details' || activeTab === 'Innovation Workspace') && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200/50">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                      <span>Innovation Draft Spec Editor</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowTips(!showTips)}
-                        className="px-2 py-0.5 text-[8px] font-bold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-750 rounded transition-all cursor-pointer"
-                      >
-                        {showTips ? 'Hide Drafting Tips' : 'Show Drafting Tips'}
-                      </button>
-                    </h3>
-                    {editMode && (
-                      <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold">
-                        {isAutosaving ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />
-                            <span className="text-indigo-650">Autosaving specifications draft...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            <span className="text-emerald-600">Draft changes autosaved to database</span>
-                          </>
-                        )}
-                      </div>
+            <div className="space-y-6 max-w-5xl mx-auto animate-fade-in">
+              {/* 1. Header & Live Edit Control Bar */}
+              <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+                      Specification Editor
+                    </span>
+                    {editMode ? (
+                      <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Live Edit Enabled
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                        View Only Mode
+                      </span>
                     )}
                   </div>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Invention Specifications & Disclosure</h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Draft, refine, and structure the technical description, abstract, and inventive step for Form 2.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowTips(!showTips)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                      showTips ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {showTips ? '💡 Hide Drafting Tips' : '💡 Show Drafting Tips'}
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setEditMode(!editMode)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${editMode ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer border shadow-xs ${
+                      editMode
+                        ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white border-transparent'
+                    }`}
                   >
-                    {editMode ? 'Disable Autosave' : 'Enable Live Edit'}
+                    {editMode ? 'Exit Edit Mode' : 'Enable Live Edit'}
                   </button>
                 </div>
+              </div>
 
-                <form onSubmit={handleSaveDetails} className="space-y-4">
+              {/* 2. Top AI Innovation Optimizers Toolbar */}
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-md space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+                    <h4 className="text-sm font-black tracking-tight text-white">AI Innovation & Drafting Optimizers</h4>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    Automatically enhance specifications and claims copy with Google Gemini AI
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                  <button
+                    type="button"
+                    disabled={!!aiLoading}
+                    onClick={() => triggerAiInnovation('title')}
+                    className="p-3 bg-slate-800/80 hover:bg-indigo-600/30 border border-slate-700/80 hover:border-indigo-400/50 rounded-2xl text-left transition group disabled:opacity-50 cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black text-slate-200 group-hover:text-white">Optimize Title</span>
+                      {aiLoading === 'title' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 group-hover:text-slate-300 line-clamp-2">
+                      Formats technical title to adhere to statutory IPO guidelines.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!!aiLoading}
+                    onClick={() => triggerAiInnovation('abstract')}
+                    className="p-3 bg-slate-800/80 hover:bg-indigo-600/30 border border-slate-700/80 hover:border-indigo-400/50 rounded-2xl text-left transition group disabled:opacity-50 cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black text-slate-200 group-hover:text-white">Enhance Abstract</span>
+                      {aiLoading === 'abstract' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 group-hover:text-slate-300 line-clamp-2">
+                      Summarizes the technical solution within standard 150-word limits.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!!aiLoading}
+                    onClick={() => triggerAiInnovation('description')}
+                    className="p-3 bg-slate-800/80 hover:bg-indigo-600/30 border border-slate-700/80 hover:border-indigo-400/50 rounded-2xl text-left transition group disabled:opacity-50 cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black text-slate-200 group-hover:text-white">Improve Solution</span>
+                      {aiLoading === 'description' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 group-hover:text-slate-300 line-clamp-2">
+                      Deepens technical architecture and embodiment descriptions.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!!aiLoading}
+                    onClick={() => triggerAiInnovation('keywords')}
+                    className="p-3 bg-slate-800/80 hover:bg-indigo-600/30 border border-slate-700/80 hover:border-indigo-400/50 rounded-2xl text-left transition group disabled:opacity-50 cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black text-slate-200 group-hover:text-white">Suggest Keywords</span>
+                      {aiLoading === 'keywords' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 group-hover:text-slate-300 line-clamp-2">
+                      Generates statutory IPC classification tags and keywords.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Main Specifications Form Divided into Clean, Spacious Cards */}
+              <form onSubmit={handleSaveDetails} className="space-y-6">
+                {/* Card 1: Title & Classification */}
+                <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">1. Patent Title & Technology Classification</h4>
+                      <p className="text-xs text-slate-500 font-medium">Core metadata defining the invention scope</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Patent Title <span className="text-rose-500">*</span>
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {formData.title?.length || 0} characters
+                        </span>
+                      </div>
+                      {showTips && (
+                        <p className="text-xs text-indigo-900 font-medium mb-2 bg-indigo-50/70 p-3 rounded-xl border border-indigo-100">
+                          💡 <strong>Statutory Tip:</strong> Use a concise, technical description (under 15 words) of the system or method. Avoid proprietary product names or abbreviations.
+                        </p>
+                      )}
+                      <input
+                        type="text"
+                        disabled={!editMode}
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        placeholder="e.g. Smart Waste Segregation and Resource Recovery System Using Computer Vision..."
+                        className="w-full px-4 py-3 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-2xl text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition shadow-2xs"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Technology Domain
+                        </label>
+                        <input
+                          type="text"
+                          disabled={!editMode}
+                          value={formData.technicalDomain}
+                          onChange={(e) => setFormData({ ...formData, technicalDomain: e.target.value })}
+                          placeholder="e.g. Artificial Intelligence / Robotics"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Patent Category / Type
+                        </label>
+                        <input
+                          type="text"
+                          disabled={!editMode}
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                          placeholder="e.g. Utility Patent / System"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 transition"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Statutory Keywords & Classification Tags (Comma separated)
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!editMode}
+                        value={formData.keywords}
+                        onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                        placeholder="e.g. computer vision, optical sensors, robotic sorter, waste classification"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 2: Innovation Description / Abstract */}
+                <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">2. Innovation Description & Abstract (Form 2)</h4>
+                      <p className="text-xs text-slate-500 font-medium">Concise summary of the technical disclosure and functional operation</p>
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Patent Title</label>
                     {showTips && (
-                      <p className="text-[10px] text-indigo-650 font-bold mb-1 bg-indigo-50/40 p-2 rounded-lg border border-indigo-100/50">
-                        💡 Tip: Use a clear, technical description of the system or method. Avoid proprietary or brand names.
+                      <p className="text-xs text-indigo-900 font-medium mb-2 bg-indigo-50/70 p-3 rounded-xl border border-indigo-100">
+                        💡 <strong>Statutory Tip:</strong> The abstract should summarize the technical problem, solution approach, and principal use of the invention in roughly 150 words.
                       </p>
                     )}
-                    <input
-                      type="text"
-                      disabled={!editMode}
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-600"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Technology Domain</label>
-                      <input
-                        type="text"
-                        disabled={!editMode}
-                        value={formData.technicalDomain}
-                        onChange={(e) => setFormData({ ...formData, technicalDomain: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Category</label>
-                      <input
-                        type="text"
-                        disabled={!editMode}
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Innovation Description / Abstract</label>
                     <textarea
-                      rows={4}
+                      rows={5}
                       disabled={!editMode}
                       value={formData.innovationIdea}
                       onChange={(e) => setFormData({ ...formData, innovationIdea: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                      placeholder="Describe the overall technical system, working method, sensor architecture, and operational flow..."
+                      className="w-full px-4 py-3 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-2xl text-xs font-medium text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition"
                     />
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Card 3: Problem Statement & Proposed Technical Solution */}
+                <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Problem Statement</label>
+                      <h4 className="text-sm font-black text-slate-900">3. Problem Statement & Technical Solution</h4>
+                      <p className="text-xs text-slate-500 font-medium">Clear definition of current technological bottlenecks and how your invention resolves them</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Technical Problem Statement
+                      </label>
                       <textarea
-                        rows={3}
+                        rows={5}
                         disabled={!editMode}
                         value={formData.problemStatement}
                         onChange={(e) => setFormData({ ...formData, problemStatement: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                        placeholder="State the technological limitations, inefficiencies, high error rates, or manual bottlenecks in existing systems..."
+                        className="w-full px-4 py-3 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-2xl text-xs font-medium text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600 transition"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Proposed Technical Solution</label>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Proposed Technical Solution
+                      </label>
                       <textarea
-                        rows={3}
+                        rows={5}
                         disabled={!editMode}
                         value={formData.proposedSolution}
                         onChange={(e) => setFormData({ ...formData, proposedSolution: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                        placeholder="Detail the novel hardware integration, algorithmic decision framework, sensory feedback, or operational apparatus..."
+                        className="w-full px-4 py-3 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-2xl text-xs font-medium text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600 transition"
                       />
                     </div>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Card 4: Prior Art Gaps & Distinctive Novel Features */}
+                <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Existing Solutions Mapped</label>
+                      <h4 className="text-sm font-black text-slate-900">4. State-of-the-Art Analysis & Inventive Step</h4>
+                      <p className="text-xs text-slate-500 font-medium">Distinction from prior art citations and legal non-obviousness justification</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Existing Solutions Mapped
+                      </label>
                       <textarea
-                        rows={3}
+                        rows={4}
                         disabled={!editMode}
                         value={formData.existingSolutions}
                         onChange={(e) => setFormData({ ...formData, existingSolutions: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                        placeholder="Describe conventional commercial machines, existing patent citations, or academic baseline methods..."
+                        className="w-full px-4 py-3 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-2xl text-xs font-medium text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600 transition"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Existing Drawbacks & Infringements</label>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Existing Drawbacks & Infringement Gaps
+                      </label>
                       <textarea
-                        rows={3}
+                        rows={4}
                         disabled={!editMode}
                         value={formData.drawbacks}
                         onChange={(e) => setFormData({ ...formData, drawbacks: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                        placeholder="List specific drawbacks of prior art (e.g. latency, false positive rate, expensive calibration)..."
+                        className="w-full px-4 py-3 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-2xl text-xs font-medium text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600 transition"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Objectives</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Invention Objectives
+                      </label>
                       <textarea
-                        rows={2}
+                        rows={4}
                         disabled={!editMode}
                         value={formData.objectives}
                         onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                        placeholder="Primary and secondary technical goals accomplished by the proposed invention..."
+                        className="w-full px-4 py-3 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-2xl text-xs font-medium text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600 transition"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Novel Features Mapped</label>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Novel Features & Inventive Step (Non-Obviousness)
+                      </label>
                       <textarea
-                        rows={2}
+                        rows={4}
                         disabled={!editMode}
                         value={formData.novelFeatures}
                         onChange={(e) => setFormData({ ...formData, novelFeatures: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
+                        placeholder="State the core inventive features that cannot be deduced by a person skilled in the art..."
+                        className="w-full px-4 py-3 bg-white border border-slate-250 disabled:bg-slate-50/80 disabled:text-slate-700 rounded-2xl text-xs font-medium text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600 transition"
                       />
                     </div>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Keywords (Comma separated)</label>
-                    <input
-                      type="text"
-                      disabled={!editMode}
-                      value={formData.keywords}
-                      onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-250 disabled:opacity-75 rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
+                {/* Bottom Action Footer */}
+                {editMode && (
+                  <div className="p-4 bg-slate-900 text-white rounded-2xl flex items-center justify-between gap-4 shadow-lg sticky bottom-4 z-20 animate-fade-in">
+                    <div className="flex items-center gap-2 text-xs">
+                      {isAutosaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                          <span className="text-slate-300 font-medium">Autosaving specifications draft...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span className="text-slate-300 font-medium">All edits synced & ready to save</span>
+                        </>
+                      )}
+                    </div>
 
-                  {editMode && (
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
-                      >
-                        Save Specifications Now
-                      </button>
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => setEditMode(false)}
-                        className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
                       >
                         Finish Editing
                       </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-md transition cursor-pointer"
+                      >
+                        Save Specifications Now
+                      </button>
                     </div>
-                  )}
-                </form>
-              </div>
-
-              {/* AI Assistant recommendations column */}
-              <div className="lg:col-span-1 space-y-4">
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs">
-                  <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Sparkles className="w-4.5 h-4.5 text-indigo-600 animate-pulse" /> AI Innovation Optimizers
-                  </h4>
-                  <p className="text-[11px] text-slate-500 leading-normal font-semibold">
-                    Select a module to automatically review and enhance your patent specifications copy:
-                  </p>
-
-                  <div className="space-y-2 pt-2">
-                    <button
-                      type="button"
-                      disabled={!!aiLoading}
-                      onClick={() => triggerAiInnovation('title')}
-                      className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      {aiLoading === 'title' ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Optimize Title
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={!!aiLoading}
-                      onClick={() => triggerAiInnovation('abstract')}
-                      className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      {aiLoading === 'abstract' ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Generate Better Abstract
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={!!aiLoading}
-                      onClick={() => triggerAiInnovation('description')}
-                      className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      {aiLoading === 'description' ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Improve Specification
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={!!aiLoading}
-                      onClick={() => triggerAiInnovation('keywords')}
-                      className="w-full py-2.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-xs font-extrabold text-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      {aiLoading === 'keywords' ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Suggest Patent Keywords
-                        </>
-                      )}
-                    </button>
                   </div>
-                </div>
-              </div>
+                )}
+              </form>
             </div>
           )}
           {/* T3: PROTOTYPE MODULE */}
