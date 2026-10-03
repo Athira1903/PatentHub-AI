@@ -161,6 +161,17 @@ export const getProfile = async (req: AuthenticatedRequest, res: Response): Prom
             fullName: true,
             username: true,
             role: true,
+            accountType: true,
+            organizationId: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+                domain: true,
+                location: true,
+              },
+            },
           },
         },
       },

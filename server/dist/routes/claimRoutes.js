@@ -16,7 +16,7 @@ router.post('/docket-pdf', (0, policyGuard_1.projectGuard)((u, p) => claim_polic
 // Preliminary FTO Claim Charts Endpoints (Step 6)
 router.get('/charts', (0, policyGuard_1.projectGuard)((u, p) => claim_policy_1.ClaimPolicy.canRunFtoAnalysis(u, p)), claimController_1.getProjectClaimCharts);
 router.get('/charts/reference/:referenceId', (0, policyGuard_1.projectGuard)((u, p) => claim_policy_1.ClaimPolicy.canRunFtoAnalysis(u, p)), claimController_1.getClaimChartByReference);
-router.delete('/charts/:chartId', (0, policyGuard_1.projectGuard)((u, p) => claim_policy_1.ClaimPolicy.canDeleteClaim(u, p)), claimController_1.deleteClaimChart);
+router.delete('/charts/:chartId', (0, policyGuard_1.projectGuard)((u, p) => claim_policy_1.ClaimPolicy.canDeleteClaimChart(u, p)), claimController_1.deleteClaimChart);
 router.post('/:claimId/chart/:referenceId', (0, policyGuard_1.projectGuard)((u, p) => claim_policy_1.ClaimPolicy.canRunFtoAnalysis(u, p)), claimController_1.generateFtoClaimChart);
 // Claim Elements & Drawing Component Link Endpoints (Step 3)
 router.get('/:claimId/elements', (0, policyGuard_1.projectGuard)((u, p) => claim_policy_1.ClaimPolicy.canViewClaimElements(u, p)), claimController_1.getClaimElements);

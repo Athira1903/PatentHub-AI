@@ -5,6 +5,7 @@ import { CoInventorDashboard } from '../components/dashboard/CoInventorDashboard
 import { PatentExpertDashboard } from '../components/dashboard/PatentExpertDashboard';
 import { GuideDashboard } from '../components/dashboard/GuideDashboard';
 import { InventorDashboard } from '../components/dashboard/InventorDashboard';
+import { OrganizationAdminDashboardPage } from './admin/OrganizationAdminDashboardPage';
 
 interface Project {
   id: string;
@@ -50,9 +51,14 @@ export const DashboardPage: React.FC = () => {
 
   const user = currentUser || outletCtx.user;
   const userRole = user?.role || 'Inventor';
+  const isOrgAdminRole = userRole === 'OrganizationAdmin' || userRole === 'OrgAdmin';
   const isGuideRole = userRole === 'Guide' || userRole === 'GUIDE';
   const isPatentExpertRole = userRole === 'PatentExpert' || userRole === 'Patent Expert' || userRole === 'PATENT_EXPERT';
   const isCoInventorRole = userRole === 'CoInventor' || userRole === 'CO_INVENTOR' || userRole === 'Co-Inventor';
+
+  if (isOrgAdminRole) {
+    return <OrganizationAdminDashboardPage />;
+  }
 
   if (isGuideRole) {
     return <GuideDashboard user={user} projects={projects} onRefresh={fetchDashboardData} />;

@@ -12,12 +12,11 @@ class ClaimPolicy {
             return 'ADMIN';
         if (project.ownerId === user.userId)
             return 'OWNER';
+        if (user.role === 'OrganizationAdmin' && project.organizationId && user.organizationId === project.organizationId) {
+            return 'VIEWER';
+        }
         const member = project.members?.find((m) => m.userId === user.userId);
         if (!member) {
-            const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
-            const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
-            if (isGuide || isExpert)
-                return 'VIEWER';
             return null;
         }
         if (member.role === 'INVENTOR' || member.role === 'CO_INVENTOR') {
@@ -128,6 +127,12 @@ class ClaimPolicy {
      * Determine if the user can generate and view preliminary FTO claim charts.
      */
     static canRunFtoAnalysis(user, project) {
+        return ClaimPolicy.canViewClaims(user, project);
+    }
+    /**
+     * Determine if the user can delete preliminary FTO claim charts.
+     */
+    static canDeleteClaimChart(user, project) {
         return ClaimPolicy.canViewClaims(user, project);
     }
     /**

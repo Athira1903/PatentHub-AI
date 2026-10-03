@@ -677,13 +677,13 @@ class AnalyticsService {
      * Aggregates live Patent Intelligence Workspace data for the Patent Expert dashboard.
      */
     static async getPatentExpertDashboardData(userId) {
-        // 1. Fetch all projects assigned to this expert or relevant to their review queue
+        // 1. Fetch strictly projects assigned to this expert or owned by them
         const projects = await db_1.prisma.patentProject.findMany({
             where: {
+                isArchived: false,
                 OR: [
                     { ownerId: userId },
                     { members: { some: { userId } } },
-                    { stage: { in: ['PATENT_EXPERT_REVIEW', 'GUIDE_REVIEW', 'DOCUMENTATION', 'FORMS_PREPARATION'] } }
                 ]
             },
             include: {
@@ -708,6 +708,11 @@ class AnalyticsService {
                 claimCharts: true,
                 patentReferences: true,
                 documents: true,
+                deadlines: {
+                    where: { status: { not: 'COMPLETED' } },
+                    orderBy: { dueDate: 'asc' },
+                    take: 1
+                },
                 tasks: true,
                 _count: {
                     select: {
@@ -750,20 +755,25 @@ class AnalyticsService {
             const readiness = await filingReadinessService_1.FilingReadinessService.getFilingReadiness(proj.id);
             const readinessScore = Math.round((readiness.completedCount / readiness.totalRequiredCount) * 100);
             // Reviews
+            let hasPendingReview = false;
             for (const r of proj.projectReviews) {
                 if (r.decision === 'PENDING') {
-                    pendingReviewsCount++;
-                    dueThisWeekCount++;
+                    hasPendingReview = true;
                 }
-                else if (r.decision === 'APPROVED' || r.decision === 'REJECTED') {
-                    completedReviewsCount++;
+                else if (r.decision === 'APPROVED' || r.decision === 'REJECTED' || r.decision === 'CHANGES_REQUESTED') {
+                    if (r.reviewerId === userId) {
+                        completedReviewsCount++;
+                    }
                 }
             }
-            // FTO
+            if (hasPendingReview || proj.stage === 'PATENT_EXPERT_REVIEW') {
+                pendingReviewsCount++;
+            }
+            // FTO: projects that have claim charts or are in PATENT_EXPERT_REVIEW requiring FTO assessment
             if (proj._count.claimCharts > 0 || proj.stage === 'PATENT_EXPERT_REVIEW') {
                 ftoAnalysisCount++;
             }
-            // Claims
+            // Claims awaiting expert review
             if (proj._count.patentClaims > 0) {
                 claimReviewsCount += proj._count.patentClaims;
             }
@@ -793,23 +803,43 @@ class AnalyticsService {
                 updatedAt: proj.updatedAt,
             });
         }
+        // Deadlines due this week
+        if (projectIds.length > 0) {
+            dueThisWeekCount = await db_1.prisma.deadline.count({
+                where: {
+                    projectId: { in: projectIds },
+                    dueDate: { gte: now, lte: oneWeekFromNow },
+                    status: { not: 'COMPLETED' },
+                }
+            });
+        }
+        // Any reviews completed directly by this expert across projects
+        const totalExpertReviews = await db_1.prisma.projectReview.count({
+            where: {
+                reviewerId: userId,
+                decision: { in: ['APPROVED', 'REJECTED', 'CHANGES_REQUESTED'] }
+            }
+        });
+        completedReviewsCount = Math.max(completedReviewsCount, totalExpertReviews);
         const n = Math.max(1, projects.length);
         const avgPriorArtRisk = Math.round(totalPriorArtRisk / n);
         const avgPatentability = Math.round(totalPatentability / n);
         const avgClaimStrength = Math.round(totalClaimStrength / n);
         const avgFilingReadiness = Math.round(totalFilingReadiness / n);
-        // 2. Fetch Recent Activities across projects
-        const rawActivityLogs = await db_1.prisma.activityLog.findMany({
-            where: {
-                projectId: { in: projectIds }
-            },
-            include: {
-                user: { select: { id: true, fullName: true, username: true } },
-                project: { select: { id: true, title: true } }
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 8
-        });
+        // 2. Fetch Recent Activities across assigned projects
+        const rawActivityLogs = projectIds.length > 0
+            ? await db_1.prisma.activityLog.findMany({
+                where: {
+                    projectId: { in: projectIds }
+                },
+                include: {
+                    user: { select: { id: true, fullName: true, username: true } },
+                    project: { select: { id: true, title: true } }
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 8
+            })
+            : [];
         const recentActivities = rawActivityLogs.map(log => ({
             id: log.id,
             actor: log.user?.fullName || log.user?.username || 'Team Member',
@@ -821,7 +851,7 @@ class AnalyticsService {
         let claimsAwaitingReview = null;
         for (const proj of projects) {
             if (proj.patentClaims && proj.patentClaims.length > 0) {
-                const topClaim = proj.patentClaims[0];
+                const topClaim = proj.patentClaims.find((c) => c.status === 'UNDER_REVIEW' || c.status === 'DRAFT') || proj.patentClaims[0];
                 claimsAwaitingReview = {
                     id: topClaim.id,
                     projectId: proj.id,
@@ -832,7 +862,7 @@ class AnalyticsService {
                     status: topClaim.status,
                     elementsCount: topClaim.claimElements?.length || 0,
                     hasAntecedents: true,
-                    hasDependency: topClaim.dependsOnNumber === null,
+                    hasDependency: topClaim.dependsOnNumber !== null,
                     hasDrawingLinks: topClaim.claimElements?.some((e) => e.componentId !== null) || false,
                 };
                 break;
@@ -840,30 +870,48 @@ class AnalyticsService {
         }
         // 4. Priority Reviews Table Rows
         const priorityReviews = projects.slice(0, 6).map((proj, idx) => {
-            const reviewTypes = ['FTO Analysis', 'Claim Review', 'Patentability Review', 'Specification Review'];
-            const reviewType = proj.stage === 'PATENT_EXPERT_REVIEW' ? 'FTO Analysis' : reviewTypes[idx % reviewTypes.length];
-            const risk = (idx === 0 || proj._count.patentReferences > 3) ? 'HIGH' : idx % 2 === 0 ? 'MEDIUM' : 'LOW';
+            let reviewType = 'Invention Review';
+            if (proj.stage === 'PATENT_EXPERT_REVIEW') {
+                reviewType = 'FTO & Claims Clearance';
+            }
+            else if (proj.stage === 'GUIDE_REVIEW') {
+                reviewType = 'Academic Supervisor Review';
+            }
+            else if (proj._count.claimCharts > 0) {
+                reviewType = 'FTO Analysis';
+            }
+            else if (proj._count.patentClaims > 0) {
+                reviewType = 'Claim Review';
+            }
+            else if (proj.stage === 'DOCUMENTATION') {
+                reviewType = 'Specification Review';
+            }
+            const risk = (proj._count.patentReferences > 3) ? 'HIGH' : (proj._count.patentReferences > 1) ? 'MEDIUM' : 'LOW';
+            let formattedDueDate = 'Pending schedule';
+            if (proj.deadlines && proj.deadlines.length > 0) {
+                formattedDueDate = new Date(proj.deadlines[0].dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
             return {
                 id: `rev-${proj.id}`,
                 projectId: proj.id,
                 projectTitle: proj.title,
                 reviewType,
                 risk,
-                dueDate: idx === 0 ? 'Today' : idx === 1 ? 'Tomorrow' : `Aug ${20 + idx}`,
+                dueDate: formattedDueDate,
                 action: 'Review',
                 inventor: proj.owner?.fullName || proj.owner?.username || 'Lead Inventor',
                 stage: proj.stage,
             };
         });
         // 5. Featured High-Priority Review Banner
-        const featuredProject = projects[0] || null;
+        const featuredProject = projects.find(p => p.stage === 'PATENT_EXPERT_REVIEW') || projects[0] || null;
         const featuredReview = featuredProject ? {
             projectId: featuredProject.id,
             title: featuredProject.title,
-            riskType: 'FTO Claim Overlap',
-            riskLevel: 'HIGH',
-            description: `${Math.max(2, featuredProject._count.patentReferences)} elements require expert assessment based on prior art analysis.`,
-            link: `/dashboard/projects/${featuredProject.id}`,
+            riskType: featuredProject._count.claimCharts > 0 ? 'FTO Claim Overlap' : 'Patent Claims Review',
+            riskLevel: featuredProject._count.patentReferences > 3 ? 'HIGH' : featuredProject._count.patentReferences > 1 ? 'MEDIUM' : 'LOW',
+            description: `${featuredProject._count.patentClaims} claims and ${featuredProject._count.patentReferences} references awaiting expert assessment.`,
+            link: `/dashboard/projects/${featuredProject.id}?tab=Reviews`,
         } : null;
         // 6. Review Queue Grouping
         const reviewQueue = {
@@ -871,43 +919,45 @@ class AnalyticsService {
             claims: priorityReviews.filter(r => r.reviewType.includes('Claim')),
             fto: priorityReviews.filter(r => r.reviewType.includes('FTO')),
             documents: priorityReviews.filter(r => r.reviewType.includes('Specification') || r.reviewType.includes('Document')),
-            patentability: priorityReviews.filter(r => r.reviewType.includes('Patentability')),
+            patentability: priorityReviews.filter(r => r.reviewType.includes('Patentability') || r.reviewType.includes('Invention') || r.reviewType.includes('Academic')),
         };
         return {
             kpis: {
-                pendingReviews: pendingReviewsCount || (projects.length > 0 ? 8 : 0),
-                ftoAnalysis: ftoAnalysisCount || (projects.length > 0 ? 4 : 0),
-                claimReviews: claimReviewsCount || (projects.length > 0 ? 6 : 0),
-                dueThisWeek: dueThisWeekCount || (projects.length > 0 ? 3 : 0),
-                completedReviews: completedReviewsCount || (projects.length > 0 ? 24 : 0),
+                pendingReviews: pendingReviewsCount,
+                ftoAnalysis: ftoAnalysisCount,
+                claimReviews: claimReviewsCount,
+                dueThisWeek: dueThisWeekCount,
+                completedReviews: completedReviewsCount,
             },
             workload: {
-                claimsReviews: claimReviewsCount || (projects.length > 0 ? 8 : 0),
-                ftoAnalysis: ftoAnalysisCount || (projects.length > 0 ? 4 : 0),
-                documents: projects.reduce((acc, p) => acc + p._count.documents, 0) || (projects.length > 0 ? 3 : 0),
-                decisions: completedReviewsCount || (projects.length > 0 ? 2 : 0),
+                claimsReviews: claimReviewsCount,
+                ftoAnalysis: ftoAnalysisCount,
+                documents: projects.reduce((acc, p) => acc + p._count.documents, 0),
+                decisions: completedReviewsCount,
             },
             featuredReview,
             patentIntelligence: {
                 priorArtRisk: {
-                    score: avgPriorArtRisk,
-                    level: avgPriorArtRisk > 70 ? 'HIGH' : avgPriorArtRisk > 40 ? 'MEDIUM' : 'LOW',
-                    note: `${Math.max(1, projects[0]?._count.patentReferences || 3)} relevant references require expert review`,
+                    score: projects.length > 0 ? avgPriorArtRisk : 0,
+                    level: projects.length > 0 ? (avgPriorArtRisk > 70 ? 'HIGH' : avgPriorArtRisk > 40 ? 'MEDIUM' : 'LOW') : 'LOW',
+                    note: projects.length > 0
+                        ? `${projects[0]?._count?.patentReferences || 0} relevant references evaluated`
+                        : 'No active projects under review',
                 },
                 patentability: {
-                    score: avgPatentability,
-                    level: avgPatentability > 75 ? 'HIGH' : avgPatentability > 50 ? 'MEDIUM' : 'LOW',
-                    note: 'Invention shows strong novelty potential',
+                    score: projects.length > 0 ? avgPatentability : 0,
+                    level: projects.length > 0 ? (avgPatentability > 75 ? 'HIGH' : avgPatentability > 50 ? 'MEDIUM' : 'LOW') : 'LOW',
+                    note: projects.length > 0 ? 'Patentability metrics based on verified citations' : 'No active projects under review',
                 },
                 claimStrength: {
-                    score: avgClaimStrength,
-                    level: avgClaimStrength > 70 ? 'MEDIUM' : 'HIGH',
-                    note: 'Claims show good legal structure',
+                    score: projects.length > 0 ? avgClaimStrength : 0,
+                    level: projects.length > 0 ? (avgClaimStrength > 70 ? 'HIGH' : avgClaimStrength > 40 ? 'MEDIUM' : 'LOW') : 'LOW',
+                    note: projects.length > 0 ? 'Claims evaluation based on antecedent structure' : 'No active projects under review',
                 },
                 filingReadiness: {
-                    score: avgFilingReadiness,
-                    level: avgFilingReadiness > 70 ? 'HIGH' : avgFilingReadiness > 40 ? 'MEDIUM' : 'LOW',
-                    note: 'Ready for next stage evaluation',
+                    score: projects.length > 0 ? avgFilingReadiness : 0,
+                    level: projects.length > 0 ? (avgFilingReadiness > 70 ? 'HIGH' : avgFilingReadiness > 40 ? 'MEDIUM' : 'LOW') : 'LOW',
+                    note: projects.length > 0 ? 'Filing readiness based on 12-point statutory checklist' : 'No active projects under review',
                 },
             },
             claimsAwaitingReview,
@@ -921,13 +971,13 @@ class AnalyticsService {
      * Aggregates live Patent Development Platform data for the Guide dashboard.
      */
     static async getGuideDashboardData(userId) {
-        // 1. Fetch all projects supervised by this guide or assigned to them
+        // 1. Fetch strictly projects supervised by this guide (where user is owner or assigned member)
         const projects = await db_1.prisma.patentProject.findMany({
             where: {
+                isArchived: false,
                 OR: [
                     { ownerId: userId },
                     { members: { some: { userId } } },
-                    { stage: { in: ['GUIDE_REVIEW', 'PATENT_EXPERT_REVIEW', 'DOCUMENTATION', 'FORMS_PREPARATION', 'IDEA', 'LITERATURE_REVIEW'] } }
                 ]
             },
             include: {
@@ -950,7 +1000,14 @@ class AnalyticsService {
                 patentReferences: true,
                 documents: true,
                 drawingFigures: true,
-                tasks: true,
+                tasks: {
+                    include: {
+                        assignedTo: { select: { id: true, fullName: true, username: true } }
+                    }
+                },
+                deadlines: {
+                    orderBy: { dueDate: 'asc' }
+                },
                 _count: {
                     select: {
                         patentClaims: true,
@@ -1006,6 +1063,10 @@ class AnalyticsService {
                     completedReviewsCount++;
                 }
             }
+            // If project is currently at GUIDE_REVIEW stage, increment pending reviews count
+            if (proj.stage === 'GUIDE_REVIEW') {
+                pendingReviewsCount++;
+            }
             // Journey distribution
             const currentStageIdx = stageMap[proj.stage] !== undefined ? stageMap[proj.stage] : 2;
             if (currentStageIdx === 0)
@@ -1021,10 +1082,13 @@ class AnalyticsService {
             else
                 journeyCounts.filing++;
             // Health
-            if (readinessScore >= 70) {
+            const hasOverdueDeadline = proj.deadlines?.some((d) => d.status === 'OVERDUE');
+            const isReviewRequired = proj.stage === 'GUIDE_REVIEW' || proj.stage === 'CHANGES_REQUESTED';
+            const hasDraftClaims = proj.patentClaims?.some((c) => c.status === 'DRAFT');
+            if (readinessScore >= 70 && !hasOverdueDeadline && !isReviewRequired) {
                 healthyCount++;
             }
-            else if (readinessScore >= 50) {
+            else if (readinessScore >= 50 || isReviewRequired) {
                 attentionCount++;
                 needsAttentionCount++;
             }
@@ -1045,27 +1109,54 @@ class AnalyticsService {
                 }
                 myInventorsMap[oId].projectCount++;
             }
-            // Identify attention items
-            if (needsAttentionProjects.length < 4) {
-                let issueText = '3 claims require review';
+            // Health Audit matrix (concise DB-driven health status)
+            const healthAudit = {
+                research: proj._count.patentReferences >= 1 ? 'Complete' : 'Pending',
+                claims: proj._count.patentClaims >= 1 ? (hasDraftClaims ? 'Needs Review' : 'Complete') : 'Pending',
+                specification: proj._count.documents >= 1 ? 'Complete' : 'Incomplete',
+                drawings: (proj._count.drawingFigures >= 1 || proj.patentCategory === 'PROCESS') ? 'Complete' : 'Pending',
+                review: proj.stage === 'GUIDE_REVIEW' ? 'Action Required' : (proj.projectReviews.length > 0 ? 'Reviewed' : 'Pending'),
+                deadline: hasOverdueDeadline ? 'Overdue' : 'On Track',
+            };
+            // Identify attention items dynamically from DB state
+            if (isReviewRequired || hasOverdueDeadline || readinessScore < 70 || hasDraftClaims) {
+                let issueText = 'Invention disclosure submitted for Guide review';
                 let severity = 'HIGH';
-                if (idx === 1 || proj._count.documents === 0) {
-                    issueText = 'Form 2 specification incomplete';
+                if (hasOverdueDeadline) {
+                    issueText = 'Statutory patent deadline overdue';
+                    severity = 'HIGH';
+                }
+                else if (proj.stage === 'GUIDE_REVIEW') {
+                    issueText = 'Complete invention dossier awaiting Guide endorsement';
+                    severity = 'HIGH';
+                }
+                else if (proj.stage === 'CHANGES_REQUESTED') {
+                    issueText = 'Revisions requested; awaiting inventor resubmission';
                     severity = 'MEDIUM';
                 }
-                else if (idx === 2 || proj._count.patentClaims === 0) {
-                    issueText = '1 document pending review';
+                else if (hasDraftClaims) {
+                    const draftCount = proj.patentClaims.filter((c) => c.status === 'DRAFT').length;
+                    issueText = `${draftCount} claim(s) require review and antecedent check`;
+                    severity = 'MEDIUM';
+                }
+                else if (readinessScore < 50) {
+                    issueText = 'Mandatory filing forms (Form 1, 2, 3, 5) incomplete';
+                    severity = 'HIGH';
+                }
+                else if (proj._count.patentReferences === 0) {
+                    issueText = 'Prior-art research incomplete';
                     severity = 'MEDIUM';
                 }
                 needsAttentionProjects.push({
                     id: proj.id,
                     title: proj.title,
                     inventor: proj.owner?.fullName || proj.owner?.username || 'Lead Inventor',
-                    stage: proj.stage === 'GUIDE_REVIEW' ? 'Claims Review' : proj.stage.replace('_', ' '),
+                    stage: proj.stage === 'GUIDE_REVIEW' ? 'Guide Review' : proj.stage.replace(/_/g, ' '),
                     filingReadiness: readinessScore,
                     issueText,
                     severity,
-                    actionText: severity === 'HIGH' ? 'Review →' : 'Open Project →',
+                    actionText: severity === 'HIGH' ? 'Review →' : 'Open Workspace →',
+                    healthAudit,
                 });
             }
             detailedProjects.push({
@@ -1083,6 +1174,7 @@ class AnalyticsService {
                 referencesCount: proj._count.patentReferences,
                 documentsCount: proj._count.documents,
                 drawingsCount: proj._count.drawingFigures,
+                healthAudit,
                 updatedAt: proj.updatedAt,
             });
         }
@@ -1105,58 +1197,106 @@ class AnalyticsService {
             time: log.createdAt,
             projectTitle: log.project?.title || 'Patent Project',
         }));
-        // 3. Review Queue
-        const reviewQueueItems = [
-            {
-                id: 'q1',
-                type: 'CLAIM REVIEW',
-                title: `${projects[0]?.title || 'Smart Traffic Optimization'} – Claim #3`,
-                note: 'Inventor submitted an updated claim.',
-                badge: 'Today',
-                badgeColor: 'bg-blue-100 text-blue-800',
-                projectId: projects[0]?.id || '',
-                category: 'Claims'
-            },
-            {
-                id: 'q2',
-                type: 'DOCUMENT REVIEW',
-                title: `${projects[1]?.title || 'AI Agriculture System'} – Form 2 specification updated and needs review.`,
-                note: 'Form 2 specification complete.',
-                badge: 'Tomorrow',
-                badgeColor: 'bg-amber-100 text-amber-800',
-                projectId: projects[1]?.id || '',
-                category: 'Documents'
-            },
-            {
-                id: 'q3',
-                type: 'DRAWING REVIEW',
-                title: `${projects[2]?.title || 'Smart Healthcare Monitoring'} – Updated drawing requires expert review.`,
-                note: 'Drawing sheet 1 and annotations uploaded.',
-                badge: 'Aug 20',
-                badgeColor: 'bg-slate-100 text-slate-700',
-                projectId: projects[2]?.id || '',
-                category: 'Drawings'
+        // 3. Real Dynamic Review Queue from Supervised Projects
+        const reviewQueueItems = [];
+        for (const p of projects) {
+            // Real Claims Needing Review
+            for (const claim of (p.patentClaims || [])) {
+                if (claim.status === 'DRAFT' || p.stage === 'CLAIM_DRAFTING' || p.stage === 'GUIDE_REVIEW') {
+                    reviewQueueItems.push({
+                        id: `claim-${claim.id}`,
+                        type: 'CLAIM REVIEW',
+                        title: `${p.title} – Claim #${claim.claimNumber}`,
+                        note: `${claim.claimType} Claim (${claim.body ? claim.body.slice(0, 50) + '...' : 'Pending Review'})`,
+                        badge: 'Pending',
+                        badgeColor: 'bg-blue-100 text-blue-800',
+                        projectId: p.id,
+                        category: 'Claims'
+                    });
+                }
             }
-        ];
-        // 4. Open Guidance Items
-        const openGuidanceItems = [
-            {
-                id: 'g1',
-                type: 'INVENTOR QUESTION',
-                project: projects[0]?.title || 'Smart Traffic Optimization',
-                message: '"Need clarification on Claim #4 dependency."',
-                time: 'Today',
-                icon: 'question'
-            },
-            {
-                id: 'g2',
-                type: 'DOCUMENT ISSUE',
-                project: projects[1]?.title || 'AI Agriculture System',
-                message: 'Specification needs additional technical details.',
-                time: 'Yesterday',
-                icon: 'document'
+            // Real Documents Needing Review
+            for (const doc of (p.documents || [])) {
+                reviewQueueItems.push({
+                    id: `doc-${doc.id}`,
+                    type: 'DOCUMENT REVIEW',
+                    title: `${p.title} – ${doc.name}`,
+                    note: `Category: ${doc.category || 'SUPPORTING'} (Version ${doc.version})`,
+                    badge: 'Document',
+                    badgeColor: 'bg-amber-100 text-amber-800',
+                    projectId: p.id,
+                    category: 'Documents'
+                });
             }
-        ];
+            // Real Drawing Figures Needing Review
+            for (const fig of (p.drawingFigures || [])) {
+                reviewQueueItems.push({
+                    id: `fig-${fig.id}`,
+                    type: 'DRAWING REVIEW',
+                    title: `${p.title} – ${fig.figureNumber} (${fig.title})`,
+                    note: fig.description ? fig.description.slice(0, 50) + '...' : 'Drawing sheet & component annotations.',
+                    badge: fig.analysisStatus || 'Pending',
+                    badgeColor: 'bg-purple-100 text-purple-800',
+                    projectId: p.id,
+                    category: 'Drawings'
+                });
+            }
+            // Real Project-level Stage Review
+            if (p.stage === 'GUIDE_REVIEW' || p.stage === 'PATENT_EXPERT_REVIEW' || p.stage === 'REVIEW') {
+                reviewQueueItems.push({
+                    id: `proj-${p.id}`,
+                    type: 'PROJECT REVIEW',
+                    title: `${p.title}`,
+                    note: `Project stage: ${p.stage.replace(/_/g, ' ')} awaiting formal evaluation.`,
+                    badge: 'Urgent',
+                    badgeColor: 'bg-rose-100 text-rose-800',
+                    projectId: p.id,
+                    category: 'Projects'
+                });
+            }
+        }
+        // 4. Real Open Guidance Items (from actual project review states)
+        const openGuidanceItems = [];
+        for (const p of projects) {
+            if (p.stage === 'GUIDE_REVIEW' || p.stage === 'CHANGES_REQUESTED') {
+                openGuidanceItems.push({
+                    id: `g-${p.id}`,
+                    type: p.stage === 'GUIDE_REVIEW' ? 'GUIDE REVIEW REQUIRED' : 'CHANGES REQUESTED',
+                    project: p.title,
+                    message: p.stage === 'GUIDE_REVIEW'
+                        ? `Dossier submitted for review & rubric scoring.`
+                        : `Revisions pending inventor resubmission.`,
+                    time: new Date(p.updatedAt).toLocaleDateString(),
+                    icon: 'document'
+                });
+            }
+        }
+        // 5. Real Upcoming Deadlines for supervised projects
+        const upcomingDeadlines = await db_1.prisma.deadline.findMany({
+            where: {
+                projectId: { in: projectIds },
+                status: { in: ['PENDING', 'APPROACHING', 'OVERDUE'] },
+            },
+            include: {
+                project: { select: { id: true, title: true } },
+            },
+            orderBy: { dueDate: 'asc' },
+            take: 6,
+        });
+        // 6. Real Guide Notifications
+        const notifications = await db_1.prisma.notification.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            take: 6,
+        });
+        // 7. Dynamic Filing Readiness Overview
+        const filingReadinessOverview = detailedProjects.slice(0, 4).map(p => ({
+            id: p.id,
+            title: p.title,
+            readiness: p.filingReadiness,
+            stage: p.stage,
+            domain: p.domain,
+        }));
         const myInventors = Object.values(myInventorsMap);
         return {
             kpis: {
@@ -1185,9 +1325,26 @@ class AnalyticsService {
                 prototype: journeyCounts.prototype,
                 filing: journeyCounts.filing,
             },
-            filingReadinessOverview: detailedProjects.slice(0, 4),
+            filingReadinessOverview,
             recentActivities,
-            openGuidanceItems: [],
+            upcomingDeadlines: upcomingDeadlines.map(d => ({
+                id: d.id,
+                projectId: d.projectId,
+                projectTitle: d.project.title,
+                deadlineType: d.deadlineType,
+                dueDate: d.dueDate,
+                status: d.status,
+                description: d.description,
+            })),
+            notifications: notifications.map(n => ({
+                id: n.id,
+                title: n.title,
+                message: n.message,
+                type: n.type,
+                createdAt: n.createdAt,
+                referenceId: n.referenceId,
+            })),
+            openGuidanceItems,
             myInventors,
         };
     }

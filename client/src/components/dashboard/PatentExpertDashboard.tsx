@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
+import { NextActionCard } from '../project/NextActionCard';
 
 interface PatentExpertDashboardProps {
   user: any;
@@ -34,15 +35,30 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [primaryNextActionData, setPrimaryNextActionData] = useState<any>(null);
+  const [loadingNextAction, setLoadingNextAction] = useState<boolean>(false);
   const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
   const [priorityTab, setPriorityTab] = useState<'All' | 'Claims' | 'FTO' | 'Patentability' | 'Documents'>('All');
   const [queueTab, setQueueTab] = useState<'All' | 'Claims' | 'FTO' | 'Documents' | 'Patentability'>('All');
+
+  const loadPrimaryNextAction = async () => {
+    try {
+      setLoadingNextAction(true);
+      const res = await api.get('/projects/next-action/primary');
+      setPrimaryNextActionData(res.data);
+    } catch (e) {
+      console.error('Failed to load primary next action', e);
+    } finally {
+      setLoadingNextAction(false);
+    }
+  };
 
   const fetchExpertDashboard = async () => {
     setLoading(true);
     try {
       const res = await api.get('/projects/analytics/expert');
       setData(res.data);
+      loadPrimaryNextAction();
     } catch (err) {
       console.error('Failed to load Patent Expert dashboard', err);
       toast.error('Failed to fetch expert workspace metrics');
@@ -77,18 +93,18 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
   };
 
   const kpis = data?.kpis || {
-    pendingReviews: 8,
-    ftoAnalysis: 4,
-    claimReviews: 6,
-    dueThisWeek: 3,
-    completedReviews: 24
+    pendingReviews: 0,
+    ftoAnalysis: 0,
+    claimReviews: 0,
+    dueThisWeek: 0,
+    completedReviews: 0
   };
 
   const workload = data?.workload || {
-    claimsReviews: 8,
-    ftoAnalysis: 4,
-    documents: 3,
-    decisions: 2
+    claimsReviews: 0,
+    ftoAnalysis: 0,
+    documents: 0,
+    decisions: 0
   };
 
   const patentIntelligence = data?.patentIntelligence || {
@@ -134,13 +150,33 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
     { label: 'Filing', id: 5 }
   ];
 
+  if (loading && !data) {
+    return (
+      <div className="space-y-6 max-w-[1400px] mx-auto pb-16 animate-pulse font-sans">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs h-24"></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-28 bg-white rounded-2xl border border-slate-200/80 p-5 space-y-3">
+              <div className="w-8 h-8 bg-slate-200 rounded-xl"></div>
+              <div className="w-12 h-6 bg-slate-200 rounded"></div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/80 h-72"></div>
+          <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/80 h-72"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-16 animate-fade-in font-sans text-slate-800">
       {/* 1. TOP HEADER & FILTER TOOLBAR */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight flex items-center gap-2">
-            {getGreeting()}, {user?.fullName || 'Dr. Arun'} <span className="inline-block animate-wave">👋</span>
+            {getGreeting()}, {user?.fullName || user?.username || 'Patent Expert'} <span className="inline-block animate-wave">👋</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
             Here's your patent review workspace for today.
@@ -165,7 +201,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
             className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer focus:bg-white focus:outline-none"
           >
             {projectList.length === 0 ? (
-              <option value="0">All Projects</option>
+              <option value="0">All Projects (0)</option>
             ) : (
               projectList.map((p: any, idx: number) => (
                 <option key={p.id || idx} value={idx}>
@@ -181,6 +217,16 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
         </div>
       </div>
 
+      {projectList.length === 0 && (
+        <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl text-center space-y-2">
+          <FolderKanban className="w-10 h-10 text-slate-400 mx-auto" />
+          <h3 className="text-sm font-bold text-slate-800">No Projects Assigned for Review</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            When patent projects are assigned to you for legal, claims, or FTO review, they will automatically appear here.
+          </p>
+        </div>
+      )}
+
       {/* 2. TOP 5 KPI SUMMARY CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {/* Pending Reviews */}
@@ -190,7 +236,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
               <FileText className="w-4 h-4" />
             </div>
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {String(kpis.pendingReviews).padStart(2, '0')}
+              {kpis.pendingReviews}
             </span>
           </div>
           <div>
@@ -206,7 +252,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
               <Scale className="w-4 h-4" />
             </div>
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {String(kpis.ftoAnalysis).padStart(2, '0')}
+              {kpis.ftoAnalysis}
             </span>
           </div>
           <div>
@@ -222,7 +268,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
               <FileCheck className="w-4 h-4" />
             </div>
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {String(kpis.claimReviews).padStart(2, '0')}
+              {kpis.claimReviews}
             </span>
           </div>
           <div>
@@ -238,7 +284,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
               <Calendar className="w-4 h-4" />
             </div>
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {String(kpis.dueThisWeek).padStart(2, '0')}
+              {kpis.dueThisWeek}
             </span>
           </div>
           <div>
@@ -254,15 +300,28 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
               <CheckCircle2 className="w-4 h-4" />
             </div>
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {String(kpis.completedReviews).padStart(2, '0')}
+              {kpis.completedReviews}
             </span>
           </div>
           <div>
             <h4 className="text-xs font-extrabold text-slate-900">Completed</h4>
-            <p className="text-[11px] text-slate-500 font-medium leading-tight">Reviews completed this month</p>
+            <p className="text-[11px] text-slate-500 font-medium leading-tight">Reviews completed by you</p>
           </div>
         </div>
       </div>
+
+      {/* PRIMARY NEXT-ACTION HERO CARD */}
+      {primaryNextActionData?.nextAction && (
+        <NextActionCard
+          projectId={primaryNextActionData.project?.id}
+          projectTitle={primaryNextActionData.project?.title}
+          nextAction={primaryNextActionData.nextAction.primaryAction}
+          secondaryActions={primaryNextActionData.nextAction.secondaryActions}
+          progressPercentage={primaryNextActionData.nextAction.progressPercentage}
+          loading={loadingNextAction}
+          onRetry={loadPrimaryNextAction}
+        />
+      )}
 
       {/* 3. TODAY'S PATENT INTELLIGENCE & WORKLOAD + PATENT INTELLIGENCE GAUGES */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
@@ -284,40 +343,50 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black tracking-wider uppercase text-rose-800">Review Priority</span>
                 <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[9px] font-black uppercase">
-                  {featuredReview?.riskLevel || 'HIGH'}
+                  {featuredReview?.riskLevel || 'NORMAL'}
                 </span>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-xl bg-rose-100 text-rose-700 shrink-0 mt-0.5">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-extrabold text-slate-900">
-                    {featuredReview?.title || 'Smart Traffic System'}
-                  </h4>
-                  <p className="text-[10px] font-bold text-rose-700 mt-0.5">
-                    {featuredReview?.riskType || 'FTO Claim Overlap'}
-                  </p>
-                  <p className="text-[11px] text-slate-600 font-medium leading-relaxed mt-1">
-                    {featuredReview?.description || '3 elements require expert assessment based on prior art analysis.'}
-                  </p>
-                </div>
-              </div>
+              {featuredReview ? (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-rose-100 text-rose-700 shrink-0 mt-0.5">
+                      <AlertTriangle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-900">
+                        {featuredReview.title}
+                      </h4>
+                      <p className="text-[10px] font-bold text-rose-700 mt-0.5">
+                        {featuredReview.riskType}
+                      </p>
+                      <p className="text-[11px] text-slate-600 font-medium leading-relaxed mt-1">
+                        {featuredReview.description}
+                      </p>
+                    </div>
+                  </div>
 
-              <button
-                onClick={() => {
-                  if (featuredReview?.projectId) {
-                    navigate(`/dashboard/projects/${featuredReview.projectId}/reviews`);
-                  } else {
-                    navigate('/dashboard/reviews');
-                  }
-                }}
-                className="w-full py-2 bg-[#004d40] hover:bg-[#00382e] text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span>Review Analysis</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+                  <button
+                    onClick={() => {
+                      if (featuredReview.projectId) {
+                        navigate(`/dashboard/projects/${featuredReview.projectId}?tab=Reviews`);
+                      } else {
+                        navigate('/dashboard/reviews');
+                      }
+                    }}
+                    className="w-full py-2 bg-[#004d40] hover:bg-[#00382e] text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Review Analysis</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              ) : (
+                <div className="py-6 text-center space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                  <h4 className="text-xs font-extrabold text-slate-800">Priority Reviews Clear</h4>
+                  <p className="text-[11px] text-slate-500">No urgent FTO overlaps or reviews pending.</p>
+                </div>
+              )}
             </div>
 
             {/* Your Workload Box */}
@@ -334,9 +403,9 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
                   </div>
                   <div>
                     <div className="text-sm font-black text-slate-900 font-mono leading-none">
-                      {String(workload.claimsReviews).padStart(2, '0')}
+                      {workload.claimsReviews}
                     </div>
-                    <span className="text-[10px] font-medium text-slate-500">Claims Reviews</span>
+                    <span className="text-[10px] font-medium text-slate-500">Claims</span>
                   </div>
                 </div>
 
@@ -346,9 +415,9 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
                   </div>
                   <div>
                     <div className="text-sm font-black text-slate-900 font-mono leading-none">
-                      {String(workload.ftoAnalysis).padStart(2, '0')}
+                      {workload.ftoAnalysis}
                     </div>
-                    <span className="text-[10px] font-medium text-slate-500">FTO Analysis</span>
+                    <span className="text-[10px] font-medium text-slate-500">FTO Charts</span>
                   </div>
                 </div>
 
@@ -358,7 +427,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
                   </div>
                   <div>
                     <div className="text-sm font-black text-slate-900 font-mono leading-none">
-                      {String(workload.documents).padStart(2, '0')}
+                      {workload.documents}
                     </div>
                     <span className="text-[10px] font-medium text-slate-500">Documents</span>
                   </div>
@@ -370,7 +439,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
                   </div>
                   <div>
                     <div className="text-sm font-black text-slate-900 font-mono leading-none">
-                      {String(workload.decisions).padStart(2, '0')}
+                      {workload.decisions}
                     </div>
                     <span className="text-[10px] font-medium text-slate-500">Decisions</span>
                   </div>
@@ -575,69 +644,80 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
         <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">Claims Awaiting Review</h3>
-            <button
-              onClick={() => {
-                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}/claims`);
-              }}
-              className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
-            >
-              View All →
-            </button>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/70 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-slate-900">
-                Claim #{claimsAwaitingReview?.claimNumber || 1} · {claimsAwaitingReview?.claimType || 'Independent'}
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-extrabold">
-                New
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-600 font-medium leading-relaxed italic line-clamp-3">
-              "{claimsAwaitingReview?.body ||
-                'A system for dynamically controlling traffic signals based on real-time vehicle density and sensor feedback metrics...'}"
-            </p>
-
-            <div className="pt-1 border-t border-slate-200/60">
-              <span className="text-[10px] font-black uppercase text-slate-400 block mb-1.5">AI Validation</span>
-              <div className="flex flex-wrap gap-2 text-[11px] font-bold text-emerald-700">
-                <span className="flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5 text-emerald-600" /> Antecedent Basis
-                </span>
-                <span className="flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5 text-emerald-600" /> Dependency
-                </span>
-                <span className="flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5 text-emerald-600" /> Drawing Links
-                </span>
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center gap-2">
-              <button
-                onClick={() => handleApproveClaim(claimsAwaitingReview?.id || '1')}
-                className="flex-1 py-1.5 bg-[#004d40] hover:bg-[#00382e] text-white rounded-xl text-xs font-bold transition shadow-3xs cursor-pointer text-center"
-              >
-                Approve
-              </button>
-              <button
-                onClick={() => handleRequestChanges(claimsAwaitingReview?.projectId || activeProject?.id)}
-                className="py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Request Changes
-              </button>
+            {claimsAwaitingReview?.projectId && (
               <button
                 onClick={() => {
-                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Claims%20Studio`);
+                  navigate(`/dashboard/projects/${claimsAwaitingReview.projectId}?tab=Claims%20Studio`);
                 }}
-                className="py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
               >
-                Open Claim
+                View All →
               </button>
-            </div>
+            )}
           </div>
+
+          {claimsAwaitingReview ? (
+            <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/70 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-900">
+                  Claim #{claimsAwaitingReview.claimNumber} · {claimsAwaitingReview.claimType}
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-extrabold">
+                  {claimsAwaitingReview.status || 'Active'}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-600 font-medium leading-relaxed italic line-clamp-3">
+                "{claimsAwaitingReview.body}"
+              </p>
+
+              <div className="pt-1 border-t border-slate-200/60">
+                <span className="text-[10px] font-black uppercase text-slate-400 block mb-1.5">Claim Structure Diagnostics</span>
+                <div className="flex flex-wrap gap-2 text-[11px] font-bold text-emerald-700">
+                  <span className="flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" /> Antecedent Basis
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" /> Hierarchy
+                  </span>
+                  {claimsAwaitingReview.hasDrawingLinks && (
+                    <span className="flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Drawing Links
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  onClick={() => handleApproveClaim(claimsAwaitingReview.id)}
+                  className="flex-1 py-1.5 bg-[#004d40] hover:bg-[#00382e] text-white rounded-xl text-xs font-bold transition shadow-3xs cursor-pointer text-center"
+                >
+                  Endorse Claim
+                </button>
+                <button
+                  onClick={() => handleRequestChanges(claimsAwaitingReview.projectId)}
+                  className="py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Request Changes
+                </button>
+                <button
+                  onClick={() => {
+                    navigate(`/dashboard/projects/${claimsAwaitingReview.projectId}?tab=Claims%20Studio`);
+                  }}
+                  className="py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Open Studio
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 rounded-2xl bg-slate-50/80 border border-slate-200/70 text-center space-y-2">
+              <FileCheck className="w-8 h-8 text-slate-300 mx-auto" />
+              <h4 className="text-xs font-extrabold text-slate-700">No Claims Awaiting Review</h4>
+              <p className="text-[11px] text-slate-500">All submitted claims have been reviewed or are in drafting.</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -652,78 +732,90 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
             </Link>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                  <FolderKanban className="w-4 h-4" />
+          {activeProject ? (
+            <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                    <FolderKanban className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900 uppercase truncate max-w-[170px]">
+                      {activeProject.title}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-semibold">{activeProject.domain}</p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase">
+                  {activeProject.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                <div>
+                  <span className="text-slate-400 font-medium block">Lead Inventor</span>
+                  <span className="font-bold text-slate-900 truncate block">
+                    {activeProject.owner?.fullName || activeProject.owner?.username || 'Lead Inventor'}
+                  </span>
                 </div>
                 <div>
-                  <h4 className="text-xs font-extrabold text-slate-900 uppercase">
-                    {activeProject?.title || 'SMART TRAFFIC SYSTEM'}
-                  </h4>
-                  <p className="text-[10px] text-slate-400 font-semibold">{activeProject?.domain || 'AI / Transportation'}</p>
+                  <span className="text-slate-400 font-medium block">Current Stage</span>
+                  <span className="font-bold text-slate-900">
+                    {activeProject.stage?.replace(/_/g, ' ')}
+                  </span>
                 </div>
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase">
-                {activeProject?.status || 'ACTIVE'}
-              </span>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
-              <div>
-                <span className="text-slate-400 font-medium block">Inventor</span>
-                <span className="font-bold text-slate-900">{activeProject?.owner?.fullName || 'Athira Biju'}</span>
+              <div className="space-y-1">
+                <div className="flex justify-between text-[11px] font-extrabold">
+                  <span className="text-slate-600">Filing Readiness</span>
+                  <span className="text-emerald-700">{activeProject.filingReadiness || 0}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                    style={{ width: `${activeProject.filingReadiness || 0}%` }}
+                  />
+                </div>
               </div>
-              <div>
-                <span className="text-slate-400 font-medium block">Current Stage</span>
-                <span className="font-bold text-slate-900">{activeProject?.stage?.replace('_', ' ') || 'Claims Review'}</span>
-              </div>
-            </div>
 
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-extrabold">
-                <span className="text-slate-600">Filing Readiness</span>
-                <span className="text-emerald-700">{activeProject?.filingReadiness || 68}%</span>
+              <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-[10px] font-semibold text-slate-400">
+                <span>Your Role: <strong className="text-slate-700">Patent Expert</strong></span>
+                <span>Claims: {activeProject.claimsCount || 0}</span>
               </div>
-              <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                  style={{ width: `${activeProject?.filingReadiness || 68}%` }}
-                />
+
+              {/* Stage Progress Stepper */}
+              <div className="pt-1 flex items-center justify-between text-[9px] font-extrabold text-slate-400">
+                {stages.map((st, i) => {
+                  const currentIdx = activeProject.currentStageIndex !== undefined ? activeProject.currentStageIndex : 3;
+                  const isPastOrCurrent = i <= currentIdx;
+                  const isCurrent = i === currentIdx;
+                  return (
+                    <React.Fragment key={st.label}>
+                      <span
+                        className={`${
+                          isCurrent
+                            ? 'text-emerald-700 font-black'
+                            : isPastOrCurrent
+                            ? 'text-slate-800 font-bold'
+                            : 'text-slate-300'
+                        }`}
+                      >
+                        {st.label}
+                      </span>
+                      {i < stages.length - 1 && <span className="text-slate-300">→</span>}
+                    </React.Fragment>
+                  );
+                })}
               </div>
             </div>
-
-            <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-[10px] font-semibold text-slate-400">
-              <span>Your Role: <strong className="text-slate-700">Patent Expert</strong></span>
-              <span>Last Activity: 2 hours ago</span>
+          ) : (
+            <div className="p-8 rounded-2xl bg-slate-50/70 border border-slate-200/80 text-center space-y-2">
+              <FolderKanban className="w-8 h-8 text-slate-300 mx-auto" />
+              <h4 className="text-xs font-extrabold text-slate-700">No Active Projects</h4>
+              <p className="text-[11px] text-slate-500">No patent projects are currently assigned to your review queue.</p>
             </div>
-
-            {/* Stage Progress Stepper */}
-            <div className="pt-1 flex items-center justify-between text-[9px] font-extrabold text-slate-400">
-              {stages.map((st, i) => {
-                const currentIdx = activeProject?.currentStageIndex !== undefined ? activeProject.currentStageIndex : 3;
-                const isPastOrCurrent = i <= currentIdx;
-                const isCurrent = i === currentIdx;
-                return (
-                  <React.Fragment key={st.label}>
-                    <span
-                      className={`${
-                        isCurrent
-                          ? 'text-emerald-700 font-black'
-                          : isPastOrCurrent
-                          ? 'text-slate-800 font-bold'
-                          : 'text-slate-300'
-                      }`}
-                    >
-                      {st.label}
-                    </span>
-                    {i < stages.length - 1 && <span className="text-slate-300">→</span>}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Middle: Review Queue (4 cols) */}
@@ -752,83 +844,38 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
           </div>
 
           <div className="space-y-3">
-            <div
-              onClick={() => {
-                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Claims%20Studio`);
-              }}
-              className="p-3 bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/70 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-purple-50 text-purple-700 shrink-0">
-                  <FileCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-extrabold text-slate-900">Claim Review</h4>
-                  <p className="text-[10px] text-slate-500 font-medium">Smart Traffic Optimization</p>
-                </div>
+            {(!data?.reviewQueue || (queueTab === 'All' ? data.reviewQueue.all : data.reviewQueue[queueTab.toLowerCase()])?.length === 0) ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                No items in this review queue.
               </div>
-              <div className="flex items-center gap-2 text-right">
-                <div>
-                  <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded block">
-                    Claim #3
-                  </span>
-                  <span className="text-[9px] text-slate-400">2h ago</span>
+            ) : (
+              (queueTab === 'All' ? data.reviewQueue.all : (data.reviewQueue[queueTab.toLowerCase()] || [])).map((item: any) => (
+                <div
+                  key={item.id}
+                  onClick={() => navigate(`/dashboard/projects/${item.projectId}?tab=Reviews`)}
+                  className="p-3 bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/70 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-purple-50 text-purple-700 shrink-0">
+                      <FileCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">{item.reviewType}</h4>
+                      <p className="text-[10px] text-slate-500 font-medium truncate max-w-[140px] sm:max-w-[180px]">{item.projectTitle}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-right">
+                    <div>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded block border ${getRiskBadge(item.risk)}`}>
+                        {item.risk}
+                      </span>
+                      <span className="text-[9px] text-slate-400">{item.dueDate}</span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
                 </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-            </div>
-
-            <div
-              onClick={() => {
-                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Reviews`);
-              }}
-              className="p-3 bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/70 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-50 text-amber-700 shrink-0">
-                  <Scale className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-extrabold text-slate-900">FTO Analysis</h4>
-                  <p className="text-[10px] text-slate-500 font-medium">AI Diagnostic Device</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-right">
-                <div>
-                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded block">
-                    FTO Report
-                  </span>
-                  <span className="text-[9px] text-slate-400">5h ago</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-            </div>
-
-            <div
-              onClick={() => {
-                if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Documents`);
-              }}
-              className="p-3 bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/70 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-700 shrink-0">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-extrabold text-slate-900">Document Review</h4>
-                  <p className="text-[10px] text-slate-500 font-medium">Solar Monitoring System</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-right">
-                <div>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded block">
-                    Specification
-                  </span>
-                  <span className="text-[9px] text-slate-400">Yesterday</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-            </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -869,7 +916,10 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
 
             <div className="grid grid-cols-2 gap-2.5">
               <button
-                onClick={() => navigate('/dashboard/reviews')}
+                onClick={() => {
+                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Reviews`);
+                  else navigate('/dashboard/reviews');
+                }}
                 className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200/80 rounded-2xl text-xs font-bold flex items-center gap-2 transition cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-emerald-700" />
@@ -878,7 +928,7 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
 
               <button
                 onClick={() => {
-                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Reviews`);
+                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=FTO%20Analysis`);
                   else navigate('/dashboard/projects');
                 }}
                 className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold flex items-center gap-2 transition cursor-pointer"
@@ -899,7 +949,10 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
               </button>
 
               <button
-                onClick={() => navigate('/dashboard/prior-art')}
+                onClick={() => {
+                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Prior%20Art%20Search`);
+                  else navigate('/dashboard/projects');
+                }}
                 className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold flex items-center gap-2 transition cursor-pointer"
               >
                 <Search className="w-4 h-4 text-blue-600" />
@@ -907,7 +960,10 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
               </button>
 
               <button
-                onClick={() => navigate('/dashboard/documents')}
+                onClick={() => {
+                  if (activeProject?.id) navigate(`/dashboard/projects/${activeProject.id}?tab=Documents`);
+                  else navigate('/dashboard/documents');
+                }}
                 className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold flex items-center gap-2 transition cursor-pointer"
               >
                 <FolderKanban className="w-4 h-4 text-indigo-600" />
@@ -931,3 +987,4 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
     </div>
   );
 };
+

@@ -74,6 +74,9 @@ import { DocumentPolicy } from '../policies/document/document.policy';
 import { ReviewPolicy } from '../policies/review/review.policy';
 import { ReportPolicy } from '../policies/report/report.policy';
 import { PatentFormPolicy } from '../policies/forms/patent-form.policy';
+import { SpecificationPolicy } from '../policies/specification/specification.policy';
+import { SpecificationController } from '../controllers/specificationController';
+import { requireEntitlement } from '../middleware/entitlementMiddleware';
 
 const router = Router();
 
@@ -127,7 +130,7 @@ router.get('/:id/reviews', projectGuard((u, p) => ReviewPolicy.canViewReviews(u,
 router.post('/:id/reviews', projectGuard((u, p) => ReviewPolicy.canReview(u, p)) as any, submitReview as any);
 router.get('/:id/filing-readiness', projectGuard((u, p) => ReportPolicy.canGenerateSummary(u, p)) as any, getFilingReadiness as any);
 router.post('/:id/readiness-report/pdf', projectGuard((u, p) => ReportPolicy.canGenerateReadinessReport(u, p)) as any, generateReadinessReportPdf as any);
-router.post('/:id/filing-package', projectGuard((u, p) => ReportPolicy.canGenerateFinalReport(u, p)) as any, exportFilingPackage as any);
+router.post('/:id/filing-package', projectGuard((u, p) => ReportPolicy.canGenerateFinalReport(u, p)) as any, requireEntitlement('EXPORT_FILING_PACKAGE') as any, exportFilingPackage as any);
 
 // Prototype & Technical Drawing Endpoints (Task 6)
 router.get('/:id/prototypes', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getPrototypes as any);
@@ -146,14 +149,71 @@ router.post('/:id/figures/:figureId/ai-vision', projectGuard((u, p) => DocumentP
 router.post('/:id/figures/:figureId/render-sheet', projectGuard((u, p) => DocumentPolicy.canUpload(u, p)) as any, generateFigureSheetPdf as any);
 
 // Simulated AI Innovation & Diagnostics endpoints
-router.post('/:id/ai/innovation', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, generateInnovationAi as any);
+router.post('/:id/ai/innovation', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, requireEntitlement('AI_INNOVATION_ANALYSIS') as any, generateInnovationAi as any);
 router.get('/:id/ai/similarity', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getSimilarityAnalysis as any);
 router.get('/:id/ai/novelty', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getNoveltyAssessment as any);
 router.post('/:id/ai/novelty', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getNoveltyAssessment as any);
-router.post('/:id/ai/drawing', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, generatePatentDrawing as any);
+router.post('/:id/ai/drawing', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, requireEntitlement('PATENT_DRAWING_GENERATION') as any, generatePatentDrawing as any);
 router.post('/:id/ai/assistant', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, chatProjectAssistant as any);
 
 // Claims Engineering Endpoints (Task 9)
 router.use('/:id/claims', claimRoutes);
 
+// Smart Next-Action & Indian Filing Readiness Engine
+import {
+  getNextAction,
+  getUserPrimaryNextAction,
+  getFilingAssessment,
+  getDeadlines,
+  recordFilingEvent,
+  suggestClassification,
+  getSpecification,
+  saveSpecification,
+  restoreSpecificationVersion,
+  exportSpecificationPdf,
+  getApplicants,
+  addApplicant,
+  deleteApplicant,
+  getInventors,
+  addInventor,
+  deleteInventor,
+  runInnovationAnalysis,
+  runClaimSuggestion,
+  searchIPC,
+} from '../controllers/patentEngineController';
+
+router.post('/classification/suggest', suggestClassification as any);
+router.get('/ipc/search', searchIPC as any);
+router.post('/ai/claim-suggestion', runClaimSuggestion as any);
+router.get('/next-action/primary', getUserPrimaryNextAction as any);
+
+router.get('/:id/next-action', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getNextAction as any);
+router.get('/:id/filing-assessment', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getFilingAssessment as any);
+router.get('/:id/deadlines', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getDeadlines as any);
+router.post('/:id/filing-events', projectGuard((u, p) => ProjectPolicy.canEditProject(u, p)) as any, recordFilingEvent as any);
+
+// Specification Studio & Versioning
+router.get('/:id/specification', projectGuard((u, p) => SpecificationPolicy.canView(u, p)) as any, SpecificationController.getSpecification as any);
+router.put('/:id/specification', projectGuard((u, p) => SpecificationPolicy.canEdit(u, p)) as any, SpecificationController.updateSpecification as any);
+router.post('/:id/specification/versions', projectGuard((u, p) => SpecificationPolicy.canCreateVersion(u, p)) as any, SpecificationController.createVersion as any);
+router.get('/:id/specification/versions', projectGuard((u, p) => SpecificationPolicy.canView(u, p)) as any, SpecificationController.getVersions as any);
+router.get('/:id/specification/versions/:versionId', projectGuard((u, p) => SpecificationPolicy.canView(u, p)) as any, SpecificationController.getVersionById as any);
+router.post('/:id/specification/versions/:versionId/restore', projectGuard((u, p) => SpecificationPolicy.canRestoreVersion(u, p)) as any, SpecificationController.restoreVersion as any);
+router.post('/:id/specification/restore/:versionId', projectGuard((u, p) => SpecificationPolicy.canRestoreVersion(u, p)) as any, SpecificationController.restoreVersion as any);
+router.get('/:id/specification/compare/:versionA/:versionB', projectGuard((u, p) => SpecificationPolicy.canView(u, p)) as any, SpecificationController.compareVersions as any);
+router.post('/:id/specification/sync-form2', projectGuard((u, p) => SpecificationPolicy.canSyncForm2(u, p)) as any, SpecificationController.syncWithForm2 as any);
+router.post('/:id/specification/pdf', projectGuard((u, p) => SpecificationPolicy.canView(u, p)) as any, SpecificationController.exportPdf as any);
+
+router.get('/:id/applicants', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getApplicants as any);
+router.post('/:id/applicants', projectGuard((u, p) => ProjectPolicy.canEditProject(u, p)) as any, addApplicant as any);
+router.delete('/:id/applicants/:applicantId', projectGuard((u, p) => ProjectPolicy.canEditProject(u, p)) as any, deleteApplicant as any);
+
+router.get('/:id/inventors', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getInventors as any);
+router.post('/:id/inventors', projectGuard((u, p) => ProjectPolicy.canEditProject(u, p)) as any, addInventor as any);
+router.delete('/:id/inventors/:inventorId', projectGuard((u, p) => ProjectPolicy.canEditProject(u, p)) as any, deleteInventor as any);
+
+router.post('/:id/ai/innovation-analysis', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, runInnovationAnalysis as any);
+router.post('/:id/ai/claim-suggestion', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, runClaimSuggestion as any);
+
 export default router;
+

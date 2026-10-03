@@ -28,7 +28,17 @@ import {
   Edit3,
   Save,
   RotateCcw,
-  Shield
+  Shield,
+  CreditCard,
+  FileCheck,
+  DollarSign,
+  Cpu,
+  Server,
+  Database,
+  Mail,
+  Cloud,
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -66,6 +76,39 @@ export const AdminDashboardPage: React.FC = () => {
     notifications: []
   });
   const [systemSettings, setSystemSettings] = useState<any>(null);
+
+  // ----------------------------------------------------
+  // GOVERNANCE, BILLING & ENTITLEMENT STATES
+  // ----------------------------------------------------
+  const [policiesList, setPoliciesList] = useState<any[]>([]);
+  const [subscriptionsData, setSubscriptionsData] = useState<{ subscriptions: any[]; trials: any[]; plans: any[] }>({
+    subscriptions: [],
+    trials: [],
+    plans: []
+  });
+  const [paymentsList, setPaymentsList] = useState<any[]>([]);
+  const [entitlementsList, setEntitlementsList] = useState<any[]>([]);
+  const [systemHealth, setSystemHealth] = useState<any>(null);
+
+  // Policy Modals & State
+  const [showCreatePolicyModal, setShowCreatePolicyModal] = useState(false);
+  const [showEditPolicyModal, setShowEditPolicyModal] = useState(false);
+  const [selectedPolicy, setSelectedPolicy] = useState<any | null>(null);
+  const [newPolicyData, setNewPolicyData] = useState({
+    name: '',
+    description: '',
+    organizationId: '',
+    rules: '{\n  "allowAiFeatures": true,\n  "allowDrawingGeneration": true,\n  "requireDualApproval": false\n}'
+  });
+  const [policySearchTerm, setPolicySearchTerm] = useState('');
+  const [policyOrgFilter, setPolicyOrgFilter] = useState('ALL');
+  const [policyStatusFilter, setPolicyStatusFilter] = useState('ALL');
+
+  // Subscriptions & Payments Filters
+  const [subStatusFilter, setSubStatusFilter] = useState('ALL');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
+  const [paymentSearchTerm, setPaymentSearchTerm] = useState('');
+  const [entitlementOrgFilter, setEntitlementOrgFilter] = useState('ALL');
 
   // ----------------------------------------------------
   // COMPLETE USER PROFILE DRAWER STATE
@@ -160,7 +203,12 @@ export const AdminDashboardPage: React.FC = () => {
         permsRes,
         activityRes,
         notifRes,
-        settingsRes
+        settingsRes,
+        policiesRes,
+        subscriptionsRes,
+        paymentsRes,
+        entitlementsRes,
+        healthRes
       ] = await Promise.allSettled([
         api.get('/admin/dashboard'),
         api.get('/admin/users'),
@@ -172,7 +220,12 @@ export const AdminDashboardPage: React.FC = () => {
         api.get('/admin/roles-permissions'),
         api.get('/admin/activity-logs?page=1&limit=25'),
         api.get('/admin/notifications?limit=50'),
-        api.get('/admin/settings')
+        api.get('/admin/settings'),
+        api.get('/admin/policies'),
+        api.get('/admin/subscriptions'),
+        api.get('/admin/payments'),
+        api.get('/admin/entitlements'),
+        api.get('/admin/health')
       ]);
 
       if (dashRes.status === 'fulfilled') setMetrics(dashRes.value.data);
@@ -191,6 +244,11 @@ export const AdminDashboardPage: React.FC = () => {
       if (activityRes.status === 'fulfilled') setActivityLogsData(activityRes.value.data);
       if (notifRes.status === 'fulfilled') setNotificationsData(notifRes.value.data);
       if (settingsRes.status === 'fulfilled') setSystemSettings(settingsRes.value.data.settings);
+      if (policiesRes.status === 'fulfilled') setPoliciesList(policiesRes.value.data.policies || []);
+      if (subscriptionsRes.status === 'fulfilled') setSubscriptionsData(subscriptionsRes.value.data);
+      if (paymentsRes.status === 'fulfilled') setPaymentsList(paymentsRes.value.data.payments || []);
+      if (entitlementsRes.status === 'fulfilled') setEntitlementsList(entitlementsRes.value.data.entitlements || []);
+      if (healthRes.status === 'fulfilled') setSystemHealth(healthRes.value.data);
     } catch (err) {
       console.error('Failed to load admin data', err);
       toast.error('Failed to connect to admin services');
@@ -331,6 +389,105 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const handleToggleOrgStatus = async (orgId: string, currentStatus: string) => {
+    try {
+      const nextStatus = currentStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+      await api.put(`/admin/organizations/${orgId}/status`, { status: nextStatus });
+      toast.success(`Organization status changed to ${nextStatus}`);
+      const updated = await api.get('/admin/organizations');
+      setOrganizationsList(updated.data.organizations || []);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to update organization status');
+    }
+  };
+
+  // ----------------------------------------------------
+  // POLICY GOVERNANCE ACTIONS
+  // ----------------------------------------------------
+  const handleTogglePolicyStatus = async (policyId: string, currentStatus: string) => {
+    try {
+      const nextStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      await api.put(`/admin/policies/${policyId}/status`, { status: nextStatus });
+      toast.success(`Policy status updated to ${nextStatus}`);
+      const updated = await api.get('/admin/policies');
+      setPoliciesList(updated.data.policies || []);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to update policy status');
+    }
+  };
+
+  const handleCreatePolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPolicyData.name.trim()) {
+      toast.error('Policy name is required');
+      return;
+    }
+    try {
+      let parsedRules = {};
+      try {
+        parsedRules = JSON.parse(newPolicyData.rules);
+      } catch (jsonErr) {
+        toast.error('Invalid JSON syntax in policy rules');
+        return;
+      }
+      await api.post('/admin/policies', {
+        name: newPolicyData.name,
+        description: newPolicyData.description,
+        rules: parsedRules,
+        organizationId: newPolicyData.organizationId || undefined
+      });
+      toast.success('Platform policy created successfully');
+      setShowCreatePolicyModal(false);
+      setNewPolicyData({
+        name: '',
+        description: '',
+        organizationId: '',
+        rules: '{\n  "allowAiFeatures": true,\n  "allowDrawingGeneration": true,\n  "requireDualApproval": false\n}'
+      });
+      const updated = await api.get('/admin/policies');
+      setPoliciesList(updated.data.policies || []);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to create policy');
+    }
+  };
+
+  const handleUpdatePolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPolicy) return;
+    try {
+      let parsedRules = {};
+      try {
+        parsedRules = typeof selectedPolicy.rules === 'string' ? JSON.parse(selectedPolicy.rules) : selectedPolicy.rules;
+      } catch (jsonErr) {
+        toast.error('Invalid JSON syntax in policy rules');
+        return;
+      }
+      await api.put(`/admin/policies/${selectedPolicy.id}`, {
+        name: selectedPolicy.name,
+        description: selectedPolicy.description,
+        rules: parsedRules
+      });
+      toast.success('Policy updated successfully');
+      setShowEditPolicyModal(false);
+      setSelectedPolicy(null);
+      const updated = await api.get('/admin/policies');
+      setPoliciesList(updated.data.policies || []);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to update policy');
+    }
+  };
+
+  const handleToggleNotification = async (notifId: string) => {
+    try {
+      await api.put(`/admin/notifications/${notifId}/toggle`);
+      const updated = await api.get('/admin/notifications?limit=50');
+      setNotificationsData(updated.data);
+      toast.success('Notification status toggled');
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to toggle notification');
+    }
+  };
+
   // ----------------------------------------------------
   // ROLES & PERMISSIONS ACTIONS
   // ----------------------------------------------------
@@ -457,28 +614,32 @@ export const AdminDashboardPage: React.FC = () => {
   // ----------------------------------------------------
   const navGroups = [
     {
-      group: 'MAIN',
+      group: 'PLATFORM ADMIN',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'users', label: 'Users', icon: Users, badge: usersList.length > 0 ? usersList.length : undefined },
         { id: 'organizations', label: 'Organizations', icon: Building2, badge: organizationsList.length > 0 ? organizationsList.length : undefined },
         { id: 'projects', label: 'Projects', icon: FolderKanban, badge: projectsList.length > 0 ? projectsList.length : undefined },
+        { id: 'reviews', label: 'Reviews', icon: Scale, badge: pendingReviewsCount > 0 ? pendingReviewsCount : undefined },
       ]
     },
     {
-      group: 'MANAGEMENT',
+      group: 'GOVERNANCE & BILLING',
       items: [
-        { id: 'verifications', label: 'Verification Requests', icon: UserCheck, badge: pendingVerifsCount > 0 ? pendingVerifsCount : undefined },
-        { id: 'roles', label: 'Roles & Permissions', icon: ShieldAlert },
-        { id: 'reviews', label: 'Reviews / Moderation', icon: Scale, badge: pendingReviewsCount > 0 ? pendingReviewsCount : undefined },
+        { id: 'policies', label: 'Policies', icon: Shield, badge: policiesList.length > 0 ? policiesList.length : undefined },
+        { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard, badge: subscriptionsData.subscriptions.length > 0 ? subscriptionsData.subscriptions.length : undefined },
+        { id: 'payments', label: 'Payments', icon: DollarSign, badge: paymentsList.length > 0 ? paymentsList.length : undefined },
+        { id: 'entitlements', label: 'Entitlements', icon: Sparkles, badge: entitlementsList.length > 0 ? entitlementsList.length : undefined },
+      ]
+    },
+    {
+      group: 'SECURITY & OPS',
+      items: [
         { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotifsCount > 0 ? unreadNotifsCount : undefined },
-      ]
-    },
-    {
-      group: 'SYSTEM',
-      items: [
-        { id: 'activity', label: 'Activity Log', icon: Activity },
-        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'activity', label: 'Audit Logs', icon: Activity },
+        { id: 'verifications', label: 'Verifications', icon: UserCheck, badge: pendingVerifsCount > 0 ? pendingVerifsCount : undefined },
+        { id: 'roles', label: 'Roles & RBAC', icon: ShieldAlert },
+        { id: 'settings', label: 'System Settings', icon: Settings },
       ]
     }
   ];
@@ -486,6 +647,35 @@ export const AdminDashboardPage: React.FC = () => {
   // ----------------------------------------------------
   // FILTERED DATA VIEWS
   // ----------------------------------------------------
+  const filteredPolicies = policiesList.filter((p) => {
+    const matchOrg = policyOrgFilter === 'ALL' || p.organizationId === policyOrgFilter;
+    const matchStatus = policyStatusFilter === 'ALL' || p.status === policyStatusFilter;
+    const matchSearch =
+      !policySearchTerm.trim() ||
+      p.name.toLowerCase().includes(policySearchTerm.toLowerCase()) ||
+      (p.description && p.description.toLowerCase().includes(policySearchTerm.toLowerCase()));
+    return matchOrg && matchStatus && matchSearch;
+  });
+
+  const filteredSubscriptions = subscriptionsData.subscriptions.filter((s) => {
+    if (subStatusFilter === 'ALL') return true;
+    return s.status.toUpperCase() === subStatusFilter.toUpperCase();
+  });
+
+  const filteredPayments = paymentsList.filter((p) => {
+    const matchStatus = paymentStatusFilter === 'ALL' || p.status.toUpperCase() === paymentStatusFilter.toUpperCase();
+    const matchSearch =
+      !paymentSearchTerm.trim() ||
+      (p.organizationName && p.organizationName.toLowerCase().includes(paymentSearchTerm.toLowerCase())) ||
+      (p.razorpayPaymentId && p.razorpayPaymentId.toLowerCase().includes(paymentSearchTerm.toLowerCase())) ||
+      p.id.toLowerCase().includes(paymentSearchTerm.toLowerCase());
+    return matchStatus && matchSearch;
+  });
+
+  const filteredEntitlements = entitlementsList.filter((e) => {
+    if (entitlementOrgFilter === 'ALL') return true;
+    return e.organizationId === entitlementOrgFilter;
+  });
   const filteredUsers = usersList.filter((u) => {
     const matchRole = userRoleFilter === 'ALL' || u.role.toLowerCase() === userRoleFilter.toLowerCase();
     const matchStatus =
@@ -763,8 +953,8 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 6 Real Database KPI Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {/* 12 Real Database Platform KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
                 {/* Total Users */}
                 <div
                   onClick={() => setActiveNav('users')}
@@ -792,7 +982,7 @@ export const AdminDashboardPage: React.FC = () => {
                   <p className="text-2xl font-black text-emerald-700 font-mono">
                     {metrics?.kpis?.activeUsers ?? usersList.filter((u) => u.isActive).length}
                   </p>
-                  <span className="text-[10px] text-emerald-700 font-bold block">Verified & active</span>
+                  <span className="text-[10px] text-emerald-700 font-bold block">Active & verified</span>
                 </div>
 
                 {/* Total Organizations */}
@@ -801,13 +991,28 @@ export const AdminDashboardPage: React.FC = () => {
                   className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Organizations</span>
+                    <span className="text-[11px] font-bold text-[#71807C]">Total Orgs</span>
                     <Building2 className="w-4 h-4 text-blue-600" />
                   </div>
                   <p className="text-2xl font-black text-[#253330] font-mono">
                     {metrics?.kpis?.totalOrganizations ?? organizationsList.length}
                   </p>
-                  <span className="text-[10px] text-[#6F8F88] font-bold block">Campuses / Institutes</span>
+                  <span className="text-[10px] text-[#6F8F88] font-bold block">All institutions</span>
+                </div>
+
+                {/* Active Organizations */}
+                <div
+                  onClick={() => setActiveNav('organizations')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Active Orgs</span>
+                    <Building2 className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <p className="text-2xl font-black text-emerald-700 font-mono">
+                    {metrics?.kpis?.activeOrganizations ?? organizationsList.filter((o) => o.status === 'ACTIVE').length}
+                  </p>
+                  <span className="text-[10px] text-emerald-700 font-bold block">Operating campuses</span>
                 </div>
 
                 {/* Total Projects */}
@@ -816,28 +1021,28 @@ export const AdminDashboardPage: React.FC = () => {
                   className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Projects</span>
+                    <span className="text-[11px] font-bold text-[#71807C]">Total Projects</span>
                     <FolderKanban className="w-4 h-4 text-purple-600" />
                   </div>
                   <p className="text-2xl font-black text-[#253330] font-mono">
                     {metrics?.kpis?.totalProjects ?? projectsList.length}
                   </p>
-                  <span className="text-[10px] text-[#6F8F88] font-bold block">Invention workspaces</span>
+                  <span className="text-[10px] text-[#6F8F88] font-bold block">Patent workspaces</span>
                 </div>
 
-                {/* Pending Verifications */}
+                {/* Active Projects */}
                 <div
-                  onClick={() => setActiveNav('verifications')}
+                  onClick={() => setActiveNav('projects')}
                   className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Verifications</span>
-                    <ShieldAlert className="w-4 h-4 text-amber-600" />
+                    <span className="text-[11px] font-bold text-[#71807C]">Active Projects</span>
+                    <FolderKanban className="w-4 h-4 text-emerald-600" />
                   </div>
-                  <p className="text-2xl font-black text-amber-700 font-mono">
-                    {metrics?.kpis?.pendingVerifications ?? pendingVerifsCount}
+                  <p className="text-2xl font-black text-emerald-700 font-mono">
+                    {metrics?.kpis?.activeProjects ?? projectsList.length}
                   </p>
-                  <span className="text-[10px] text-amber-700 font-bold block">Awaiting approval</span>
+                  <span className="text-[10px] text-emerald-700 font-bold block">In active pipeline</span>
                 </div>
 
                 {/* Pending Reviews */}
@@ -846,13 +1051,88 @@ export const AdminDashboardPage: React.FC = () => {
                   className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Reviews</span>
-                    <Scale className="w-4 h-4 text-indigo-600" />
+                    <span className="text-[11px] font-bold text-[#71807C]">Pending Reviews</span>
+                    <Scale className="w-4 h-4 text-amber-600" />
                   </div>
-                  <p className="text-2xl font-black text-indigo-700 font-mono">
+                  <p className="text-2xl font-black text-amber-700 font-mono">
                     {metrics?.kpis?.pendingReviews ?? pendingReviewsCount}
                   </p>
-                  <span className="text-[10px] text-indigo-700 font-bold block">Milestone reviews</span>
+                  <span className="text-[10px] text-amber-700 font-bold block">Awaiting decision</span>
+                </div>
+
+                {/* Completed Reviews */}
+                <div
+                  onClick={() => setActiveNav('reviews')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Completed Reviews</span>
+                    <FileCheck className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <p className="text-2xl font-black text-emerald-700 font-mono">
+                    {metrics?.kpis?.completedReviews ?? 0}
+                  </p>
+                  <span className="text-[10px] text-emerald-700 font-bold block">Approved / Finished</span>
+                </div>
+
+                {/* Filing Ready */}
+                <div
+                  onClick={() => setActiveNav('projects')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Filing Ready</span>
+                    <Shield className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <p className="text-2xl font-black text-indigo-700 font-mono">
+                    {metrics?.kpis?.filingReadyProjects ?? (stageDist.FILING_READY || 0)}
+                  </p>
+                  <span className="text-[10px] text-indigo-700 font-bold block">Statutory clearance</span>
+                </div>
+
+                {/* Active Subscriptions */}
+                <div
+                  onClick={() => setActiveNav('subscriptions')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Subscriptions</span>
+                    <CreditCard className="w-4 h-4 text-[#315C55]" />
+                  </div>
+                  <p className="text-2xl font-black text-[#315C55] font-mono">
+                    {metrics?.kpis?.activeSubscriptions ?? subscriptionsData.subscriptions.filter((s) => s.status.toUpperCase() === 'ACTIVE').length}
+                  </p>
+                  <span className="text-[10px] text-[#6F8F88] font-bold block">Active Pro plans</span>
+                </div>
+
+                {/* Trial Organizations */}
+                <div
+                  onClick={() => setActiveNav('subscriptions')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Trial Orgs</span>
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <p className="text-2xl font-black text-amber-700 font-mono">
+                    {metrics?.kpis?.trialOrganizations ?? subscriptionsData.trials.filter((t) => t.status.toUpperCase() === 'ACTIVE').length}
+                  </p>
+                  <span className="text-[10px] text-amber-700 font-bold block">14-day free trials</span>
+                </div>
+
+                {/* Verifications */}
+                <div
+                  onClick={() => setActiveNav('verifications')}
+                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#71807C]">Verifications</span>
+                    <ShieldAlert className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <p className="text-2xl font-black text-blue-700 font-mono">
+                    {metrics?.kpis?.pendingVerifications ?? pendingVerifsCount}
+                  </p>
+                  <span className="text-[10px] text-blue-700 font-bold block">Awaiting review</span>
                 </div>
               </div>
 
@@ -951,12 +1231,12 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Recent Activity */}
+              {/* Recent Platform Activity */}
               <div className="p-6 bg-white border border-[#E5EBE8] rounded-3xl shadow-3xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
-                      Recent Platform Audit Trail
+                      Recent Platform Activity
                     </h3>
                     <p className="text-[11px] text-[#71807C]">Live events logged across all workspaces</p>
                   </div>
@@ -964,29 +1244,37 @@ export const AdminDashboardPage: React.FC = () => {
                     onClick={() => setActiveNav('activity')}
                     className="text-xs font-bold text-[#315C55] hover:underline"
                   >
-                    View All Activity &gt;
+                    View All Audit Logs &gt;
                   </button>
                 </div>
 
                 {metrics?.recentActivities && metrics.recentActivities.length > 0 ? (
-                  <div className="space-y-2.5">
-                    {metrics.recentActivities.slice(0, 6).map((act: any) => (
-                      <div
-                        key={act.id}
-                        className="p-3 bg-[#F7F9F8] border border-[#E5EBE8] rounded-2xl flex items-center justify-between text-xs"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="w-2 h-2 rounded-full bg-[#315C55] shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-extrabold text-[#253330] truncate">{act.action}</p>
-                            <p className="text-[11px] text-[#71807C]">
-                              Actor: <strong className="text-[#5C6B67]">{act.user}</strong> • Target: {act.target}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-[11px] font-mono text-[#71807C] shrink-0">{act.time}</span>
-                      </div>
-                    ))}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-2.5 px-3">User</th>
+                          <th className="py-2.5 px-3">Organization</th>
+                          <th className="py-2.5 px-3">Action</th>
+                          <th className="py-2.5 px-3">Resource</th>
+                          <th className="py-2.5 px-3">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {metrics.recentActivities.slice(0, 6).map((act: any) => (
+                          <tr key={act.id} className="hover:bg-[#F7F9F8] transition">
+                            <td className="py-3 px-3 font-bold text-[#253330] flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-[#315C55] shrink-0" />
+                              <span>{act.user}</span>
+                            </td>
+                            <td className="py-3 px-3 text-[#5C6B67]">{act.organization || 'Independent'}</td>
+                            <td className="py-3 px-3 font-semibold text-[#253330]">{act.action}</td>
+                            <td className="py-3 px-3 text-[#71807C] truncate max-w-xs">{act.target}</td>
+                            <td className="py-3 px-3 font-mono text-[11px] text-[#71807C]">{act.date || act.time}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <div className="p-8 text-center bg-[#F7F9F8] rounded-2xl border border-dashed border-[#E5EBE8]">
@@ -994,6 +1282,153 @@ export const AdminDashboardPage: React.FC = () => {
                     <p className="text-xs font-bold text-[#71807C]">No activity logs recorded yet</p>
                   </div>
                 )}
+              </div>
+
+              {/* System Status Section */}
+              <div className="p-6 bg-white border border-[#E5EBE8] rounded-3xl shadow-3xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                      System Status
+                    </h3>
+                    <p className="text-[11px] text-[#71807C]">Live infrastructure health and microservice connectivity</p>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#71807C]">
+                    Updated: {systemHealth?.timestamp ? new Date(systemHealth.timestamp).toLocaleTimeString() : 'Live'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-1">
+                  {/* Backend */}
+                  <div className="p-3 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Server className="w-4 h-4 text-[#315C55]" />
+                      <div>
+                        <span className="text-[10px] font-bold text-[#71807C] block">Backend</span>
+                        <span className="text-xs font-black text-[#253330]">Express API</span>
+                      </div>
+                    </div>
+                    <span className="flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Online
+                    </span>
+                  </div>
+
+                  {/* Database */}
+                  <div className="p-3 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Database className="w-4 h-4 text-blue-600" />
+                      <div>
+                        <span className="text-[10px] font-bold text-[#71807C] block">PostgreSQL</span>
+                        <span className="text-xs font-black text-[#253330]">Primary DB</span>
+                      </div>
+                    </div>
+                    <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      systemHealth?.database === 'CONNECTED' || metrics?.systemStatus?.database === 'CONNECTED'
+                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                        : 'text-amber-700 bg-amber-50 border-amber-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        systemHealth?.database === 'CONNECTED' || metrics?.systemStatus?.database === 'CONNECTED'
+                          ? 'bg-emerald-500'
+                          : 'bg-amber-500'
+                      }`} />
+                      {systemHealth?.database === 'CONNECTED' || metrics?.systemStatus?.database === 'CONNECTED' ? 'Connected' : 'Status unavailable'}
+                    </span>
+                  </div>
+
+                  {/* AI Service */}
+                  <div className="p-3 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="w-4 h-4 text-purple-600" />
+                      <div>
+                        <span className="text-[10px] font-bold text-[#71807C] block">AI Service</span>
+                        <span className="text-xs font-black text-[#253330]">Gemini Pro</span>
+                      </div>
+                    </div>
+                    <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      systemHealth?.aiService === 'AVAILABLE' || metrics?.systemStatus?.aiService === 'AVAILABLE'
+                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                        : 'text-amber-700 bg-amber-50 border-amber-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        systemHealth?.aiService === 'AVAILABLE' || metrics?.systemStatus?.aiService === 'AVAILABLE'
+                          ? 'bg-emerald-500'
+                          : 'bg-amber-500'
+                      }`} />
+                      {systemHealth?.aiService === 'AVAILABLE' || metrics?.systemStatus?.aiService === 'AVAILABLE' ? 'Available' : 'Status unavailable'}
+                    </span>
+                  </div>
+
+                  {/* Cloud Storage */}
+                  <div className="p-3 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Cloud className="w-4 h-4 text-cyan-600" />
+                      <div>
+                        <span className="text-[10px] font-bold text-[#71807C] block">Storage</span>
+                        <span className="text-xs font-black text-[#253330]">Cloudinary</span>
+                      </div>
+                    </div>
+                    <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      systemHealth?.cloudStorage === 'AVAILABLE' || metrics?.systemStatus?.cloudStorage === 'AVAILABLE'
+                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                        : 'text-amber-700 bg-amber-50 border-amber-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        systemHealth?.cloudStorage === 'AVAILABLE' || metrics?.systemStatus?.cloudStorage === 'AVAILABLE'
+                          ? 'bg-emerald-500'
+                          : 'bg-amber-500'
+                      }`} />
+                      {systemHealth?.cloudStorage === 'AVAILABLE' || metrics?.systemStatus?.cloudStorage === 'AVAILABLE' ? 'Available' : 'Status unavailable'}
+                    </span>
+                  </div>
+
+                  {/* Payment */}
+                  <div className="p-3 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-indigo-600" />
+                      <div>
+                        <span className="text-[10px] font-bold text-[#71807C] block">Payment</span>
+                        <span className="text-xs font-black text-[#253330]">Razorpay</span>
+                      </div>
+                    </div>
+                    <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      systemHealth?.payment === 'AVAILABLE' || metrics?.systemStatus?.payment === 'AVAILABLE'
+                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                        : 'text-amber-700 bg-amber-50 border-amber-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        systemHealth?.payment === 'AVAILABLE' || metrics?.systemStatus?.payment === 'AVAILABLE'
+                          ? 'bg-emerald-500'
+                          : 'bg-amber-500'
+                      }`} />
+                      {systemHealth?.payment === 'AVAILABLE' || metrics?.systemStatus?.payment === 'AVAILABLE' ? 'Available' : 'Status unavailable'}
+                    </span>
+                  </div>
+
+                  {/* Email */}
+                  <div className="p-3 bg-[#F7F9F8] rounded-2xl border border-[#E5EBE8] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-rose-600" />
+                      <div>
+                        <span className="text-[10px] font-bold text-[#71807C] block">Email</span>
+                        <span className="text-xs font-black text-[#253330]">SMTP Mailer</span>
+                      </div>
+                    </div>
+                    <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      systemHealth?.email === 'AVAILABLE' || metrics?.systemStatus?.email === 'AVAILABLE'
+                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                        : 'text-amber-700 bg-amber-50 border-amber-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        systemHealth?.email === 'AVAILABLE' || metrics?.systemStatus?.email === 'AVAILABLE'
+                          ? 'bg-emerald-500'
+                          : 'bg-amber-500'
+                      }`} />
+                      {systemHealth?.email === 'AVAILABLE' || metrics?.systemStatus?.email === 'AVAILABLE' ? 'Available' : 'Status unavailable'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1086,7 +1521,7 @@ export const AdminDashboardPage: React.FC = () => {
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3.5 px-4 font-mono text-[11px] text-[#5C6B67]">{u.email}</td>
+                            <td className="py-3.5 px-4 text-xs font-medium text-slate-700">{u.email}</td>
                             <td className="py-3.5 px-4">
                               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
                                 {u.role}
@@ -1220,9 +1655,25 @@ export const AdminDashboardPage: React.FC = () => {
 
                       <div className="flex items-center justify-between text-[11px] text-[#71807C]">
                         <span className="truncate max-w-[180px]">Contact: {org.contactEmail}</span>
-                        <span className="text-xs font-bold text-[#315C55] group-hover:underline">
-                          Details →
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleOrgStatus(org.id, org.status);
+                            }}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                              org.status === 'ACTIVE'
+                                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            }`}
+                          >
+                            {org.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                          </button>
+                          <span className="text-xs font-bold text-[#315C55] group-hover:underline">
+                            Details →
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1562,7 +2013,7 @@ export const AdminDashboardPage: React.FC = () => {
                             </td>
                             <td className="py-3.5 px-4 text-[#5C6B67]">{app.organization}</td>
                             <td className="py-3.5 px-4 text-[#71807C]">{app.specialization}</td>
-                            <td className="py-3.5 px-4 font-mono text-[11px] text-[#5C6B67]">{app.email}</td>
+                            <td className="py-3.5 px-4 text-xs font-medium text-slate-700">{app.email}</td>
                             <td className="py-3.5 px-4">
                               <span
                                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
@@ -1666,11 +2117,12 @@ export const AdminDashboardPage: React.FC = () => {
                         <tr>
                           <th className="py-3 px-4 w-12 text-center">#</th>
                           <th className="py-3 px-4">Project Title</th>
+                          <th className="py-3 px-4">Organization</th>
                           <th className="py-3 px-4">Inventor</th>
                           <th className="py-3 px-4">Supervisor</th>
                           <th className="py-3 px-4">Review Type</th>
                           <th className="py-3 px-4">Decision</th>
-                          <th className="py-3 px-4">Date</th>
+                          <th className="py-3 px-4">Due Date</th>
                           <th className="py-3 px-4 text-right">Action</th>
                         </tr>
                       </thead>
@@ -1681,6 +2133,7 @@ export const AdminDashboardPage: React.FC = () => {
                               {index + 1}
                             </td>
                             <td className="py-3.5 px-4 font-bold text-[#253330]">{rev.projectTitle}</td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{rev.organization || 'Independent'}</td>
                             <td className="py-3.5 px-4 text-[#5C6B67]">{rev.inventor}</td>
                             <td className="py-3.5 px-4 text-[#315C55] font-bold">{rev.reviewer}</td>
                             <td className="py-3.5 px-4 text-[#71807C]">{rev.type}</td>
@@ -1719,6 +2172,573 @@ export const AdminDashboardPage: React.FC = () => {
                     <p className="text-xs text-[#71807C] mt-1">
                       No project reviews have been logged in the system yet.
                     </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* VIEW: POLICIES GOVERNANCE MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'policies' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                <div>
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">
+                    Platform Policies Governance
+                  </h1>
+                  <p className="text-xs text-[#71807C]">
+                    Configure organization-level access rules, AI invocation gates, and review mandates
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="relative w-48">
+                    <Search className="w-3.5 h-3.5 text-[#8A9B96] absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search policies..."
+                      value={policySearchTerm}
+                      onChange={(e) => setPolicySearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:outline-none"
+                    />
+                  </div>
+                  <select
+                    value={policyOrgFilter}
+                    onChange={(e) => setPolicyOrgFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                  >
+                    <option value="ALL">All Organizations</option>
+                    {organizationsList.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={policyStatusFilter}
+                    onChange={(e) => setPolicyStatusFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                  </select>
+                  <button
+                    onClick={() => setShowCreatePolicyModal(true)}
+                    className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-2xl text-xs font-bold transition shadow-3xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create Policy</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Policies Table */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                {filteredPolicies.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">Policy Name</th>
+                          <th className="py-3 px-4">Organization / Scope</th>
+                          <th className="py-3 px-4">Enforced Rules</th>
+                          <th className="py-3 px-4">Assignments</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Created Date</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {filteredPolicies.map((p, index) => {
+                          const rulesObj = typeof p.rules === 'string' ? JSON.parse(p.rules || '{}') : (p.rules || {});
+                          return (
+                            <tr key={p.id || index} className="hover:bg-[#F7F9F8] transition">
+                              <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                                {index + 1}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <span className="font-extrabold text-[#253330] block">{p.name}</span>
+                                {p.description && (
+                                  <span className="text-[10px] text-[#71807C] block truncate max-w-xs">{p.description}</span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F0F4F2] text-[#315C55]">
+                                  {p.organizationName || p.organization?.name || 'Global Platform'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.keys(rulesObj).length > 0 ? (
+                                    Object.entries(rulesObj).map(([key, val]) => (
+                                      <span
+                                        key={key}
+                                        className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold ${
+                                          val ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-50 text-slate-600 border border-slate-200'
+                                        }`}
+                                      >
+                                        {key}: {String(val)}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-[10px] text-[#8A9B96] italic">Default Policy</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-[#5C6B67] font-bold">
+                                {p.assignmentsCount ?? 0}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <button
+                                  onClick={() => handleTogglePolicyStatus(p.id, p.status)}
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase transition cursor-pointer ${
+                                    p.status === 'ACTIVE'
+                                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                  }`}
+                                  title="Click to toggle status"
+                                >
+                                  {p.status}
+                                </button>
+                              </td>
+                              <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                                {new Date(p.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-3.5 px-4 text-right">
+                                <button
+                                  onClick={() => {
+                                    setSelectedPolicy(p);
+                                    setShowEditPolicyModal(true);
+                                  }}
+                                  className="p-1.5 hover:bg-[#DDEBE6] text-[#315C55] rounded-lg transition cursor-pointer"
+                                  title="Edit Policy"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center">
+                    <Shield className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-[#253330]">No Policies Found</h4>
+                    <p className="text-xs text-[#71807C] mt-1">
+                      No governance policies match your search or filter criteria.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* VIEW: SUBSCRIPTION MANAGEMENT MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'subscriptions' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                <div>
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">
+                    Subscription & License Management
+                  </h1>
+                  <p className="text-xs text-[#71807C]">
+                    Monitor institutional subscription plans, trial lifecycle, and payment continuity
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={subStatusFilter}
+                    onChange={(e) => setSubStatusFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                  >
+                    <option value="ALL">All Subscriptions</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="TRIAL">Trial</option>
+                    <option value="CANCELLED">Cancelled</option>
+                    <option value="EXPIRED">Expired</option>
+                    <option value="FAILED">Payment Failed</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Available Plans Cards */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                  Available Platform Plans
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {subscriptionsData.plans.map((pl) => (
+                    <div key={pl.id} className="p-5 bg-white border border-[#E5EBE8] rounded-3xl shadow-3xs space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="px-2.5 py-0.5 bg-[#E5EBE8] text-[#315C55] rounded-full text-[10px] font-black uppercase">
+                            {pl.code}
+                          </span>
+                          <h4 className="text-base font-black text-[#253330] mt-1">{pl.name}</h4>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xl font-black text-[#315C55] font-mono">
+                            ₹{pl.amount.toLocaleString()}
+                          </span>
+                          <span className="text-[10px] text-[#71807C] block">/{pl.billingInterval || 'month'}</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-[#71807C]">{pl.description || 'Enterprise grade patent automation'}</p>
+                      <div className="pt-2 border-t border-[#E5EBE8] space-y-1">
+                        {pl.features && Object.keys(pl.features).length > 0 ? (
+                          Object.entries(pl.features).map(([fKey, fVal]) => (
+                            <div key={fKey} className="flex items-center gap-1.5 text-[11px] text-[#5C6B67]">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="capitalize">{fKey.replace(/([A-Z])/g, ' $1')}: {String(fVal)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-[11px] text-[#71807C]">Standard Plan Entitlements</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Active & Historical Subscriptions Table */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                  Organization Subscriptions ({filteredSubscriptions.length})
+                </h3>
+                <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                  {filteredSubscriptions.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                          <tr>
+                            <th className="py-3 px-4 w-12 text-center">#</th>
+                            <th className="py-3 px-4">Organization</th>
+                            <th className="py-3 px-4">Plan</th>
+                            <th className="py-3 px-4">Status</th>
+                            <th className="py-3 px-4">Period Start</th>
+                            <th className="py-3 px-4">Period End</th>
+                            <th className="py-3 px-4">Trial Status</th>
+                            <th className="py-3 px-4">Gateway Reference</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#E5EBE8]">
+                          {filteredSubscriptions.map((sub, index) => (
+                            <tr key={sub.id || index} className="hover:bg-[#F7F9F8] transition">
+                              <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                                {index + 1}
+                              </td>
+                              <td className="py-3.5 px-4 font-bold text-[#253330]">
+                                {sub.organizationName}
+                                <span className="text-[10px] text-[#71807C] block font-mono">{sub.domain}</span>
+                              </td>
+                              <td className="py-3.5 px-4 font-medium text-[#5C6B67]">
+                                <span className="font-bold text-[#253330]">{sub.planName}</span>
+                                <span className="text-[10px] text-[#71807C] block font-mono">₹{sub.amount} {sub.currency}</span>
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                    sub.status.toUpperCase() === 'ACTIVE'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : sub.status.toUpperCase() === 'TRIAL'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-rose-100 text-rose-800'
+                                  }`}
+                                >
+                                  {sub.status}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                                {new Date(sub.startDate).toLocaleDateString()}
+                              </td>
+                              <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                                {sub.endDate ? new Date(sub.endDate).toLocaleDateString() : 'Auto-renew'}
+                              </td>
+                              <td className="py-3.5 px-4 text-[11px] font-mono text-[#5C6B67]">
+                                {sub.trialStatus}
+                              </td>
+                              <td className="py-3.5 px-4 text-[11px] font-mono text-[#71807C] truncate max-w-xs">
+                                {sub.razorpaySubscriptionId || 'N/A'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-12 text-center">
+                      <CreditCard className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                      <h4 className="text-sm font-black text-[#253330]">No Subscriptions Found</h4>
+                      <p className="text-xs text-[#71807C] mt-1">No organization subscription records match query.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Trial Organizations Table */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#253330]">
+                  Trial Organizations ({subscriptionsData.trials.length})
+                </h3>
+                <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                  {subscriptionsData.trials.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                          <tr>
+                            <th className="py-3 px-4 w-12 text-center">#</th>
+                            <th className="py-3 px-4">Organization</th>
+                            <th className="py-3 px-4">Trial Status</th>
+                            <th className="py-3 px-4">Started At</th>
+                            <th className="py-3 px-4">Expires At</th>
+                            <th className="py-3 px-4">Consumption</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#E5EBE8]">
+                          {subscriptionsData.trials.map((tr, index) => (
+                            <tr key={tr.id || index} className="hover:bg-[#F7F9F8] transition">
+                              <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                                {index + 1}
+                              </td>
+                              <td className="py-3.5 px-4 font-bold text-[#253330]">{tr.organizationName}</td>
+                              <td className="py-3.5 px-4">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                    tr.status.toUpperCase() === 'ACTIVE'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  {tr.status}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                                {new Date(tr.startedAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                                {new Date(tr.expiresAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-3.5 px-4 text-[11px] text-[#5C6B67]">
+                                {tr.consumedAt ? `Consumed on ${new Date(tr.consumedAt).toLocaleDateString()}` : 'In progress'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center">
+                      <Sparkles className="w-8 h-8 text-[#8A9B96] mx-auto mb-2" />
+                      <p className="text-xs font-bold text-[#71807C]">No active trials currently registered.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* VIEW: PAYMENTS MANAGEMENT MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'payments' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                <div>
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">
+                    Payment Transactions Oversight
+                  </h1>
+                  <p className="text-xs text-[#71807C]">
+                    Real database payment transactions verified through Razorpay payment gateway
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="relative w-56">
+                    <Search className="w-3.5 h-3.5 text-[#8A9B96] absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search payment or Razorpay ID..."
+                      value={paymentSearchTerm}
+                      onChange={(e) => setPaymentSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:outline-none"
+                    />
+                  </div>
+                  <select
+                    value={paymentStatusFilter}
+                    onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                  >
+                    <option value="ALL">All Payment Statuses</option>
+                    <option value="SUCCESS">Success</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="FAILED">Failed</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Payments Table */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                {filteredPayments.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">Organization</th>
+                          <th className="py-3 px-4">Internal Payment ID</th>
+                          <th className="py-3 px-4">Razorpay Payment ID</th>
+                          <th className="py-3 px-4">Plan</th>
+                          <th className="py-3 px-4">Amount</th>
+                          <th className="py-3 px-4">Payment Status</th>
+                          <th className="py-3 px-4">Verification</th>
+                          <th className="py-3 px-4">Payment Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {filteredPayments.map((pay, index) => (
+                          <tr key={pay.id || index} className="hover:bg-[#F7F9F8] transition">
+                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                              {index + 1}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-[#253330]">{pay.organizationName}</td>
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-[#71807C] truncate max-w-[120px]">
+                              {pay.paymentId}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-[#315C55] font-bold">
+                              {pay.razorpayPaymentId}
+                            </td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{pay.planName}</td>
+                            <td className="py-3.5 px-4 font-mono font-black text-[#253330]">
+                              ₹{pay.amount.toLocaleString()} {pay.currency}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                  pay.status === 'SUCCESS'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : pay.status === 'PENDING'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {pay.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono text-[10px] rounded-md">
+                                {pay.verificationStatus}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                              {new Date(pay.paymentDate).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center">
+                    <DollarSign className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-[#253330]">No Payment Records Available</h4>
+                    <p className="text-xs text-[#71807C] mt-1">No payment transactions match the selected filters.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* VIEW: ENTITLEMENTS MANAGEMENT MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'entitlements' && (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
+                <div>
+                  <h1 className="text-xl font-black text-[#253330] tracking-tight">
+                    Organization Feature Entitlements
+                  </h1>
+                  <p className="text-xs text-[#71807C]">
+                    Inspect active feature gates, AI drawing generation grants, and statutory export capabilities
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={entitlementOrgFilter}
+                    onChange={(e) => setEntitlementOrgFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
+                  >
+                    <option value="ALL">All Organizations</option>
+                    {organizationsList.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Entitlements Table */}
+              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
+                {filteredEntitlements.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">Organization</th>
+                          <th className="py-3 px-4">Feature Name</th>
+                          <th className="py-3 px-4">Feature Code</th>
+                          <th className="py-3 px-4">Plan Association</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Valid From</th>
+                          <th className="py-3 px-4">Valid Until</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E5EBE8]">
+                        {filteredEntitlements.map((ent, index) => (
+                          <tr key={ent.id || index} className="hover:bg-[#F7F9F8] transition">
+                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
+                              {index + 1}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-[#253330]">{ent.organizationName}</td>
+                            <td className="py-3.5 px-4 font-semibold text-[#315C55]">{ent.featureName}</td>
+                            <td className="py-3.5 px-4 font-mono text-[10px] text-[#71807C]">{ent.featureCode}</td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{ent.planName}</td>
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                  ent.status === 'ACTIVE'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {ent.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                              {new Date(ent.validFrom).toLocaleDateString()}
+                            </td>
+                            <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
+                              {ent.validUntil ? new Date(ent.validUntil).toLocaleDateString() : 'Continuous (Subscription)'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center">
+                    <Sparkles className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-[#253330]">No Entitlements Found</h4>
+                    <p className="text-xs text-[#71807C] mt-1">No feature entitlements provisioned for this criteria.</p>
                   </div>
                 )}
               </div>
@@ -1800,13 +2820,16 @@ export const AdminDashboardPage: React.FC = () => {
                             </td>
                             <td className="py-3.5 px-4 text-[#71807C] truncate max-w-xs">{notif.message}</td>
                             <td className="py-3.5 px-4">
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                  notif.isRead ? 'bg-slate-100 text-slate-700' : 'bg-emerald-100 text-emerald-800'
+                              <button
+                                type="button"
+                                onClick={() => handleToggleNotification(notif.id)}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase transition cursor-pointer ${
+                                  notif.isRead ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                                 }`}
+                                title="Click to toggle read status"
                               >
                                 {notif.isRead ? 'Read' : 'Unread'}
-                              </span>
+                              </button>
                             </td>
                             <td className="py-3.5 px-4 text-[11px] text-[#71807C]">
                               {new Date(notif.createdAt).toLocaleDateString()}
@@ -3120,6 +4143,177 @@ export const AdminDashboardPage: React.FC = () => {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: CREATE POLICY */}
+      {/* ==================================================== */}
+      {showCreatePolicyModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-lg w-full space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE8]">
+              <div className="flex items-center gap-2 text-[#315C55]">
+                <Shield className="w-5 h-5" />
+                <h3 className="text-sm font-black text-[#253330]">Create Platform Governance Policy</h3>
+              </div>
+              <button
+                onClick={() => setShowCreatePolicyModal(false)}
+                className="p-1 hover:bg-[#F0F4F2] rounded-lg text-[#71807C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePolicy} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Policy Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Standard University IP Clearance Policy"
+                  value={newPolicyData.name}
+                  onChange={(e) => setNewPolicyData({ ...newPolicyData, name: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Description</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mandatory supervisor review and restricted AI drawing export"
+                  value={newPolicyData.description}
+                  onChange={(e) => setNewPolicyData({ ...newPolicyData, description: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Target Organization</label>
+                <select
+                  value={newPolicyData.organizationId}
+                  onChange={(e) => setNewPolicyData({ ...newPolicyData, organizationId: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67]"
+                >
+                  <option value="">Global / Platform Default</option>
+                  {organizationsList.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Enforced Rules (JSON Schema)</label>
+                <textarea
+                  rows={4}
+                  value={newPolicyData.rules}
+                  onChange={(e) => setNewPolicyData({ ...newPolicyData, rules: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-mono focus:bg-white focus:outline-none"
+                  required
+                />
+                <span className="text-[10px] text-[#71807C] block">
+                  Keys supported: allowAiFeatures, allowDrawingGeneration, requireDualApproval, allowExport
+                </span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#E5EBE8]">
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePolicyModal(false)}
+                  className="px-4 py-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] text-[#5C6B67] rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+                >
+                  Create Policy
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: EDIT POLICY */}
+      {/* ==================================================== */}
+      {showEditPolicyModal && selectedPolicy && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#E5EBE8] p-6 max-w-lg w-full space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE8]">
+              <div className="flex items-center gap-2 text-[#315C55]">
+                <Shield className="w-5 h-5" />
+                <h3 className="text-sm font-black text-[#253330]">Edit Policy: {selectedPolicy.name}</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditPolicyModal(false);
+                  setSelectedPolicy(null);
+                }}
+                className="p-1 hover:bg-[#F0F4F2] rounded-lg text-[#71807C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePolicy} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Policy Name</label>
+                <input
+                  type="text"
+                  value={selectedPolicy.name}
+                  onChange={(e) => setSelectedPolicy({ ...selectedPolicy, name: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Description</label>
+                <input
+                  type="text"
+                  value={selectedPolicy.description || ''}
+                  onChange={(e) => setSelectedPolicy({ ...selectedPolicy, description: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#5C6B67]">Enforced Rules (JSON Schema)</label>
+                <textarea
+                  rows={4}
+                  value={typeof selectedPolicy.rules === 'string' ? selectedPolicy.rules : JSON.stringify(selectedPolicy.rules, null, 2)}
+                  onChange={(e) => setSelectedPolicy({ ...selectedPolicy, rules: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-mono focus:bg-white focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#E5EBE8]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditPolicyModal(false);
+                    setSelectedPolicy(null);
+                  }}
+                  className="px-4 py-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] text-[#5C6B67] rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

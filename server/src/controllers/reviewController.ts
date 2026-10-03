@@ -14,6 +14,16 @@ export const submitReview = async (req: ProjectRequest, res: Response): Promise<
       return;
     }
 
+    if (!['APPROVED', 'REJECTED', 'CHANGES_REQUESTED'].includes(decision)) {
+      res.status(400).json({ message: `Invalid review decision: ${decision}. Must be APPROVED, REJECTED, or CHANGES_REQUESTED.` });
+      return;
+    }
+
+    if (!['GUIDE_REVIEW', 'EXPERT_REVIEW'].includes(reviewType)) {
+      res.status(400).json({ message: `Invalid reviewType: ${reviewType}. Must be GUIDE_REVIEW or EXPERT_REVIEW.` });
+      return;
+    }
+
     const review = await ReviewService.submitReviewDecision(projectId, req.user!, {
       reviewType,
       decision,

@@ -10,6 +10,7 @@ import {
   FolderCheck,
   BookOpen,
   Check,
+  ArrowRight,
   Download,
   Eye,
   Save,
@@ -18,7 +19,7 @@ import {
   FileCheck2,
   Sparkles,
 } from 'lucide-react';
-import { api } from '../../services/api';
+import { api, patentApi } from '../../services/api';
 import toast from 'react-hot-toast';
 
 interface FilingReadinessViewProps {
@@ -70,9 +71,27 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
     }
   };
 
+  const [assessment, setAssessment] = useState<any>(null);
+  const [_loadingAssessment, setLoadingAssessment] = useState(true);
+
+  const fetchAssessment = async () => {
+    try {
+      setLoadingAssessment(true);
+      const res = await patentApi.getFilingAssessment(projectId);
+      if (res.data?.assessment) {
+        setAssessment(res.data.assessment);
+      }
+    } catch (err) {
+      console.error('Failed to load filing assessment:', err);
+    } finally {
+      setLoadingAssessment(false);
+    }
+  };
+
   useEffect(() => {
     if (projectId) {
       fetchForms();
+      fetchAssessment();
     }
   }, [projectId]);
 
@@ -676,71 +695,158 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
         </div>
       </div>
 
-      {/* Top Split Section: Gauge & Checklist vs Remaining Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column (6 cols): Gauge + Verification Checklist */}
-        <div className="lg:col-span-6 space-y-6">
-          {/* Gauge Summary Banner */}
-          <div className="flex items-center gap-6">
-            <div className="relative w-28 h-28 shrink-0 flex items-center justify-center">
-              {/* Circular SVG Gauge */}
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-slate-100"
-                  strokeWidth="3"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-emerald-500"
-                  strokeDasharray={`${readinessScore}, 100`}
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-              <span className="absolute text-2xl font-black text-slate-900 font-sans">
-                {readinessScore}%
-              </span>
-            </div>
+      {/* Top Split Section: Gauge & Checklist vs Forms Engine */}
+      {(() => {
+        const readinessValue = assessment?.overallScore ?? assessment?.readinessPercentage ?? readinessScore;
+        const completedCountValue = assessment?.completedRequirements ?? assessment?.completedCount ?? 8;
+        const totalCountValue = assessment?.totalRequirements ?? 12;
+        const issuesList = assessment?.issues ?? assessment?.items ?? [];
+        const formsListApplicable = assessment?.applicableForms ?? assessment?.forms ?? [];
 
-            <div className="space-y-1">
-              <h2 className="text-lg font-extrabold text-slate-900">
-                {readinessScore >= 80 ? (
-                  <>Your project is <span className="text-emerald-600 font-extrabold">filing ready</span></>
-                ) : (
-                  <>Your project is <span className="text-amber-600 font-extrabold">in preparation</span></>
-                )}
-              </h2>
-              <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                {readinessScore >= 80
-                  ? 'All core statutory milestones are complete. You can export the consolidated filing bundle.'
-                  : 'Complete the remaining checklist milestones below to achieve full filing readiness.'}
-              </p>
-            </div>
-          </div>
-
-          {/* 6 Verification Sections */}
-          <div className="space-y-3 pt-2">
-            {checklistItems.map((item, idx) => (
-              <div
-                key={idx}
-                className="p-4 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-3xs"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className={`p-2 rounded-xl ${item.isComplete ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
-                    <p className="text-[11px] text-slate-400 font-medium">{item.subtitle}</p>
-                  </div>
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column (7 cols): Gauge + 12-Point Statutory Audit */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* Gauge Summary Banner */}
+              <div className="flex items-center gap-6 bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs">
+                <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-slate-100"
+                      strokeWidth="3.5"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="text-emerald-500"
+                      strokeDasharray={`${readinessValue}, 100`}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <span className="absolute text-xl font-black text-slate-900 font-sans">
+                    {readinessValue}%
+                  </span>
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base font-black text-slate-900">
+                      {readinessValue >= 80 ? (
+                        <>Your project is <span className="text-emerald-600 font-black">Filing Ready</span></>
+                      ) : (
+                        <>Your project is <span className="text-amber-600 font-black">In Preparation</span></>
+                      )}
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-extrabold">
+                      {completedCountValue} / {totalCountValue} Requirements Met
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                    {readinessValue >= 80
+                      ? 'All core statutory milestones under The Patents Act, 1970 are complete. You can export the master filing bundle.'
+                      : 'Resolve the outstanding items below with one-click direct fixes to achieve registry compliance.'}
+                  </p>
+                </div>
+              </div>
+
+          {/* 12-Point Statutory Audit List */}
+          <div className="space-y-3">
+            {issuesList.length > 0 ? (
+              issuesList.map((item: any) => {
+                const isComp = item.status === 'COMPLETE';
+                const isNeedsAttn = item.status === 'NEEDS_ATTENTION';
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-3xs ${
+                      isComp
+                        ? 'bg-white border-slate-200/90'
+                        : isNeedsAttn
+                        ? 'bg-amber-50/40 border-amber-200/80'
+                        : 'bg-rose-50/30 border-rose-200/80'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div
+                        className={`p-1.5 rounded-xl shrink-0 mt-0.5 ${
+                          isComp
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : isNeedsAttn
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-rose-100 text-rose-700'
+                        }`}
+                      >
+                        {isComp ? (
+                          <Check className="w-4 h-4 stroke-[3]" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-xs font-bold text-slate-900 truncate">{item.title}</h4>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">
+                            {item.category}
+                          </span>
+                          {!isComp && (
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                item.priority === 'HIGH'
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {item.priority}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-relaxed">
+                          {item.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 flex items-center gap-2 self-end sm:self-center">
+                      {isComp ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+                          <Check className="w-3.5 h-3.5 stroke-[3] text-emerald-600" />
+                          Complete
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onNavigateTab && onNavigateTab(item.route)}
+                          className="px-3 py-1.5 bg-[#064E3B] hover:bg-[#043E2F] text-white text-xs font-bold rounded-xl shadow-3xs flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <span>Fix</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              checklistItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-3xs"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className={`p-2 rounded-xl ${item.isComplete ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
+                      <p className="text-[11px] text-slate-400 font-medium">{item.subtitle}</p>
+                    </div>
+                  </div>
                   {item.isComplete ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
                       <Check className="w-3.5 h-3.5 stroke-[3] text-emerald-600" />
@@ -753,67 +859,100 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
                     </span>
                   )}
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
-        {/* Right Column (6 cols): Remaining Actions Card */}
-        <div className="lg:col-span-6">
-          <div className="app-card p-6 sm:p-7 space-y-6 shadow-xs">
+        {/* Right Column (5 cols): Indian Patent Office (IPO) Form Engine */}
+        <div className="lg:col-span-5 space-y-5">
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-4">
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900">Remaining actions</h3>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Complete the following to reach 100% readiness.
+              <div className="flex items-center gap-2">
+                <FileCheck2 className="w-4 h-4 text-[#064E3B]" />
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  Indian Patent Office (IPO) Statutory Forms
+                </h3>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                Statutory applicability determined automatically by the project characteristics.
               </p>
             </div>
 
-            <div className="space-y-3.5">
-              {remainingActions.map((action) => {
-                const Icon = action.icon;
+            <div className="space-y-3">
+              {(formsListApplicable.length > 0 ? formsListApplicable : [
+                { formType: 'Form 1', name: 'Application for Grant of Patent', status: 'REQUIRED', description: 'Application for Grant of Patent under Section 7, 54 & 135.' },
+                { formType: 'Form 2', name: 'Provisional / Complete Specification', status: 'REQUIRED', description: 'Technical specification & legal claims under Section 10.' },
+                { formType: 'Form 3', name: 'Statement & Undertaking', status: 'REQUIRED', description: 'Section 8 undertaking regarding corresponding foreign filings.' },
+                { formType: 'Form 5', name: 'Declaration as to Inventorship', status: 'REQUIRED', description: 'Legal inventor identity declaration under Section 10(6).' },
+                { formType: 'Form 18', name: 'Request for Examination (RFE)', status: 'OPTIONAL', description: 'Mandatory within 48 months from priority/filing date.' },
+                { formType: 'Form 26', name: 'Form of Authorization (POA)', status: 'OPTIONAL', description: 'Power of attorney for registered patent agent representation.' },
+              ]).map((form: any) => {
+                const formCode = form.formNumber || form.formType;
+                const isReady = form.status === 'READY' || form.status === 'COMPLETED';
+                const isRequired = form.status === 'REQUIRED';
+
                 return (
                   <div
-                    key={action.id}
-                    onClick={() => action.tabTarget && onNavigateTab && onNavigateTab(action.tabTarget)}
-                    className={`p-4 bg-slate-50/70 border border-slate-200/70 rounded-2xl flex items-start justify-between gap-3 ${
-                      action.tabTarget ? 'cursor-pointer hover:border-slate-300 transition' : ''
-                    }`}
+                    key={formCode}
+                    className="p-3.5 bg-slate-50/70 border border-slate-200/70 rounded-2xl flex items-center justify-between gap-3 text-xs"
                   >
-                    <div className="flex items-start gap-3.5">
-                      <div className="w-6 h-6 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                        {action.id}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-slate-950">{formCode}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider ${
+                            isReady
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : isRequired
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-200/80 text-slate-700'
+                          }`}
+                        >
+                          {form.status.replace(/_/g, ' ')}
+                        </span>
                       </div>
-                      <div className={`p-2 rounded-xl ${action.iconBg} shrink-0`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900">{action.title}</h4>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-relaxed">
-                          {action.desc}
-                        </p>
-                      </div>
+                      <p className="text-[11px] text-slate-600 font-medium mt-0.5">{form.name}</p>
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${action.priorityColor}`}>
-                      {action.priority}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedFormType(formCode);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 shadow-3xs transition cursor-pointer"
+                    >
+                      {isReady ? 'View' : 'Draft'}
+                    </button>
                   </div>
                 );
               })}
             </div>
 
             <button
-              onClick={() => {
-                if (onNavigateTab) onNavigateTab('Overview');
-                toast.success('Returning to Overview Command Center.');
-              }}
-              className="w-full py-3 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/10 transition cursor-pointer"
+              type="button"
+              onClick={handleGeneratePackage}
+              disabled={generatingPackage}
+              className="w-full py-3 bg-[#064E3B] hover:bg-[#043E2F] text-white rounded-2xl text-xs font-extrabold shadow-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              Continue preparation
+              {generatingPackage ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Generating Master Package...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>Generate Consolidated IPO Package</span>
+                </>
+              )}
             </button>
           </div>
         </div>
       </div>
+    );
+  })()}
 
       {/* Bottom Section: Final Filing Package 10-Item Grid */}
       <div className="app-card p-6 sm:p-7 space-y-6 shadow-xs">

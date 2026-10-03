@@ -256,9 +256,12 @@ export const chatProjectAssistant = async (req: AuthenticatedRequest, res: Respo
     });
   } catch (error: any) {
     console.error('chatProjectAssistant Error:', error);
-    const userMessage = error.message?.includes('API Key')
-      ? 'AI service is temporarily unavailable: Gemini API key not configured.'
-      : error.message || 'Google Gemini AI assistant is currently unavailable.';
+    let userMessage = 'Google Gemini AI assistant is currently unavailable.';
+    if (error.message?.includes('API Key') || error.message?.includes('API_KEY')) {
+      userMessage = 'AI service is temporarily unavailable: Gemini API key not configured or invalid.';
+    } else if (error.message?.includes('403') || error.message?.includes('denied access')) {
+      userMessage = 'Cloud AI project access restricted. Operating in local heuristic assistance mode.';
+    }
     res.status(502).json({ message: userMessage });
   }
 };

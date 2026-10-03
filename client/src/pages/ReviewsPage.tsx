@@ -396,17 +396,17 @@ export const ReviewsPage: React.FC = () => {
                 {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0 self-end sm:self-center" onClick={(e) => e.stopPropagation()}>
                   <button
-                    onClick={() => setSelectedReview(r)}
+                    onClick={() => navigate(`/dashboard/projects/${r.projectId}/reviews`)}
                     className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition cursor-pointer"
                   >
                     View Review
                   </button>
 
                   <button
-                    onClick={() => navigate(`/dashboard/projects/${r.projectId}`)}
+                    onClick={() => navigate(`/dashboard/projects/${r.projectId}/reviews`)}
                     className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
                   >
-                    <span>Open Project</span>
+                    <span>Open Review Center</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -489,10 +489,10 @@ export const ReviewsPage: React.FC = () => {
             {/* Modal Actions */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
               <button
-                onClick={() => navigate(`/dashboard/projects/${selectedReview.projectId}`)}
+                onClick={() => navigate(`/dashboard/projects/${selectedReview.projectId}/reviews`)}
                 className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Open Project</span>
+                <span>Open Review Center</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
 

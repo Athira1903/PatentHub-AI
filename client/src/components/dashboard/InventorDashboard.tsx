@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
+import { NextActionCard } from '../project/NextActionCard';
 
 interface InventorDashboardProps {
   user: any;
@@ -34,6 +35,8 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(true);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [primaryNextActionData, setPrimaryNextActionData] = useState<any>(null);
+  const [loadingNextAction, setLoadingNextAction] = useState<boolean>(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [stageFilter, setStageFilter] = useState<string>('ALL');
@@ -47,11 +50,24 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
     return 'Good evening';
   };
 
+  const loadPrimaryNextAction = async () => {
+    try {
+      setLoadingNextAction(true);
+      const res = await api.get('/projects/next-action/primary');
+      setPrimaryNextActionData(res.data);
+    } catch (e) {
+      console.error('Failed to load primary next action', e);
+    } finally {
+      setLoadingNextAction(false);
+    }
+  };
+
   const fetchInventorData = async () => {
     try {
       setLoading(true);
       const res = await api.get('/projects/analytics/inventor');
       setDashboardData(res.data);
+      loadPrimaryNextAction();
       if (onRefresh) onRefresh();
     } catch (e: any) {
       console.error('Failed to load inventor dashboard data:', e);
@@ -277,6 +293,19 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
         </div>
       ) : (
         <div className="space-y-6">
+          {/* PRIMARY NEXT-ACTION ENGINE HERO CARD */}
+          {primaryNextActionData?.nextAction && (
+            <NextActionCard
+              projectId={primaryNextActionData.project?.id}
+              projectTitle={primaryNextActionData.project?.title}
+              nextAction={primaryNextActionData.nextAction.primaryAction}
+              secondaryActions={primaryNextActionData.nextAction.secondaryActions}
+              progressPercentage={primaryNextActionData.nextAction.progressPercentage}
+              loading={loadingNextAction}
+              onRetry={loadPrimaryNextAction}
+            />
+          )}
+
           {/* ==================================================== */}
           {/* SEARCH & STAGE FILTER BAR */}
           {/* ==================================================== */}
@@ -836,7 +865,7 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
                         </h4>
                         <div className="flex justify-between items-center text-[10px] text-[#71807C]">
                           <span>
-                            Reviewer: <strong>{rev.reviewer}</strong> ({rev.role})
+                            Reviewer: <strong>{rev.reviewer}</strong> ({typeof rev.role === 'object' ? rev.role?.name : rev.role})
                           </span>
                           <button
                             onClick={() => navigate(`/dashboard/projects/${rev.projectId}`)}
@@ -879,8 +908,8 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
                         </div>
                         <p className="text-xs font-bold text-[#253330]">
                           {inv.isReceived
-                            ? `${inv.senderName} invited you as ${inv.role}`
-                            : `Invited ${inv.receiverName} as ${inv.role}`}
+                            ? `${inv.senderName} invited you as ${typeof inv.role === 'object' ? inv.role?.name : inv.role}`
+                            : `Invited ${inv.receiverName} as ${typeof inv.role === 'object' ? inv.role?.name : inv.role}`}
                         </p>
 
                         {inv.isReceived && inv.status === 'PENDING' && (

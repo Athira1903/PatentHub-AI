@@ -21,6 +21,8 @@ import {
   Bell,
   Lightbulb,
   ClipboardCheck,
+  FileText,
+  CreditCard,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -151,50 +153,62 @@ export const DashboardLayout: React.FC = () => {
   };
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Administrator';
+  const isOrgAdmin = user?.role === 'OrganizationAdmin' || user?.role === 'OrgAdmin';
   const isCoInventor = user?.role === 'CoInventor' || user?.role === 'CO_INVENTOR' || user?.role === 'Co-Inventor';
   const isPatentExpert = user?.role === 'PatentExpert' || user?.role === 'Patent Expert' || user?.role === 'PATENT_EXPERT';
   const isGuide = user?.role === 'Guide' || user?.role === 'GUIDE';
 
-  const navItems = isGuide
+  const navItems = isAdmin
     ? [
-      { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-      { label: 'My Projects', path: '/dashboard/projects?type=owned', icon: Folder },
-      { label: 'Supervised Projects', path: '/dashboard/projects?type=supervised', icon: FolderKanban },
-      { label: 'Review Queue', path: '/dashboard/reviews', icon: CheckSquare, badge: '5' },
-      { label: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare },
-      { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
-      { label: 'Profile', path: '/dashboard/profile', icon: User },
-      { label: 'Settings', path: '/dashboard/settings', icon: Settings },
-    ]
-    : isPatentExpert
-      ? [
         { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
-        { label: 'Review Queue', path: '/dashboard/reviews', icon: CheckSquare, badge: '3' },
-        { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
-        { label: 'Profile', path: '/dashboard/profile', icon: User },
-        { label: 'Settings', path: '/dashboard/settings', icon: Settings },
+        { label: 'Users', path: '/admin?tab=users', icon: User },
+        { label: 'Projects', path: '/admin?tab=projects', icon: Folder },
+        { label: 'Reviews', path: '/admin?tab=reviews', icon: ClipboardCheck },
+        { label: 'System', path: '/admin?tab=system', icon: Settings },
+        { label: 'Audit', path: '/admin?tab=audit', icon: Shield },
       ]
-      : isCoInventor
-        ? [
-          { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-          { label: 'My Projects', path: '/dashboard/projects', icon: Folder },
-          { label: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare },
-          { label: 'Reviews', path: '/dashboard/reviews', icon: ClipboardCheck },
-          { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
-          { label: 'Profile', path: '/dashboard/profile', icon: User },
-          { label: 'Settings', path: '/dashboard/settings', icon: Settings },
-        ]
-        : [
-          { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-          { label: 'My Inventions', path: '/dashboard/projects', icon: Folder },
-          { label: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare },
-          { label: 'Reviews', path: '/dashboard/reviews', icon: ClipboardCheck },
-          { label: 'Notifications', path: '/dashboard/notifications', icon: Bell },
-          { label: 'Profile', path: '/dashboard/profile', icon: User },
-          { label: 'Settings', path: '/dashboard/settings', icon: Settings },
-          ...(isAdmin ? [{ label: 'Admin Governance', path: '/admin', icon: Shield }] : []),
-        ];
+    : isOrgAdmin
+    ? [
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'Users', path: '/dashboard/org-admin?tab=users', icon: User },
+        { label: 'Projects', path: '/dashboard/org-admin?tab=projects', icon: Folder },
+        { label: 'Policies', path: '/dashboard/org-admin?tab=policies', icon: Shield },
+        { label: 'Billing', path: '/dashboard/billing', icon: CreditCard },
+      ]
+    : isGuide
+    ? [
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'Supervised Projects', path: '/dashboard/projects?type=supervised', icon: FolderKanban },
+        { label: 'Reviews', path: '/dashboard/reviews', icon: ClipboardCheck },
+        { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+        { label: 'Documents', path: '/dashboard/documents', icon: FileText },
+        { label: 'Policies', path: '/dashboard/policies', icon: Shield },
+      ]
+    : isPatentExpert
+    ? [
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'Patent Reviews', path: '/dashboard/reviews', icon: ClipboardCheck },
+        { label: 'Research', path: '/dashboard/research', icon: BookOpen },
+        { label: 'Documents', path: '/dashboard/documents', icon: FileText },
+        { label: 'Policies', path: '/dashboard/policies', icon: Shield },
+      ]
+    : isCoInventor
+    ? [
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'My Inventions', path: '/dashboard/projects', icon: Folder },
+        { label: 'Research', path: '/dashboard/research', icon: BookOpen },
+        { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+        { label: 'Documents', path: '/dashboard/documents', icon: FileText },
+        { label: 'Policies', path: '/dashboard/policies', icon: Shield },
+      ]
+    : [
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'My Inventions', path: '/dashboard/projects', icon: Folder },
+        { label: 'Research', path: '/dashboard/research', icon: BookOpen },
+        { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+        { label: 'Documents', path: '/dashboard/documents', icon: FileText },
+        { label: 'Policies', path: '/dashboard/policies', icon: Shield },
+      ];
 
   const intelligenceItems: any[] = [];
 

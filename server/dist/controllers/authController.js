@@ -17,7 +17,9 @@ const RESERVED_USERNAMES = [
     'help',
     'user',
 ];
-const registerSchema = zod_1.z.object({
+const registerSchema = zod_1.z
+    .object({
+    accountType: zod_1.z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional().default('INDIVIDUAL'),
     fullName: zod_1.z
         .string()
         .trim()
@@ -35,8 +37,8 @@ const registerSchema = zod_1.z.object({
         .trim()
         .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number'),
     institution: zod_1.z.string().trim().max(150, 'Institution name cannot exceed 150 characters').optional(),
-    department: zod_1.z.string().trim().min(1, 'Department is required').max(100, 'Department cannot exceed 100 characters'),
-    designation: zod_1.z.string().trim().min(1, 'Designation is required').max(100, 'Designation cannot exceed 100 characters'),
+    department: zod_1.z.string().trim().max(100, 'Department cannot exceed 100 characters').optional().default('General'),
+    designation: zod_1.z.string().trim().max(100, 'Designation cannot exceed 100 characters').optional().default('Member'),
     userType: zod_1.z.enum([
         'Student',
         'Guide',
@@ -49,6 +51,22 @@ const registerSchema = zod_1.z.object({
         'Administrator',
     ]),
     employeeOrStudentId: zod_1.z.string().trim().max(50).optional(),
+    organizationName: zod_1.z.string().trim().max(150, 'Organization name cannot exceed 150 characters').optional(),
+    organizationType: zod_1.z.string().trim().max(100).optional(),
+    organizationDomain: zod_1.z.string().trim().max(100).optional(),
+    organizationLocation: zod_1.z.string().trim().max(150).optional(),
+})
+    .superRefine((data, ctx) => {
+    if (data.accountType === 'ORGANIZATION') {
+        const orgName = data.organizationName || data.institution;
+        if (!orgName || orgName.trim().length === 0) {
+            ctx.addIssue({
+                code: zod_1.z.ZodIssueCode.custom,
+                message: 'Organization name is required for organization accounts',
+                path: ['organizationName'],
+            });
+        }
+    }
 });
 const activateSchema = zod_1.z.object({
     username: zod_1.z.string().trim().min(1, 'Username is required'),
@@ -63,21 +81,30 @@ const activateSchema = zod_1.z.object({
         .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character'),
 });
 const loginSchema = zod_1.z.object({
-    emailOrUsername: zod_1.z.string().trim().min(1, 'Username is required'),
+    identifier: zod_1.z.string().trim().min(1).optional(),
+    emailOrUsername: zod_1.z.string().trim().min(1).optional(),
     password: zod_1.z.string().min(1, 'Password is required'),
+}).refine(data => data.identifier || data.emailOrUsername, {
+    message: 'Username or email is required',
+    path: ['emailOrUsername'],
 });
 const register = async (req, res) => {
     try {
         const validatedData = registerSchema.parse(req.body);
         const result = await authService_1.AuthService.register({
+            accountType: validatedData.accountType,
             fullName: validatedData.fullName,
             email: validatedData.email,
             phone: validatedData.phone,
-            institution: validatedData.institution,
-            department: validatedData.department,
-            designation: validatedData.designation,
+            institution: validatedData.institution || validatedData.organizationName,
+            department: validatedData.department || 'General',
+            designation: validatedData.designation || (validatedData.accountType === 'ORGANIZATION' ? 'Member' : 'Student'),
             userType: validatedData.userType,
             employeeOrStudentId: validatedData.employeeOrStudentId,
+            organizationName: validatedData.organizationName || validatedData.institution,
+            organizationType: validatedData.organizationType,
+            organizationDomain: validatedData.organizationDomain,
+            organizationLocation: validatedData.organizationLocation,
         });
         res.status(201).json({
             message: 'Registration successful. Please check your email for activation credentials.',
@@ -145,11 +172,12 @@ exports.resendActivation = resendActivation;
 const login = async (req, res) => {
     try {
         const validatedData = loginSchema.parse(req.body);
-        const result = await authService_1.AuthService.login(validatedData);
-        res.status(200).json({
-            message: 'Login successful',
-            ...result,
+        const identifier = validatedData.identifier || validatedData.emailOrUsername || '';
+        const result = await authService_1.AuthService.login({
+            emailOrUsername: identifier,
+            password: validatedData.password,
         });
+        res.status(200).json(result);
     }
     catch (error) {
         if (error instanceof zod_1.z.ZodError) {
@@ -160,7 +188,7 @@ const login = async (req, res) => {
             return;
         }
         res.status(401).json({
-            message: error.message || 'Login failed',
+            message: error.message || 'Invalid credentials',
         });
     }
 };

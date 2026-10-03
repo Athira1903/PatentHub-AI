@@ -60,12 +60,14 @@ export class PatentFormPolicy {
     if (!user) return false;
     if (user.role === 'Admin') return true;
 
+    if (user.role === 'OrganizationAdmin' && project.organizationId && user.organizationId === project.organizationId) {
+      return true;
+    }
+
     const isOwner = project.ownerId === user.userId;
     const isMember = project.members?.some((m: any) => m.userId === user.userId);
-    const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
-    const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
 
-    return isOwner || isMember || isGuide || isExpert;
+    return isOwner || isMember;
   }
 
   /**

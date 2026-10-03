@@ -5,6 +5,10 @@ const db_1 = require("../config/db");
 const client_1 = require("@prisma/client");
 class ProjectService {
     static async createProject(input) {
+        const owner = await db_1.prisma.user.findUnique({
+            where: { id: input.ownerId },
+            select: { id: true, organizationId: true },
+        });
         return db_1.prisma.patentProject.create({
             data: {
                 title: input.title,
@@ -21,6 +25,7 @@ class ProjectService {
                 expectedFilingDate: input.expectedFilingDate || null,
                 patentType: input.patentType || null,
                 visibility: input.visibility || 'PRIVATE',
+                organizationId: owner?.organizationId || null,
                 ownerId: input.ownerId,
                 stage: 'IDEA',
                 isArchived: false,
@@ -28,6 +33,9 @@ class ProjectService {
             include: {
                 owner: {
                     select: { id: true, fullName: true, username: true, email: true },
+                },
+                organization: {
+                    select: { id: true, name: true },
                 },
                 members: {
                     include: {
@@ -39,15 +47,29 @@ class ProjectService {
     }
     static async getUserProjects(userId, userRole, includeArchived = false) {
         const baseWhere = includeArchived ? {} : { isArchived: false };
-        const whereClause = userRole === 'Admin'
-            ? baseWhere
-            : {
+        let whereClause = baseWhere;
+        if (userRole === 'Admin') {
+            whereClause = baseWhere;
+        }
+        else if (userRole === 'OrganizationAdmin') {
+            const adminUser = await db_1.prisma.user.findUnique({
+                where: { id: userId },
+                select: { organizationId: true },
+            });
+            whereClause = {
+                ...baseWhere,
+                organizationId: adminUser?.organizationId || '__NO_ORG__',
+            };
+        }
+        else {
+            whereClause = {
                 ...baseWhere,
                 OR: [
                     { ownerId: userId },
                     { members: { some: { userId } } },
                 ],
             };
+        }
         const projects = await db_1.prisma.patentProject.findMany({
             where: whereClause,
             include: {

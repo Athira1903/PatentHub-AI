@@ -59,7 +59,7 @@ class ClaimAiService {
         }
         try {
             const model = aiClient.getGenerativeModel({
-                model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+                model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
                 generationConfig: { responseMimeType: 'application/json' }
             });
             const prompt = `You are a professional patent attorney and claims drafting engine.

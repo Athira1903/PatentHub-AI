@@ -10,11 +10,20 @@ import collaborationRoutes from './routes/collaborationRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import documentRoutes from './routes/documentRoutes';
 import adminRoutes from './routes/adminRoutes';
+import organizationRoutes from './routes/organizationRoutes';
+import policyRoutes from './routes/policyRoutes';
+import billingRoutes from './routes/billingRoutes';
 
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 
 // Serve local static uploaded profile pictures and documents
 const uploadsDir = path.join(__dirname, '../public/uploads');
@@ -23,6 +32,8 @@ if (!fs.existsSync(documentsDir)) {
   fs.mkdirSync(documentsDir, { recursive: true });
 }
 app.use('/uploads', express.static(uploadsDir));
+
+import { searchIPC } from './controllers/patentEngineController';
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -33,6 +44,10 @@ app.use('/api/collaboration', collaborationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/organizations', organizationRoutes);
+app.use('/api/policies', policyRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/ipc', searchIPC);
 
 // Health check endpoint
 app.get('/api/health', (_req: Request, res: Response) => {

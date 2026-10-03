@@ -23,15 +23,19 @@ import {
   AlertCircle,
   Plus,
   Shield,
+  BookOpen,
+  Scale,
 } from 'lucide-react';
-import { api } from '../services/api';
+import { api, patentApi } from '../services/api';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ClaimsEngineeringStudio } from '../components/claims/ClaimsEngineeringStudio';
 import { ProjectCommandCenter } from '../components/project/ProjectCommandCenter';
 import { FilingReadinessView } from '../components/project/FilingReadinessView';
 import { PriorArtEvidenceView } from '../components/project/PriorArtEvidenceView';
 import { ProjectReviewCenter } from '../components/project/ProjectReviewCenter';
+import { SpecificationStudio } from '../components/project/SpecificationStudio';
 
 export interface ProjectDetail {
   id: string;
@@ -112,6 +116,12 @@ export const ProjectDetailsPage: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(outletCtx.user || null);
 
   useEffect(() => {
+    if (outletCtx.user) {
+      setCurrentUser(outletCtx.user);
+    }
+  }, [outletCtx.user]);
+
+  useEffect(() => {
     if (!currentUser) {
       api.get('/auth/profile')
         .then((res) => setCurrentUser(res.data.user))
@@ -121,14 +131,18 @@ export const ProjectDetailsPage: React.FC = () => {
 
   const user = currentUser;
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const projectMemberRecord = project?.members?.find((m: any) => m.user?.id === user?.id || m.user?.id === user?.userId || m.userId === user?.id || m.userId === user?.userId);
   
-  const isGlobalGuide = user?.role === 'Guide' || user?.role === 'GUIDE';
-  const isGlobalExpert = user?.role === 'PatentExpert' || user?.role === 'Patent Expert' || user?.role === 'PATENT_EXPERT';
+  const userRoleName = typeof user?.role === 'object' ? user?.role?.name : user?.role;
+  const isGlobalGuide = userRoleName === 'Guide' || userRoleName === 'GUIDE';
+  const isGlobalExpert = userRoleName === 'PatentExpert' || userRoleName === 'Patent Expert' || userRoleName === 'PATENT_EXPERT';
 
-  const userProjectRole = projectMemberRecord?.role || 
+  const rawMemberRole = (projectMemberRecord?.role as any);
+  const memberRole = typeof rawMemberRole === 'object' ? rawMemberRole?.name : rawMemberRole;
+  const userProjectRole = memberRole || 
     (isGlobalGuide ? 'GUIDE' : isGlobalExpert ? 'PATENT_EXPERT' : undefined);
-  const isOwner = !!(project?.isOwner || (project?.owner && (project.owner.id === user?.id || project.owner.id === user?.userId)) || (project?.ownerId && (project.ownerId === user?.id || project.ownerId === user?.userId)) || user?.role === 'Admin');
+  const isOwner = !!(project?.isOwner || (project?.owner && (project.owner.id === user?.id || project.owner.id === user?.userId)) || (project?.ownerId && (project.ownerId === user?.id || project.ownerId === user?.userId)) || userRoleName === 'Admin');
   const permissionLevel: 'VIEW' | 'EDIT' | 'SUBMIT' = isOwner ? 'SUBMIT' : (projectMemberRecord as any)?.permissionLevel || 'EDIT';
   const canEdit = isOwner || permissionLevel === 'EDIT' || permissionLevel === 'SUBMIT';
   const canSubmit = isOwner || permissionLevel === 'SUBMIT';
@@ -141,7 +155,10 @@ export const ProjectDetailsPage: React.FC = () => {
 
   const computeActiveTab = () => {
     if (isReviewsRoute) return 'Reviews';
-    if (urlTab) return urlTab;
+    if (urlTab) {
+      if (urlTab.toLowerCase() === 'draft' || urlTab.toLowerCase() === 'drafting') return 'Specification';
+      return urlTab;
+    }
     return 'Overview';
   };
 
@@ -380,6 +397,71 @@ export const ProjectDetailsPage: React.FC = () => {
     }
   };
 
+  // FTO Claim Charts & Overlap Analysis states
+  const [projectClaimsList, setProjectClaimsList] = useState<any[]>([]);
+  const [ftoClaimCharts, setFtoClaimCharts] = useState<any[]>([]);
+  const [loadingFtoCharts, setLoadingFtoCharts] = useState(false);
+  const [generatingFtoChart, setGeneratingFtoChart] = useState(false);
+  const [selectedFtoClaimId, setSelectedFtoClaimId] = useState<string>('');
+  const [selectedFtoReferenceId, setSelectedFtoReferenceId] = useState<string>('');
+
+  const fetchProjectClaims = async () => {
+    if (!id) return;
+    try {
+      const res = await api.get(`/projects/${id}/claims`);
+      const claims = res.data.claims || [];
+      setProjectClaimsList(claims);
+      if (claims.length > 0 && !selectedFtoClaimId) {
+        setSelectedFtoClaimId(claims[0].id);
+      }
+    } catch (e) {
+      console.error('Failed to load project claims', e);
+    }
+  };
+
+  const fetchFtoCharts = async () => {
+    if (!id) return;
+    setLoadingFtoCharts(true);
+    try {
+      const res = await patentApi.getProjectClaimCharts(id);
+      setFtoClaimCharts(res.data.charts || []);
+    } catch (e) {
+      console.error('Failed to load FTO claim charts', e);
+    } finally {
+      setLoadingFtoCharts(false);
+    }
+  };
+
+  const handleGenerateFtoChart = async () => {
+    const claimId = selectedFtoClaimId || projectClaimsList[0]?.id;
+    const refId = selectedFtoReferenceId || savedReferences[0]?.id;
+    if (!id || !claimId || !refId) {
+      toast.error('Please select both a claim and a saved patent reference.');
+      return;
+    }
+    setGeneratingFtoChart(true);
+    try {
+      await patentApi.generateFtoClaimChart(id, claimId, refId);
+      toast.success('Preliminary FTO claim chart generated successfully!');
+      fetchFtoCharts();
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to generate FTO claim chart.');
+    } finally {
+      setGeneratingFtoChart(false);
+    }
+  };
+
+  const handleDeleteFtoChart = async (chartId: string) => {
+    if (!id) return;
+    try {
+      await patentApi.deleteClaimChart(id, chartId);
+      toast.success('FTO claim chart deleted.');
+      setFtoClaimCharts(prev => prev.filter(c => c.id !== chartId));
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to delete FTO chart.');
+    }
+  };
+
   // Forms checklist wizard
   const [activeFormIndex, setActiveFormIndex] = useState<string | null>(null);
   const [formField1, setFormField1] = useState('');
@@ -432,7 +514,10 @@ export const ProjectDetailsPage: React.FC = () => {
         }
       ]);
     } catch (err: any) {
-      const errMsg = err.response?.data?.message || 'Google Gemini AI assistant is currently unavailable.';
+      let errMsg = err.response?.data?.message || 'Google Gemini AI assistant is currently unavailable.';
+      if (errMsg.includes('403') || errMsg.includes('denied access') || errMsg.includes('GoogleGenerativeAI')) {
+        errMsg = 'Cloud AI project access restricted. Operating in local heuristic assistance mode.';
+      }
       setAssistantHistory(prev => [
         ...prev,
         {
@@ -448,27 +533,34 @@ export const ProjectDetailsPage: React.FC = () => {
 
   // Load project detail
   const fetchProject = async () => {
+    if (!id) return;
+    setLoadError(null);
     try {
       const response = await api.get(`/projects/${id}`);
-      const proj = response.data.project;
-      setProject(proj);
-      setFormData({
-        title: proj.title,
-        innovationIdea: proj.innovationIdea,
-        problemStatement: proj.problemStatement,
-        existingSolutions: proj.existingSolutions || '',
-        drawbacks: proj.drawbacks || '',
-        proposedSolution: proj.proposedSolution,
-        novelFeatures: proj.novelFeatures || '',
-        objectives: proj.objectives || '',
-        technicalDomain: proj.technicalDomain,
-        keywords: proj.keywords || '',
-        category: proj.category,
-        patentType: proj.patentType || 'Utility',
-        visibility: proj.visibility || 'PRIVATE',
-      });
+      const proj = response.data?.project;
+      if (proj) {
+        setProject(proj);
+        setFormData({
+          title: proj.title || '',
+          innovationIdea: proj.innovationIdea || '',
+          problemStatement: proj.problemStatement || '',
+          existingSolutions: proj.existingSolutions || '',
+          drawbacks: proj.drawbacks || '',
+          proposedSolution: proj.proposedSolution || '',
+          novelFeatures: proj.novelFeatures || '',
+          objectives: proj.objectives || '',
+          technicalDomain: proj.technicalDomain || '',
+          keywords: proj.keywords || '',
+          category: proj.category || '',
+          patentType: proj.patentType || 'Utility',
+          visibility: proj.visibility || 'PRIVATE',
+        });
+      }
     } catch (error: any) {
-      toast.error('Failed to load project details');
+      console.error('Failed to load project details', error);
+      const errMsg = error.response?.data?.message || 'Failed to load project details or access restricted.';
+      setLoadError(errMsg);
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }
@@ -476,10 +568,19 @@ export const ProjectDetailsPage: React.FC = () => {
 
   useEffect(() => {
     if (id) {
+      setLoading(true);
       fetchProject();
       fetchSavedReferences();
+      fetchProjectClaims();
+      fetchFtoCharts();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (savedReferences.length > 0 && !selectedFtoReferenceId) {
+      setSelectedFtoReferenceId(savedReferences[0].id);
+    }
+  }, [savedReferences]);
 
   // Username search debouncing
   useEffect(() => {
@@ -683,9 +784,9 @@ export const ProjectDetailsPage: React.FC = () => {
     writeField('Project Title', project.title);
     writeField('Technical Domain', project.technicalDomain);
     writeField('Category', project.category);
-    writeField('Filing Stage', project.stage.replace(/_/g, ' '));
-    writeField('Owner / Inventor', project.owner.fullName);
-    writeField('Institution', project.owner.institution || 'N/A');
+    writeField('Filing Stage', (project.stage || 'IDEA').replace(/_/g, ' '));
+    writeField('Owner / Inventor', project.owner?.fullName || 'Inventor');
+    writeField('Institution', project.owner?.institution || 'N/A');
 
     if (reportType === 'Patent Summary Report') {
       writeField('Innovation Abstract', project.innovationIdea);
@@ -696,7 +797,7 @@ export const ProjectDetailsPage: React.FC = () => {
     } else if (reportType.includes('Filing') || reportType.includes('readiness')) {
       writeField('Forms Compilation', 'IPO Forms 1, 2, 3, 5, and 26 pre-filled drafts generated successfully.');
       writeField('Filing Readiness Index', `${getStageProgress(project.stage)}% stage completion`);
-      writeField('Task Completion', `${project.tasks.filter(t => t.status === 'COMPLETED').length} / ${project.tasks.length} tasks completed`);
+      writeField('Task Completion', `${project.tasks?.filter(t => t.status === 'COMPLETED').length || 0} / ${project.tasks?.length || 0} tasks completed`);
     } else {
       writeField('Review Comments Logged', `${project.comments?.length || 0} observations cataloged`);
       project.comments?.forEach((c) => {
@@ -781,10 +882,12 @@ export const ProjectDetailsPage: React.FC = () => {
       writeLine('State / Province', formField1 || 'State Default');
       yPos += 5;
       writeLine('', 'INVENTOR(S) DETAILS:', true);
-      writeLine('1. First Inventor', `${project.owner.fullName} (@${project.owner.username})`);
-      project.members.forEach((m, idx) => {
-        writeLine(`${idx + 2}. Co-Inventor`, `${m.user.fullName} (@${m.user.username}) - [${m.role.replace(/_/g, ' ')}]`);
-      });
+      writeLine('1. First Inventor', `${project.owner?.fullName || 'Inventor'} (@${project.owner?.username || 'user'})`);
+      if (project.members) {
+        project.members.forEach((m, idx) => {
+          writeLine(`${idx + 2}. Co-Inventor`, `${m.user?.fullName || 'User'} (@${m.user?.username || 'user'}) - [${(m.role || 'MEMBER').replace(/_/g, ' ')}]`);
+        });
+      }
     } else if (formId === '2') {
       writeLine('', 'PROVISIONAL / COMPLETE SPECIFICATION (Section 10; Rule 13)', true);
       yPos += 5;
@@ -947,15 +1050,41 @@ export const ProjectDetailsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500 font-medium">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-2" />
-        <span>Loading workspace...</span>
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500 font-medium space-y-3">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <span className="text-xs font-semibold text-slate-600">Loading project workspace...</span>
       </div>
     );
   }
 
   if (!project) {
-    return <div className="p-12 text-center text-rose-600 font-medium">Project not found or access denied.</div>;
+    return (
+      <div className="p-12 text-center bg-white border border-slate-200 rounded-3xl shadow-xs space-y-4 max-w-lg mx-auto my-12">
+        <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-extrabold text-slate-900">Project Not Found or Access Restricted</h3>
+        <p className="text-xs text-slate-600 font-medium leading-relaxed">
+          {loadError || "You don't have authorization to view this patent project, or it may have been removed."}
+        </p>
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/projects')}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+          >
+            Back to My Projects
+          </button>
+          <button
+            type="button"
+            onClick={() => fetchProject()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+          >
+            Retry Loading
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const currentStageIndex = STAGES.findIndex((s) => s.key === project.stage);
@@ -965,6 +1094,7 @@ export const ProjectDetailsPage: React.FC = () => {
     { label: 'AI Assistant', tab: 'AI Assistant', icon: Sparkles },
     { label: 'Innovation Details', tab: 'Innovation Details', icon: FileText },
     { label: 'Prior Art Search', tab: 'Prior Art Search', icon: Search },
+    { label: 'Specification', tab: 'Specification', icon: BookOpen },
     { label: 'Claims Studio', tab: 'Claims Studio', icon: FileCode },
     { label: 'Tasks', tab: 'Tasks', icon: CheckIcon },
     { label: 'Forms & Filing', tab: 'Forms & Filing', icon: FileCheck2 },
@@ -994,8 +1124,8 @@ export const ProjectDetailsPage: React.FC = () => {
           <div className="app-card p-4 space-y-4 shadow-xs">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Patent Journey</span>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
-                {project.stage.replace(/_/g, ' ')}
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                {(project?.stage || 'IDEA').replace(/_/g, ' ')}
               </span>
             </div>
 
@@ -1227,6 +1357,16 @@ export const ProjectDetailsPage: React.FC = () => {
               projectId={project.id}
               project={project}
               onRefreshReferences={fetchSavedReferences}
+            />
+          )}
+
+          {/* T_SPECIFICATION: FORM 2 MULTI-SECTION SPECIFICATION STUDIO */}
+          {(activeTab === 'Specification' || activeTab === 'Draft' || activeTab === 'draft') && (
+            <SpecificationStudio
+              projectId={project.id}
+              project={project}
+              onRefreshProject={fetchProject}
+              onNavigateTab={handleSelectTab}
             />
           )}
 
@@ -1702,7 +1842,7 @@ export const ProjectDetailsPage: React.FC = () => {
                           <div key={doc.id} className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-3xs flex flex-col justify-between hover:border-indigo-400 transition-colors">
                             <div className="space-y-1">
                               <span className="inline-block px-2 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-[8px] font-bold text-indigo-700 uppercase tracking-wider">
-                                {doc.category.replace('PROTOTYPE_', '').replace('_', ' ')}
+                                {(doc.category || '').replace('PROTOTYPE_', '').replace(/_/g, ' ')}
                               </span>
                               <h5 className="font-extrabold text-xs text-slate-900 truncate" title={doc.name}>{doc.name}</h5>
                               <p className="text-[9px] text-slate-400 font-semibold">
@@ -2539,6 +2679,229 @@ export const ProjectDetailsPage: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* FTO CLAIM CHARTS & TECHNICAL OVERLAP MATRIX WORKSPACE */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-6 shadow-3xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
+                        ⚖️ Freedom-to-Operate (FTO) Claim Charts & Technical Overlap Analysis
+                      </h4>
+                      <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-teal-50 text-teal-800 border border-teal-200">
+                        Patent Intelligence
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                      Map specific technical claim elements against cited prior-art references to evaluate overlap boundaries.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchFtoCharts}
+                    className="p-2 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs transition cursor-pointer self-start sm:self-auto"
+                    title="Refresh FTO charts"
+                  >
+                    <Loader2 className={`w-3.5 h-3.5 ${loadingFtoCharts ? 'animate-spin text-teal-600' : ''}`} />
+                  </button>
+                </div>
+
+                {/* Statutory AI Boundary Disclaimer */}
+                <div className="p-3.5 bg-amber-50/70 border border-amber-200 text-amber-950 rounded-2xl text-[11px] leading-relaxed font-semibold">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <div>
+                      <strong>AI-Assisted Preliminary FTO Research:</strong> Technical overlap analysis evaluates claim element language against publicly indexed disclosures for engineering and research guidance. This does not constitute legal clearance, guaranteed freedom to operate, or a formal legal opinion of non-infringement. Substantive clearance requires evaluation by a qualified patent attorney.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Generator Card */}
+                <div className="p-5 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-4">
+                  <h5 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    Generate Preliminary Claim Chart
+                  </h5>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
+                        Select Project Claim
+                      </label>
+                      <select
+                        value={selectedFtoClaimId}
+                        onChange={(e) => setSelectedFtoClaimId(e.target.value)}
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-teal-600"
+                      >
+                        {projectClaimsList.length === 0 ? (
+                          <option value="">No claims formulated yet</option>
+                        ) : (
+                          projectClaimsList.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              Claim #{c.claimNumber} ({c.claimType}) - {c.preamble?.slice(0, 45) || 'Claim body'}...
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
+                        Select Cited Prior-Art Patent Reference
+                      </label>
+                      <select
+                        value={selectedFtoReferenceId}
+                        onChange={(e) => setSelectedFtoReferenceId(e.target.value)}
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-teal-600"
+                      >
+                        {savedReferences.length === 0 ? (
+                          <option value="">No saved references available</option>
+                        ) : (
+                          savedReferences.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              [{r.patentNumber}] {r.title?.slice(0, 50)}...
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Evaluates each limitation element against the reference's disclosure.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={generatingFtoChart || projectClaimsList.length === 0 || savedReferences.length === 0}
+                      onClick={handleGenerateFtoChart}
+                      className="px-5 py-2.5 bg-[#004d40] hover:bg-[#00382e] text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {generatingFtoChart ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Claim Chart...
+                        </>
+                      ) : (
+                        <>
+                          <Scale className="w-3.5 h-3.5" /> Generate FTO Claim Chart
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Existing Charts Display */}
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                      Verified Project Claim Charts ({ftoClaimCharts.length})
+                    </h5>
+                  </div>
+
+                  {loadingFtoCharts ? (
+                    <div className="py-12 text-center text-slate-400 text-xs font-medium">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-teal-600 mb-2" />
+                      Loading FTO claim charts...
+                    </div>
+                  ) : ftoClaimCharts.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl bg-slate-50/50 space-y-2">
+                      <Scale className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="font-semibold text-slate-600">No FTO Claim Charts Generated Yet</p>
+                      <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                        Link at least one patent reference and formulate claims to generate structured claim-by-claim technical overlap matrices.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {ftoClaimCharts.map((chart: any) => {
+                        const riskBadge =
+                          chart.overallRisk === 'HIGH'
+                            ? 'bg-rose-100 text-rose-800 border-rose-200'
+                            : chart.overallRisk === 'MEDIUM'
+                            ? 'bg-amber-100 text-amber-800 border-amber-200'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-200';
+
+                        return (
+                          <div key={chart.id} className="border border-slate-200 rounded-2xl p-5 space-y-4 bg-white shadow-3xs">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                              <div className="flex items-center gap-2.5">
+                                <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black border uppercase ${riskBadge}`}>
+                                  {chart.overallRisk} Overlap Risk
+                                </span>
+                                <h6 className="font-extrabold text-xs text-slate-900">
+                                  Ref: {chart.reference?.patentNumber || 'Cited Reference'} · {chart.reference?.title || ''}
+                                </h6>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFtoChart(chart.id)}
+                                className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer self-start sm:self-auto"
+                                title="Delete this claim chart"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {chart.summary && (
+                              <p className="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200/70 font-medium leading-relaxed">
+                                {chart.summary}
+                              </p>
+                            )}
+
+                            {/* Elements Breakdown Table */}
+                            {chart.elements && chart.elements.length > 0 && (
+                              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200">
+                                    <tr>
+                                      <th className="py-2.5 px-3">Our Claim Element</th>
+                                      <th className="py-2.5 px-3">Prior Art Feature</th>
+                                      <th className="py-2.5 px-3">Overlap Level</th>
+                                      <th className="py-2.5 px-3">Analysis Notes</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 text-[11px]">
+                                    {chart.elements.map((el: any) => {
+                                      const overlapColor =
+                                        el.overlapLevel === 'IDENTICAL' || el.overlapLevel === 'EQUIVALENT'
+                                          ? 'text-rose-700 font-black'
+                                          : el.overlapLevel === 'PARTIAL'
+                                          ? 'text-amber-700 font-bold'
+                                          : 'text-emerald-700 font-bold';
+
+                                      return (
+                                        <tr key={el.id} className="hover:bg-slate-50/50">
+                                          <td className="py-2.5 px-3 font-bold text-slate-900 max-w-[160px]">
+                                            {el.claimElement?.elementName || 'Limitation'}
+                                          </td>
+                                          <td className="py-2.5 px-3 text-slate-700 max-w-[200px]">
+                                            {el.priorArtFeature}
+                                          </td>
+                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                            <span className={overlapColor}>{el.overlapLevel}</span>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-slate-600 italic">
+                                            {el.analysisNotes || '—'}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-1">
+                              <span>Generated: {new Date(chart.createdAt).toLocaleDateString()}</span>
+                              <span className="italic">Advisory finding only · Subject to Patent Expert review</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -2818,7 +3181,7 @@ export const ProjectDetailsPage: React.FC = () => {
                                 className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors text-xs flex flex-col cursor-pointer"
                               >
                                 <span className="font-bold text-slate-800">{u.fullName}</span>
-                                <span className="text-[10px] text-slate-500">@{u.username} • {u.role}</span>
+                                <span className="text-[10px] text-slate-500">@{u.username} • {typeof u.role === 'object' ? u.role?.name : u.role}</span>
                               </button>
                             ))}
                           </div>
@@ -2865,7 +3228,7 @@ export const ProjectDetailsPage: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                              {m.role.replace(/_/g, ' ')}
+                              {(m.role || 'MEMBER').replace(/_/g, ' ')}
                             </span>
                             {(project.isOwner || isOwner) && (
                               <button
@@ -2888,15 +3251,17 @@ export const ProjectDetailsPage: React.FC = () => {
 
           {/* T10: PROJECT REVIEW CENTER */}
           {(activeTab === 'Guide Reviews' || activeTab === 'Reviews' || location.pathname.endsWith('/reviews')) && (
-            <ProjectReviewCenter
-              projectId={id!}
-              project={project}
-              analyticsSummary={analyticsSummary}
-              currentUser={user}
-              userProjectRole={userProjectRole}
-              onRefreshProject={fetchProject}
-              onNavigateTab={(tab) => handleSelectTab(tab)}
-            />
+            <ErrorBoundary fallbackTitle="Review Center Error">
+              <ProjectReviewCenter
+                projectId={id!}
+                project={project}
+                analyticsSummary={analyticsSummary}
+                currentUser={user}
+                userProjectRole={userProjectRole}
+                onRefreshProject={fetchProject}
+                onNavigateTab={(tab) => handleSelectTab(tab)}
+              />
+            </ErrorBoundary>
           )}
 
           {/* T_TASKS: PROJECT ACTION ITEMS & TASKS */}
@@ -2935,7 +3300,7 @@ export const ProjectDetailsPage: React.FC = () => {
                     {project.members && project.members.map(m => (
                       m.user.id !== project.owner?.id && (
                         <option key={m.user.id} value={m.user.username}>
-                          {m.user.fullName} ({m.role.replace(/_/g, ' ')})
+                          {m.user.fullName} ({(m.role || 'MEMBER').replace(/_/g, ' ')})
                         </option>
                       )
                     ))}

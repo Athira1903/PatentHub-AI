@@ -1,5 +1,15 @@
 import { Router } from 'express';
-import { register, login, getProfile, sendOtp, verifyOtpReset, googleLogin, activate, resendActivation, changePassword } from '../controllers/authController';
+import {
+  register,
+  login,
+  getProfile,
+  sendOtp,
+  verifyOtpReset,
+  googleLogin,
+  activate,
+  resendActivation,
+  changePassword,
+} from '../controllers/authController';
 import { authenticateToken } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -15,3 +25,4 @@ router.post('/send-otp', sendOtp);
 router.post('/verify-otp-reset', verifyOtpReset);
 
 export default router;
+

@@ -8,17 +8,20 @@ export class ProjectPolicy {
 
   /**
    * Determine if the user can view a project.
+   * Only owner, assigned members, or OrganizationAdmin of the same organization can view.
    */
   static canViewProject(user: any, project: any): boolean {
     if (!user) return false;
     if (user.role === 'Admin') return true;
 
+    if (user.role === 'OrganizationAdmin' && project.organizationId && user.organizationId === project.organizationId) {
+      return true;
+    }
+
     const isOwner = project.ownerId === user.userId;
     const isMember = project.members?.some((m: any) => m.userId === user.userId);
-    const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
-    const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
 
-    return isOwner || isMember || isGuide || isExpert;
+    return Boolean(isOwner || isMember);
   }
 
   /**
@@ -70,6 +73,7 @@ export class ProjectPolicy {
 
   /**
    * Determine if a user can create a task for a project.
+   * Only assigned supervisors (Guide, Expert), owner, or member with EDIT/SUBMIT can create tasks.
    */
   static canCreateTask(user: any, project: any): boolean {
     if (!user) return false;
@@ -77,12 +81,12 @@ export class ProjectPolicy {
 
     if (project.ownerId === user.userId) return true;
 
-    const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
-    const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
-    if (isGuide || isExpert) return true;
-
     const member = project.members?.find((m: any) => m.userId === user.userId);
     if (!member) return false;
+
+    const isGuide = user.role === 'Guide' || user.role === 'GUIDE' || member.role === 'GUIDE';
+    const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT' || member.role === 'PATENT_EXPERT';
+    if (isGuide || isExpert) return true;
 
     // VIEW permission cannot create tasks
     return member.permissionLevel === 'EDIT' || member.permissionLevel === 'SUBMIT' || !member.permissionLevel;

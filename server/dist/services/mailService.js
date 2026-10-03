@@ -62,15 +62,33 @@ class MailService {
             }
         }
         try {
-            this.transporter = nodemailer_1.default.createTransport({
-                host,
-                port,
-                secure,
-                auth: {
-                    user,
-                    pass,
-                },
-            });
+            const isGmail = host.includes('gmail');
+            if (isGmail) {
+                this.transporter = nodemailer_1.default.createTransport({
+                    service: 'gmail',
+                    auth: {
+                        user,
+                        pass,
+                    },
+                    connectionTimeout: 4000,
+                    greetingTimeout: 4000,
+                    socketTimeout: 4000,
+                });
+            }
+            else {
+                this.transporter = nodemailer_1.default.createTransport({
+                    host,
+                    port: port || 587,
+                    secure: secure || false,
+                    auth: {
+                        user,
+                        pass,
+                    },
+                    connectionTimeout: 5000,
+                    greetingTimeout: 5000,
+                    socketTimeout: 5000,
+                });
+            }
             return this.transporter;
         }
         catch (error) {
@@ -221,6 +239,99 @@ class MailService {
                     if (previewUrl) {
                         console.log(`\n==================================================`);
                         console.log(`[MAIL SERVICE] Fallback Ethereal Email Generated!`);
+                        console.log(`[MAIL SERVICE] Preview URL: ${previewUrl}`);
+                        console.log(`==================================================\n`);
+                    }
+                    return true;
+                }
+            }
+            catch (fallbackError) {
+                console.error(`[MAIL SERVICE ERROR] Fallback Ethereal failed:`, fallbackError);
+            }
+        }
+        return false;
+    }
+    static async sendLoginOtpEmail(email, fullName, otp) {
+        const isProd = process.env.NODE_ENV === 'production';
+        if (!isProd) {
+            console.log(`\n==================================================`);
+            console.log(`[LOGIN OTP DISPATCH - DEV ENVIRONMENT]`);
+            console.log(`Recipient: ${fullName} <${email}>`);
+            console.log(`Login OTP Code: ${otp}`);
+            console.log(`Expires in: 5 minutes`);
+            console.log(`==================================================\n`);
+        }
+        else {
+            console.log(`[MAIL SERVICE] Login OTP dispatched to registered email.`);
+        }
+        const isResend = (process.env.SMTP_HOST || '').includes('resend');
+        const defaultFrom = isResend ? 'PatentHub AI <onboarding@resend.dev>' : `"PatentHub AI" <${process.env.SMTP_USER || 'no-reply@patenthub.ai'}>`;
+        const from = process.env.SMTP_FROM || defaultFrom;
+        const textContent = `Hello,\n\nWe received a login request for your PatentHub AI account.\n\nYour verification code is:\n\n${otp}\n\nThis code expires in 5 minutes.\n\nIf you did not attempt to sign in, you can safely ignore this email.\n\nRegards,\nPatentHub AI`;
+        const htmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 28px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.04);">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="display: inline-block; padding: 8px 18px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 20px;">
+            <span style="font-size: 14px; font-weight: 700; color: #166534; letter-spacing: -0.2px;">PatentHub AI</span>
+          </div>
+        </div>
+        <h2 style="color: #0f172a; margin-bottom: 12px; text-align: center; font-weight: 700; font-size: 22px;">Verify your identity</h2>
+        <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 24px; text-align: center;">
+          Hello <strong>${fullName || 'there'}</strong>, we received a sign-in request for your account. Please enter the verification code below to complete your login:
+        </p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 24px; border-radius: 12px; margin: 24px 0; text-align: center;">
+          <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 1.5px; color: #64748b; margin-bottom: 8px;">Verification Code</div>
+          <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #006670; display: inline-block;">
+            ${otp}
+          </span>
+          <div style="font-size: 12px; color: #64748b; margin-top: 10px;">Valid for <strong>5 minutes</strong> • Single use only</div>
+        </div>
+
+        <p style="font-size: 13px; color: #64748b; line-height: 1.6; margin-top: 24px;">
+          If you did not attempt to sign in, you can safely ignore this email.
+        </p>
+
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 32px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+          Regards,<br />
+          <strong>PatentHub AI Security</strong>
+        </p>
+      </div>
+    `;
+        try {
+            const transporter = await this.getTransporter();
+            if (transporter) {
+                const info = await transporter.sendMail({
+                    from,
+                    to: email,
+                    subject: 'Your PatentHub AI verification code',
+                    text: textContent,
+                    html: htmlContent,
+                });
+                console.log(`[MAIL SERVICE] Login OTP sent successfully to ${email}`);
+                const previewUrl = nodemailer_1.default.getTestMessageUrl(info);
+                if (previewUrl) {
+                    console.log(`[MAIL SERVICE] Preview URL: ${previewUrl}`);
+                }
+                return true;
+            }
+        }
+        catch (primaryError) {
+            console.warn(`[MAIL SERVICE WARNING] Primary SMTP delivery failed:`, primaryError?.message || primaryError);
+            try {
+                const fallback = await this.getEtherealTransporter();
+                if (fallback) {
+                    const info = await fallback.sendMail({
+                        from: '"PatentHub AI" <no-reply@patenthub.ai>',
+                        to: email,
+                        subject: 'Your PatentHub AI verification code (Dev Preview)',
+                        text: textContent,
+                        html: htmlContent,
+                    });
+                    const previewUrl = nodemailer_1.default.getTestMessageUrl(info);
+                    if (previewUrl) {
+                        console.log(`\n==================================================`);
+                        console.log(`[MAIL SERVICE] Fallback Ethereal Login OTP Generated!`);
                         console.log(`[MAIL SERVICE] Preview URL: ${previewUrl}`);
                         console.log(`==================================================\n`);
                     }

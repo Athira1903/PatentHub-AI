@@ -278,3 +278,149 @@ export const updateRolePermissions = async (req: AuthenticatedRequest, res: Resp
     res.status(500).json({ message: error.message || 'Failed to update role permissions.' });
   }
 };
+
+export const updateOrganizationStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const { status } = req.body;
+    if (!status) {
+      res.status(400).json({ message: 'Status is required.' });
+      return;
+    }
+    const result = await AdminService.updateOrganizationStatus(id, status);
+    res.status(200).json({ message: 'Organization status updated.', organization: result });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to update organization status.' });
+  }
+};
+
+export const getPolicies = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { organizationId, status, search } = req.query;
+    const policies = await AdminService.getPolicies(
+      organizationId as string,
+      status as string,
+      search as string
+    );
+    res.status(200).json({ policies });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch platform policies.' });
+  }
+};
+
+export const createPolicy = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { name, description, rules, organizationId, status } = req.body;
+    if (!name) {
+      res.status(400).json({ message: 'Policy name is required.' });
+      return;
+    }
+    const policy = await AdminService.createPolicy(
+      { name, description, rules, organizationId, status },
+      req.user!.userId
+    );
+    res.status(201).json({ message: 'Policy created successfully.', policy });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to create policy.' });
+  }
+};
+
+export const updatePolicy = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const policy = await AdminService.updatePolicy(id, req.body);
+    res.status(200).json({ message: 'Policy updated successfully.', policy });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to update policy.' });
+  }
+};
+
+export const updatePolicyStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const { status } = req.body;
+    if (!status || !['ACTIVE', 'INACTIVE'].includes(status)) {
+      res.status(400).json({ message: 'Status must be ACTIVE or INACTIVE.' });
+      return;
+    }
+    const policy = await AdminService.updatePolicyStatus(id, status);
+    res.status(200).json({ message: `Policy status updated to ${status}.`, policy });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to update policy status.' });
+  }
+};
+
+export const getSubscriptions = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { status, organizationId } = req.query;
+    const data = await AdminService.getSubscriptions(status as string, organizationId as string);
+    res.status(200).json(data);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch subscriptions.' });
+  }
+};
+
+export const getPayments = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { status, organizationId, planId, dateFrom, dateTo } = req.query;
+    const payments = await AdminService.getPayments({
+      status: status as string,
+      organizationId: organizationId as string,
+      planId: planId as string,
+      dateFrom: dateFrom as string,
+      dateTo: dateTo as string,
+    });
+    res.status(200).json({ payments });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch payment records.' });
+  }
+};
+
+export const getEntitlements = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { organizationId } = req.query;
+    const entitlements = await AdminService.getEntitlements(organizationId as string);
+    res.status(200).json({ entitlements });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch entitlements.' });
+  }
+};
+
+export const getAuditLogs = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { search, userId, organizationId, action, dateFrom, dateTo, page, limit } = req.query;
+    const data = await AdminService.getAuditLogs({
+      search: search as string,
+      userId: userId as string,
+      organizationId: organizationId as string,
+      action: action as string,
+      dateFrom: dateFrom as string,
+      dateTo: dateTo as string,
+      page: page ? parseInt(page as string, 10) : 1,
+      limit: limit ? parseInt(limit as string, 10) : 25,
+    });
+    res.status(200).json(data);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch audit logs.' });
+  }
+};
+
+export const getSystemHealth = async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const health = await AdminService.getSystemHealth();
+    res.status(200).json(health);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to probe system health.' });
+  }
+};
+
+export const toggleNotificationStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const notif = await AdminService.toggleNotificationStatus(id);
+    res.status(200).json({ message: 'Notification status updated.', notification: notif });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to toggle notification status.' });
+  }
+};
+

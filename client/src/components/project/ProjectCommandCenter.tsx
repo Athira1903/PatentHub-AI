@@ -21,10 +21,14 @@ import {
   X,
   Loader2,
   Save,
-  Download
+  Download,
+  BookOpen,
+  Compass,
+  Sliders,
 } from 'lucide-react';
-import { api } from '../../services/api';
+import { api, patentApi } from '../../services/api';
 import toast from 'react-hot-toast';
+import { NextActionCard } from './NextActionCard';
 
 interface ProjectCommandCenterProps {
   project: any;
@@ -53,6 +57,46 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
   onRefreshProject,
 }) => {
   const [isStarred, setIsStarred] = useState(false);
+  const [nextAction, setNextAction] = useState<any>(null);
+  const [secondaryActions, setSecondaryActions] = useState<any[]>([]);
+  const [deadlines, setDeadlines] = useState<any[]>([]);
+  const [loadingNextAction, setLoadingNextAction] = useState(false);
+  const [nextActionError, setNextActionError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'guided' | 'advanced'>(() => {
+    return (localStorage.getItem('patenthub_view_mode') as 'guided' | 'advanced') || 'guided';
+  });
+
+  const handleToggleMode = (mode: 'guided' | 'advanced') => {
+    setViewMode(mode);
+    localStorage.setItem('patenthub_view_mode', mode);
+  };
+
+  const loadNextActionData = () => {
+    if (!project?.id) return;
+    setLoadingNextAction(true);
+    setNextActionError(null);
+    patentApi
+      .getNextAction(project.id)
+      .then((res) => {
+        const data = res.data;
+        setNextAction(data?.primaryAction || data?.recommendation || data);
+        setSecondaryActions(data?.secondaryActions || []);
+      })
+      .catch((err) => {
+        console.error('Failed to load next action', err);
+        setNextActionError(err.response?.data?.error || 'Unable to load next action recommendation.');
+      })
+      .finally(() => setLoadingNextAction(false));
+
+    patentApi
+      .getDeadlines(project.id)
+      .then((res) => setDeadlines(res.data?.deadlines || []))
+      .catch((err) => console.error('Failed to load deadlines', err));
+  };
+
+  useEffect(() => {
+    loadNextActionData();
+  }, [project?.id]);
 
   // Invite Collaborator Modal
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -178,6 +222,14 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
       icon: PenTool,
       color: 'text-emerald-600 bg-emerald-50/80 hover:bg-emerald-100/60',
       action: () => onNavigateTab('Claims Studio'),
+    },
+    {
+      id: 'specification',
+      title: 'Draft Specification',
+      subtitle: 'Form 2 multi-section drafting',
+      icon: BookOpen,
+      color: 'text-indigo-600 bg-indigo-50/80 hover:bg-indigo-100/60',
+      action: () => onNavigateTab('Specification'),
     },
     {
       id: 'drawings',
@@ -408,6 +460,172 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
           </button>
         </div>
       </div>
+
+      {/* PERSPECTIVE SWITCHER: GUIDED | ADVANCED */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl p-3 px-4 shadow-3xs">
+        <div className="flex items-center gap-2">
+          <Compass className="w-4 h-4 text-[#064E3B]" />
+          <span className="text-xs font-bold text-slate-800">Invention Workspace Mode:</span>
+          <span className="text-xs text-slate-500 hidden sm:inline">
+            {viewMode === 'guided'
+              ? 'Plain-language guidance and next steps for inventors'
+              : 'Statutory IPC classification, legal deadlines, and claim hierarchy'}
+          </span>
+        </div>
+
+        <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold shrink-0">
+          <button
+            type="button"
+            onClick={() => handleToggleMode('guided')}
+            className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+              viewMode === 'guided'
+                ? 'bg-white text-slate-950 shadow-3xs font-extrabold'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            Guided
+          </button>
+          <button
+            type="button"
+            onClick={() => handleToggleMode('advanced')}
+            className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+              viewMode === 'advanced'
+                ? 'bg-[#064E3B] text-white shadow-3xs font-extrabold'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            Advanced
+          </button>
+        </div>
+      </div>
+
+      {/* NEXT-ACTION RECOMMENDATION CARD */}
+      <NextActionCard
+        projectId={project.id}
+        projectTitle={project.title}
+        nextAction={nextAction}
+        secondaryActions={secondaryActions}
+        loading={loadingNextAction}
+        error={nextActionError}
+        onRetry={loadNextActionData}
+        onNavigateTab={onNavigateTab}
+      />
+
+      {/* GUIDED MODE WALKTHROUGH PANEL */}
+      {viewMode === 'guided' && (
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+            <Lightbulb className="w-4 h-4 text-amber-500" />
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Guided Walkthrough</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 bg-slate-50/70 border border-slate-200/60 rounded-2xl space-y-1">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">1. What you need to do</span>
+              <p className="text-xs font-bold text-slate-900 mt-1">
+                {nextAction?.title || 'Draft and refine your technical disclosure'}
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Step-by-step guidance ensures you satisfy all IPO pre-filing requirements.
+              </p>
+            </div>
+            <div className="p-4 bg-slate-50/70 border border-slate-200/60 rounded-2xl space-y-1">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">2. Why it matters</span>
+              <p className="text-xs font-bold text-slate-900 mt-1">
+                Establish statutory novelty & inventive step
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Under Section 2(1)(j) of The Patents Act, your technical disclosure must distinguish itself from all global published literature.
+              </p>
+            </div>
+            <div className="p-4 bg-slate-50/70 border border-slate-200/60 rounded-2xl space-y-1">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">3. Your immediate step</span>
+              <p className="text-xs font-bold text-slate-900 mt-1">
+                {nextAction?.actionText || 'Review components'}
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                {nextAction?.reason?.substring(0, 100) || 'Proceed directly with AI assisted tools.'}...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADVANCED MODE STATUTORY & CLASSIFICATION METADATA */}
+      {viewMode === 'advanced' && (
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-[#064E3B]" />
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                Advanced Statutory & Classification Metadata
+              </h3>
+            </div>
+            <span className="text-[10px] text-slate-400 font-mono">WIPO IPC Standard / Form 1 & 2 Metadata</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* IPC Suggestions / Assigned */}
+            <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">IPC Classifications</span>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {(project?.ipcClassifications?.length ? project.ipcClassifications : [
+                  { symbol: 'G06F 16/00', title: 'Information retrieval; Database structures' },
+                  { symbol: 'H04L 9/00', title: 'Cryptographic mechanisms or protocols' }
+                ]).map((ipc: any, idx: number) => (
+                  <span key={idx} className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-[10px] font-bold font-mono" title={ipc.title || ipc.ipcClassification?.title}>
+                    {ipc.symbol || ipc.ipcClassification?.symbol || ipc.code}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">Candidate classifications for patent registry filing.</p>
+            </div>
+
+            {/* Statutory Deadlines */}
+            <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Statutory Deadlines</span>
+              {deadlines.length > 0 ? (
+                <div className="space-y-1">
+                  {deadlines.map((dl: any, idx: number) => (
+                    <div key={idx} className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                      <span className="truncate">{dl.deadlineType?.replace(/_/g, ' ')}</span>
+                      <span className="text-[10px] text-amber-600 font-mono shrink-0">
+                        {new Date(dl.dueDate).toLocaleDateString('en-GB')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-600 font-medium">
+                  Complete spec due 12 mos from provisional (Sec 9(1) Patents Act)
+                </p>
+              )}
+              <p className="text-[10px] text-slate-400">Calculated via centralized DeadlineService.</p>
+            </div>
+
+            {/* Claim Structure */}
+            <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Claim Structure</span>
+              <p className="text-base font-black text-slate-900">
+                {project?.patentClaims?.length || 0} <span className="text-xs font-semibold text-slate-500">Drafted Claims</span>
+              </p>
+              <p className="text-[10px] text-emerald-700 font-semibold">
+                Antecedent basis tracking & element hierarchy active
+              </p>
+            </div>
+
+            {/* Legal Entities */}
+            <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Legal Entities</span>
+              <p className="text-xs font-bold text-slate-900 truncate">
+                Applicant: {project?.owner?.institution || project?.owner?.fullName || 'Individual Applicant'}
+              </p>
+              <p className="text-[10px] text-slate-500">
+                {inventorsList.length} Legal Inventors declared (Form 5 compliant)
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. PATENT JOURNEY VISUAL PROGRESS STEPPER */}
       <div className="app-card p-6 shadow-xs">
@@ -840,7 +1058,7 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
                     {project.members.map((m: any) => (
                       <div key={m.id || m.userId} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-150 text-[11px]">
                         <span className="font-medium text-slate-700 truncate">{m.user?.fullName || m.user?.username || 'Member'}</span>
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[9px]">{m.role}</span>
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[9px]">{typeof m.role === 'object' ? m.role?.name : m.role}</span>
                       </div>
                     ))}
                   </div>

@@ -18,39 +18,57 @@ const RESERVED_USERNAMES = [
   'user',
 ];
 
-const registerSchema = z.object({
-  fullName: z
-    .string()
-    .trim()
-    .min(2, 'Full name must be at least 2 characters')
-    .max(100, 'Full name cannot exceed 100 characters')
-    .regex(/^[a-zA-Z\s'-]+$/, 'Full name can only contain letters, spaces, hyphens, and apostrophes'),
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .email('Please enter a valid email address')
-    .max(150, 'Email address is too long'),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number'),
-  institution: z.string().trim().max(150, 'Institution name cannot exceed 150 characters').optional(),
-  department: z.string().trim().min(1, 'Department is required').max(100, 'Department cannot exceed 100 characters'),
-  designation: z.string().trim().min(1, 'Designation is required').max(100, 'Designation cannot exceed 100 characters'),
-  userType: z.enum([
-    'Student',
-    'Guide',
-    'PatentExpert',
-    'Admin',
-    'Inventor',
-    'CoInventor',
-    'Co-Inventor',
-    'Patent Expert',
-    'Administrator',
-  ]),
-  employeeOrStudentId: z.string().trim().max(50).optional(),
-});
+const registerSchema = z
+  .object({
+    accountType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional().default('INDIVIDUAL'),
+    fullName: z
+      .string()
+      .trim()
+      .min(2, 'Full name must be at least 2 characters')
+      .max(100, 'Full name cannot exceed 100 characters')
+      .regex(/^[a-zA-Z\s'-]+$/, 'Full name can only contain letters, spaces, hyphens, and apostrophes'),
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email('Please enter a valid email address')
+      .max(150, 'Email address is too long'),
+    phone: z
+      .string()
+      .trim()
+      .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number'),
+    institution: z.string().trim().max(150, 'Institution name cannot exceed 150 characters').optional(),
+    department: z.string().trim().max(100, 'Department cannot exceed 100 characters').optional().default('General'),
+    designation: z.string().trim().max(100, 'Designation cannot exceed 100 characters').optional().default('Member'),
+    userType: z.enum([
+      'Student',
+      'Guide',
+      'PatentExpert',
+      'Admin',
+      'Inventor',
+      'CoInventor',
+      'Co-Inventor',
+      'Patent Expert',
+      'Administrator',
+    ]),
+    employeeOrStudentId: z.string().trim().max(50).optional(),
+    organizationName: z.string().trim().max(150, 'Organization name cannot exceed 150 characters').optional(),
+    organizationType: z.string().trim().max(100).optional(),
+    organizationDomain: z.string().trim().max(100).optional(),
+    organizationLocation: z.string().trim().max(150).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.accountType === 'ORGANIZATION') {
+      const orgName = data.organizationName || data.institution;
+      if (!orgName || orgName.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Organization name is required for organization accounts',
+          path: ['organizationName'],
+        });
+      }
+    }
+  });
 
 const activateSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
@@ -66,8 +84,12 @@ const activateSchema = z.object({
 });
 
 const loginSchema = z.object({
-  emailOrUsername: z.string().trim().min(1, 'Username is required'),
+  identifier: z.string().trim().min(1).optional(),
+  emailOrUsername: z.string().trim().min(1).optional(),
   password: z.string().min(1, 'Password is required'),
+}).refine(data => data.identifier || data.emailOrUsername, {
+  message: 'Username or email is required',
+  path: ['emailOrUsername'],
 });
 
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -75,14 +97,19 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const validatedData = registerSchema.parse(req.body);
 
     const result = await AuthService.register({
+      accountType: validatedData.accountType,
       fullName: validatedData.fullName,
       email: validatedData.email,
       phone: validatedData.phone,
-      institution: validatedData.institution,
-      department: validatedData.department,
-      designation: validatedData.designation,
+      institution: validatedData.institution || validatedData.organizationName,
+      department: validatedData.department || 'General',
+      designation: validatedData.designation || (validatedData.accountType === 'ORGANIZATION' ? 'Member' : 'Student'),
       userType: validatedData.userType,
       employeeOrStudentId: validatedData.employeeOrStudentId,
+      organizationName: validatedData.organizationName || validatedData.institution,
+      organizationType: validatedData.organizationType,
+      organizationDomain: validatedData.organizationDomain,
+      organizationLocation: validatedData.organizationLocation,
     });
 
     res.status(201).json({
@@ -151,13 +178,14 @@ export const resendActivation = async (req: Request, res: Response): Promise<voi
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const validatedData = loginSchema.parse(req.body);
+    const identifier = validatedData.identifier || validatedData.emailOrUsername || '';
 
-    const result = await AuthService.login(validatedData);
-
-    res.status(200).json({
-      message: 'Login successful',
-      ...result,
+    const result = await AuthService.login({
+      emailOrUsername: identifier,
+      password: validatedData.password,
     });
+
+    res.status(200).json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       res.status(400).json({
@@ -167,7 +195,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     res.status(401).json({
-      message: error.message || 'Login failed',
+      message: error.message || 'Invalid credentials',
     });
   }
 };

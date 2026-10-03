@@ -158,6 +158,17 @@ const getProfile = async (req, res) => {
                         fullName: true,
                         username: true,
                         role: true,
+                        accountType: true,
+                        organizationId: true,
+                        organization: {
+                            select: {
+                                id: true,
+                                name: true,
+                                type: true,
+                                domain: true,
+                                location: true,
+                            },
+                        },
                     },
                 },
             },

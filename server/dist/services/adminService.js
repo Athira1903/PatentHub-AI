@@ -4,6 +4,7 @@ exports.AdminService = exports.ALL_PERMISSIONS = void 0;
 const db_1 = require("../config/db");
 const analyticsService_1 = require("./analyticsService");
 const filingReadinessService_1 = require("./filingReadinessService");
+const razorpayService_1 = require("./razorpayService");
 let systemAnnouncements = [];
 let systemSettings = {
     registrationEnabled: true,
@@ -97,8 +98,9 @@ class AdminService {
         const totalUsers = await db_1.prisma.user.count();
         const activeUsers = await db_1.prisma.user.count({ where: { isActive: true } });
         const totalProjects = await db_1.prisma.patentProject.count();
+        const activeProjects = await db_1.prisma.patentProject.count({ where: { isArchived: false } });
         const projectsInProgress = await db_1.prisma.patentProject.count({
-            where: { stage: { notIn: ['FILING_READY', 'FILED'] } },
+            where: { stage: { notIn: ['FILING_READY', 'FILED'] }, isArchived: false },
         });
         const filingReadyProjects = await db_1.prisma.patentProject.count({
             where: { stage: { in: ['FILING_READY', 'FILED'] } },
@@ -111,23 +113,65 @@ class AdminService {
         const completedReviews = await db_1.prisma.projectReview.count({
             where: { decision: { in: ['APPROVED', 'REJECTED'] } },
         });
-        // Real Organizations: Grouped distinct institutions from Users & Profiles
-        const usersWithInstitutions = await db_1.prisma.user.findMany({
-            select: { institution: true, email: true },
-        });
-        const distinctOrgs = new Set();
-        usersWithInstitutions.forEach((u) => {
-            if (u.institution && u.institution.trim().length > 1) {
-                distinctOrgs.add(u.institution.trim());
-            }
-            else if (u.email.includes('@')) {
-                const dom = u.email.split('@')[1];
-                if (dom && !['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com'].includes(dom)) {
-                    distinctOrgs.add(dom);
+        // Real Organizations
+        let totalOrganizations = await db_1.prisma.organization.count();
+        let activeOrganizations = await db_1.prisma.organization.count({ where: { status: 'ACTIVE' } });
+        if (totalOrganizations === 0) {
+            const usersWithInstitutions = await db_1.prisma.user.findMany({
+                select: { institution: true, email: true },
+            });
+            const distinctOrgs = new Set();
+            usersWithInstitutions.forEach((u) => {
+                if (u.institution && u.institution.trim().length > 1) {
+                    distinctOrgs.add(u.institution.trim());
                 }
-            }
+                else if (u.email.includes('@')) {
+                    const dom = u.email.split('@')[1];
+                    if (dom && !['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com'].includes(dom)) {
+                        distinctOrgs.add(dom);
+                    }
+                }
+            });
+            totalOrganizations = distinctOrgs.size || 1;
+            activeOrganizations = totalOrganizations;
+        }
+        // Real Subscriptions and Trials
+        const activeSubscriptions = await db_1.prisma.subscription.count({
+            where: { status: { in: ['ACTIVE', 'active'] } },
         });
-        const totalOrganizations = distinctOrgs.size || 1;
+        const trialOrganizations = await db_1.prisma.trial.count({
+            where: { status: { in: ['ACTIVE', 'active'] } },
+        });
+        // Real Live System Status
+        let dbStatus = 'DISCONNECTED';
+        try {
+            await db_1.prisma.$queryRaw `SELECT 1`;
+            dbStatus = 'CONNECTED';
+        }
+        catch (e) {
+            dbStatus = 'STATUS_UNAVAILABLE';
+        }
+        const aiStatus = (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 5 && process.env.GEMINI_API_KEY !== 'your_api_key')
+            ? 'AVAILABLE'
+            : 'STATUS_UNAVAILABLE';
+        const cloudStorageStatus = (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_CLOUD_NAME !== 'your_cloud_name')
+            ? 'AVAILABLE'
+            : 'STATUS_UNAVAILABLE';
+        const paymentStatus = razorpayService_1.RazorpayService.isConfigured()
+            ? 'AVAILABLE'
+            : 'STATUS_UNAVAILABLE';
+        const emailStatus = (process.env.SMTP_USER && process.env.SMTP_USER !== 'your_email@gmail.com')
+            ? 'AVAILABLE'
+            : 'STATUS_UNAVAILABLE';
+        const systemStatus = {
+            backend: 'ONLINE',
+            database: dbStatus,
+            aiService: aiStatus,
+            cloudStorage: cloudStorageStatus,
+            payment: paymentStatus,
+            email: emailStatus,
+            timestamp: new Date().toISOString(),
+        };
         // Real Stage Distribution
         const projects = await db_1.prisma.patentProject.findMany({
             select: { id: true, stage: true },
@@ -199,8 +243,8 @@ class AdminService {
         // Real Activity Logs from PostgreSQL
         const recentActivityLogs = await db_1.prisma.activityLog.findMany({
             include: {
-                user: { select: { fullName: true, username: true } },
-                project: { select: { title: true, id: true } },
+                user: { select: { fullName: true, username: true, organization: { select: { name: true } }, institution: true } },
+                project: { select: { title: true, id: true, organization: { select: { name: true } } } },
             },
             orderBy: { createdAt: 'desc' },
             take: 10,
@@ -208,9 +252,12 @@ class AdminService {
         const recentActivities = recentActivityLogs.map((log) => ({
             id: log.id,
             user: log.user?.fullName || log.user?.username || 'Platform System',
+            organization: log.user?.organization?.name || log.project?.organization?.name || log.user?.institution || 'Independent',
             action: log.action,
             target: log.project?.title || 'Patent Workspace',
+            resourceId: log.projectId || log.id,
             time: new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            date: new Date(log.createdAt).toLocaleDateString(),
             status: 'SUCCESS',
         }));
         return {
@@ -218,12 +265,18 @@ class AdminService {
                 totalUsers,
                 activeUsers,
                 totalOrganizations,
+                activeOrganizations,
                 totalProjects,
+                activeProjects,
                 projectsInProgress,
                 pendingVerifications,
                 pendingReviews,
+                completedReviews,
                 filingReadyProjects,
+                activeSubscriptions,
+                trialOrganizations,
             },
+            systemStatus,
             stageDistribution: stageDist,
             intelligence,
             verificationQueue,
@@ -1102,6 +1155,378 @@ class AdminService {
             permissions: rolePermissionsMatrix[roleName],
             message: `Permissions updated successfully for ${roleName}.`
         };
+    }
+    /**
+     * Policies Platform Governance
+     */
+    static async getPolicies(organizationId, status, search) {
+        const where = {};
+        if (organizationId && organizationId !== 'ALL') {
+            where.organizationId = organizationId;
+        }
+        if (status && status !== 'ALL') {
+            where.status = status.toUpperCase();
+        }
+        if (search && search.trim()) {
+            where.OR = [
+                { name: { contains: search.trim(), mode: 'insensitive' } },
+                { description: { contains: search.trim(), mode: 'insensitive' } },
+            ];
+        }
+        const policies = await db_1.prisma.policy.findMany({
+            where,
+            include: {
+                organization: { select: { id: true, name: true, domain: true } },
+                createdBy: { select: { id: true, fullName: true, username: true } },
+                _count: { select: { assignments: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        return policies.map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            rules: p.rules,
+            status: p.status,
+            organizationId: p.organizationId,
+            organizationName: p.organization?.name || 'Platform Scope',
+            createdBy: p.createdBy ? p.createdBy.fullName || p.createdBy.username : 'Administrator',
+            assignmentsCount: p._count.assignments,
+            createdAt: p.createdAt,
+            updatedAt: p.updatedAt,
+        }));
+    }
+    static async createPolicy(data, adminUserId) {
+        let targetOrgId = data.organizationId;
+        if (!targetOrgId) {
+            const firstOrg = await db_1.prisma.organization.findFirst();
+            if (firstOrg) {
+                targetOrgId = firstOrg.id;
+            }
+            else {
+                const defaultOrg = await db_1.prisma.organization.create({
+                    data: { name: 'PatentHub Platform', domain: 'patenthub.ai', status: 'ACTIVE' },
+                });
+                targetOrgId = defaultOrg.id;
+            }
+        }
+        return await db_1.prisma.policy.create({
+            data: {
+                name: data.name.trim(),
+                description: data.description?.trim() || null,
+                rules: data.rules || {},
+                status: data.status || 'ACTIVE',
+                organizationId: targetOrgId,
+                createdById: adminUserId,
+            },
+            include: {
+                organization: { select: { id: true, name: true } },
+                createdBy: { select: { id: true, fullName: true } },
+            },
+        });
+    }
+    static async updatePolicy(policyId, data) {
+        return await db_1.prisma.policy.update({
+            where: { id: policyId },
+            data: {
+                ...(data.name && { name: data.name.trim() }),
+                ...(data.description !== undefined && { description: data.description?.trim() || null }),
+                ...(data.rules !== undefined && { rules: data.rules }),
+                ...(data.status && { status: data.status }),
+            },
+            include: {
+                organization: { select: { id: true, name: true } },
+            },
+        });
+    }
+    static async updatePolicyStatus(policyId, status) {
+        return await db_1.prisma.policy.update({
+            where: { id: policyId },
+            data: { status },
+        });
+    }
+    /**
+     * Subscriptions Management
+     */
+    static async getSubscriptions(status, organizationId) {
+        const where = {};
+        if (status && status !== 'ALL') {
+            where.status = status.toUpperCase();
+        }
+        if (organizationId && organizationId !== 'ALL') {
+            where.organizationId = organizationId;
+        }
+        const subscriptions = await db_1.prisma.subscription.findMany({
+            where,
+            include: {
+                organization: {
+                    select: {
+                        id: true,
+                        name: true,
+                        domain: true,
+                        contactEmail: true,
+                        trial: true,
+                    },
+                },
+                plan: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        const trials = await db_1.prisma.trial.findMany({
+            include: {
+                organization: {
+                    select: { id: true, name: true, domain: true, contactEmail: true },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        const availablePlans = await db_1.prisma.subscriptionPlan.findMany({
+            orderBy: { amount: 'asc' },
+        });
+        return {
+            subscriptions: subscriptions.map((s) => ({
+                id: s.id,
+                organizationId: s.organizationId,
+                organizationName: s.organization?.name || 'Unassigned',
+                domain: s.organization?.domain || '',
+                planName: s.plan?.name || 'PatentHub Pro',
+                planCode: s.plan?.code || 'PRO',
+                amount: s.plan?.amount ? s.plan.amount / 100 : 0,
+                currency: s.plan?.currency || 'INR',
+                status: s.status,
+                startDate: s.currentPeriodStart || s.createdAt,
+                endDate: s.currentPeriodEnd,
+                cancelAtPeriodEnd: s.cancelAtPeriodEnd,
+                trialStatus: s.organization?.trial?.status || 'NONE',
+                razorpaySubscriptionId: s.razorpaySubscriptionId || 'N/A',
+                createdAt: s.createdAt,
+            })),
+            trials: trials.map((t) => ({
+                id: t.id,
+                organizationId: t.organizationId,
+                organizationName: t.organization?.name || 'Unassigned',
+                status: t.status,
+                startedAt: t.startedAt,
+                expiresAt: t.expiresAt,
+                consumedAt: t.consumedAt,
+            })),
+            plans: availablePlans.map((p) => ({
+                id: p.id,
+                name: p.name,
+                code: p.code,
+                description: p.description,
+                amount: p.amount / 100,
+                currency: p.currency,
+                billingInterval: p.billingInterval,
+                features: p.features,
+                isActive: p.isActive,
+            })),
+        };
+    }
+    /**
+     * Payments Management
+     */
+    static async getPayments(filters) {
+        const where = {};
+        if (filters.status && filters.status !== 'ALL') {
+            where.status = filters.status.toUpperCase();
+        }
+        if (filters.organizationId && filters.organizationId !== 'ALL') {
+            where.organizationId = filters.organizationId;
+        }
+        if (filters.dateFrom || filters.dateTo) {
+            where.createdAt = {};
+            if (filters.dateFrom)
+                where.createdAt.gte = new Date(filters.dateFrom);
+            if (filters.dateTo)
+                where.createdAt.lte = new Date(filters.dateTo);
+        }
+        const payments = await db_1.prisma.payment.findMany({
+            where,
+            include: {
+                organization: { select: { id: true, name: true, domain: true } },
+                subscription: { include: { plan: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
+        return payments.map((p) => ({
+            id: p.id,
+            paymentId: p.id,
+            organizationId: p.organizationId,
+            organizationName: p.organization?.name || 'Organization',
+            razorpayPaymentId: p.razorpayPaymentId || 'N/A',
+            razorpayOrderId: p.razorpayOrderId || 'N/A',
+            razorpaySubscriptionId: p.razorpaySubscriptionId || 'N/A',
+            amount: p.amount ? p.amount / 100 : 0,
+            currency: p.currency || 'INR',
+            status: p.status,
+            paymentMethod: p.paymentMethod || 'card',
+            paymentDate: p.paidAt || p.createdAt,
+            planName: p.subscription?.plan?.name || 'PatentHub Pro',
+            verificationStatus: p.status === 'SUCCESS' ? 'VERIFIED' : p.status === 'FAILED' ? 'REJECTED' : 'PENDING',
+            failureReason: p.failureReason,
+        }));
+    }
+    /**
+     * Entitlements Management
+     */
+    static async getEntitlements(organizationId) {
+        const where = {};
+        if (organizationId && organizationId !== 'ALL') {
+            where.organizationId = organizationId;
+        }
+        const entitlements = await db_1.prisma.entitlement.findMany({
+            where,
+            include: {
+                organization: { select: { id: true, name: true } },
+                subscription: { include: { plan: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        const featureLabels = {
+            AI_INNOVATION_ANALYSIS: 'AI Innovation Analysis',
+            PATENT_DRAWING_GENERATION: 'Patent Drawing Generation',
+            EXPORT_FILING_PACKAGE: 'Filing Package Export',
+        };
+        return entitlements.map((e) => ({
+            id: e.id,
+            organizationId: e.organizationId,
+            organizationName: e.organization?.name || 'Organization',
+            featureCode: e.featureCode,
+            featureName: featureLabels[e.featureCode] || e.featureCode,
+            enabled: e.enabled,
+            status: e.enabled && (!e.validUntil || new Date() <= e.validUntil) ? 'ACTIVE' : 'EXPIRED',
+            validFrom: e.validFrom,
+            validUntil: e.validUntil,
+            planName: e.subscription?.plan?.name || 'PatentHub Pro',
+            createdAt: e.createdAt,
+        }));
+    }
+    /**
+     * Comprehensive Platform Audit Logs
+     */
+    static async getAuditLogs(filters) {
+        const page = filters.page || 1;
+        const limit = filters.limit || 25;
+        const skip = (page - 1) * limit;
+        const where = {};
+        if (filters.userId && filters.userId !== 'ALL')
+            where.userId = filters.userId;
+        if (filters.action && filters.action !== 'ALL')
+            where.type = filters.action;
+        if (filters.search && filters.search.trim()) {
+            where.OR = [
+                { action: { contains: filters.search.trim(), mode: 'insensitive' } },
+                { type: { contains: filters.search.trim(), mode: 'insensitive' } },
+            ];
+        }
+        if (filters.dateFrom || filters.dateTo) {
+            where.createdAt = {};
+            if (filters.dateFrom)
+                where.createdAt.gte = new Date(filters.dateFrom);
+            if (filters.dateTo)
+                where.createdAt.lte = new Date(filters.dateTo);
+        }
+        const [total, logs] = await Promise.all([
+            db_1.prisma.activityLog.count({ where }),
+            db_1.prisma.activityLog.findMany({
+                where,
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            username: true,
+                            email: true,
+                            role: true,
+                            organization: { select: { id: true, name: true } },
+                            institution: true,
+                        },
+                    },
+                    project: {
+                        select: {
+                            id: true,
+                            title: true,
+                            organization: { select: { id: true, name: true } },
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+        ]);
+        return {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit) || 1,
+            logs: logs.map((l) => ({
+                id: l.id,
+                user: l.user?.fullName || l.user?.username || 'System User',
+                userId: l.userId,
+                userRole: l.user?.role?.name || 'User',
+                organization: l.user?.organization?.name || l.project?.organization?.name || l.user?.institution || 'Independent',
+                organizationId: l.user?.organization?.id || l.project?.organization?.id || null,
+                action: l.action,
+                type: l.type,
+                resource: l.project?.title || 'System Resource',
+                resourceId: l.projectId || l.id,
+                createdAt: l.createdAt,
+                status: 'SUCCESS',
+            })),
+        };
+    }
+    /**
+     * Live System Health Probe
+     */
+    static async getSystemHealth() {
+        let dbStatus = 'DISCONNECTED';
+        try {
+            await db_1.prisma.$queryRaw `SELECT 1`;
+            dbStatus = 'CONNECTED';
+        }
+        catch (e) {
+            dbStatus = 'STATUS_UNAVAILABLE';
+        }
+        const aiStatus = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 5 && process.env.GEMINI_API_KEY !== 'your_api_key'
+            ? 'AVAILABLE'
+            : 'STATUS_UNAVAILABLE';
+        const cloudStorageStatus = process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_CLOUD_NAME !== 'your_cloud_name'
+            ? 'AVAILABLE'
+            : 'STATUS_UNAVAILABLE';
+        const paymentStatus = razorpayService_1.RazorpayService.isConfigured() ? 'AVAILABLE' : 'STATUS_UNAVAILABLE';
+        const emailStatus = process.env.SMTP_USER && process.env.SMTP_USER !== 'your_email@gmail.com'
+            ? 'AVAILABLE'
+            : 'STATUS_UNAVAILABLE';
+        return {
+            backend: 'ONLINE',
+            database: dbStatus,
+            aiService: aiStatus,
+            cloudStorage: cloudStorageStatus,
+            payment: paymentStatus,
+            email: emailStatus,
+            timestamp: new Date().toISOString(),
+        };
+    }
+    static async updateOrganizationStatus(orgId, status) {
+        const org = await db_1.prisma.organization.findUnique({ where: { id: orgId } });
+        if (!org)
+            throw new Error('Organization not found.');
+        return await db_1.prisma.organization.update({
+            where: { id: orgId },
+            data: { status },
+        });
+    }
+    static async toggleNotificationStatus(notificationId) {
+        const notif = await db_1.prisma.notification.findUnique({ where: { id: notificationId } });
+        if (!notif)
+            throw new Error('Notification not found.');
+        return await db_1.prisma.notification.update({
+            where: { id: notificationId },
+            data: { isRead: !notif.isRead },
+        });
     }
 }
 exports.AdminService = AdminService;

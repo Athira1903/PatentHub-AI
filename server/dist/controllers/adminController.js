@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateRolePermissions = exports.getRolePermissions = exports.getOrganizationDetails = exports.getUserProfile = exports.getRolesStats = exports.broadcastNotification = exports.getNotifications = exports.getActivityLogs = exports.updateSettings = exports.getSettings = exports.createAnnouncement = exports.getAnnouncements = exports.getAiOperations = exports.getClaimsFtoOversight = exports.getReviewsOversight = exports.assignProjectReviewer = exports.getProjects = exports.createOrganization = exports.getOrganizations = exports.processVerification = exports.getVerifications = exports.deleteUser = exports.updateUserRole = exports.updateUserStatus = exports.getUsers = exports.getDashboardMetrics = void 0;
+exports.toggleNotificationStatus = exports.getSystemHealth = exports.getAuditLogs = exports.getEntitlements = exports.getPayments = exports.getSubscriptions = exports.updatePolicyStatus = exports.updatePolicy = exports.createPolicy = exports.getPolicies = exports.updateOrganizationStatus = exports.updateRolePermissions = exports.getRolePermissions = exports.getOrganizationDetails = exports.getUserProfile = exports.getRolesStats = exports.broadcastNotification = exports.getNotifications = exports.getActivityLogs = exports.updateSettings = exports.getSettings = exports.createAnnouncement = exports.getAnnouncements = exports.getAiOperations = exports.getClaimsFtoOversight = exports.getReviewsOversight = exports.assignProjectReviewer = exports.getProjects = exports.createOrganization = exports.getOrganizations = exports.processVerification = exports.getVerifications = exports.deleteUser = exports.updateUserRole = exports.updateUserStatus = exports.getUsers = exports.getDashboardMetrics = void 0;
 const adminService_1 = require("../services/adminService");
 const getDashboardMetrics = async (req, res) => {
     try {
@@ -294,3 +294,152 @@ const updateRolePermissions = async (req, res) => {
     }
 };
 exports.updateRolePermissions = updateRolePermissions;
+const updateOrganizationStatus = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { status } = req.body;
+        if (!status) {
+            res.status(400).json({ message: 'Status is required.' });
+            return;
+        }
+        const result = await adminService_1.AdminService.updateOrganizationStatus(id, status);
+        res.status(200).json({ message: 'Organization status updated.', organization: result });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to update organization status.' });
+    }
+};
+exports.updateOrganizationStatus = updateOrganizationStatus;
+const getPolicies = async (req, res) => {
+    try {
+        const { organizationId, status, search } = req.query;
+        const policies = await adminService_1.AdminService.getPolicies(organizationId, status, search);
+        res.status(200).json({ policies });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch platform policies.' });
+    }
+};
+exports.getPolicies = getPolicies;
+const createPolicy = async (req, res) => {
+    try {
+        const { name, description, rules, organizationId, status } = req.body;
+        if (!name) {
+            res.status(400).json({ message: 'Policy name is required.' });
+            return;
+        }
+        const policy = await adminService_1.AdminService.createPolicy({ name, description, rules, organizationId, status }, req.user.userId);
+        res.status(201).json({ message: 'Policy created successfully.', policy });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to create policy.' });
+    }
+};
+exports.createPolicy = createPolicy;
+const updatePolicy = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const policy = await adminService_1.AdminService.updatePolicy(id, req.body);
+        res.status(200).json({ message: 'Policy updated successfully.', policy });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to update policy.' });
+    }
+};
+exports.updatePolicy = updatePolicy;
+const updatePolicyStatus = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { status } = req.body;
+        if (!status || !['ACTIVE', 'INACTIVE'].includes(status)) {
+            res.status(400).json({ message: 'Status must be ACTIVE or INACTIVE.' });
+            return;
+        }
+        const policy = await adminService_1.AdminService.updatePolicyStatus(id, status);
+        res.status(200).json({ message: `Policy status updated to ${status}.`, policy });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to update policy status.' });
+    }
+};
+exports.updatePolicyStatus = updatePolicyStatus;
+const getSubscriptions = async (req, res) => {
+    try {
+        const { status, organizationId } = req.query;
+        const data = await adminService_1.AdminService.getSubscriptions(status, organizationId);
+        res.status(200).json(data);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch subscriptions.' });
+    }
+};
+exports.getSubscriptions = getSubscriptions;
+const getPayments = async (req, res) => {
+    try {
+        const { status, organizationId, planId, dateFrom, dateTo } = req.query;
+        const payments = await adminService_1.AdminService.getPayments({
+            status: status,
+            organizationId: organizationId,
+            planId: planId,
+            dateFrom: dateFrom,
+            dateTo: dateTo,
+        });
+        res.status(200).json({ payments });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch payment records.' });
+    }
+};
+exports.getPayments = getPayments;
+const getEntitlements = async (req, res) => {
+    try {
+        const { organizationId } = req.query;
+        const entitlements = await adminService_1.AdminService.getEntitlements(organizationId);
+        res.status(200).json({ entitlements });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch entitlements.' });
+    }
+};
+exports.getEntitlements = getEntitlements;
+const getAuditLogs = async (req, res) => {
+    try {
+        const { search, userId, organizationId, action, dateFrom, dateTo, page, limit } = req.query;
+        const data = await adminService_1.AdminService.getAuditLogs({
+            search: search,
+            userId: userId,
+            organizationId: organizationId,
+            action: action,
+            dateFrom: dateFrom,
+            dateTo: dateTo,
+            page: page ? parseInt(page, 10) : 1,
+            limit: limit ? parseInt(limit, 10) : 25,
+        });
+        res.status(200).json(data);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch audit logs.' });
+    }
+};
+exports.getAuditLogs = getAuditLogs;
+const getSystemHealth = async (_req, res) => {
+    try {
+        const health = await adminService_1.AdminService.getSystemHealth();
+        res.status(200).json(health);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to probe system health.' });
+    }
+};
+exports.getSystemHealth = getSystemHealth;
+const toggleNotificationStatus = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const notif = await adminService_1.AdminService.toggleNotificationStatus(id);
+        res.status(200).json({ message: 'Notification status updated.', notification: notif });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to toggle notification status.' });
+    }
+};
+exports.toggleNotificationStatus = toggleNotificationStatus;

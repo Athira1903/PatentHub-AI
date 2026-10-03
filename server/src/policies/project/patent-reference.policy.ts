@@ -9,11 +9,12 @@ export class PatentReferencePolicy {
     if (user.role === 'Admin') return 'ADMIN';
     if (project.ownerId === user.userId) return 'OWNER';
 
+    if (user.role === 'OrganizationAdmin' && project.organizationId && user.organizationId === project.organizationId) {
+      return 'VIEWER';
+    }
+
     const member = project.members?.find((m: any) => m.userId === user.userId);
     if (!member) {
-      const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
-      const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
-      if (isGuide || isExpert) return 'VIEWER';
       return null;
     }
 

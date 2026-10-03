@@ -29,6 +29,9 @@ export const Navbar: React.FC = () => {
             <Link to="/#features" className="hover:text-slate-950 transition">
               Patent Studio
             </Link>
+            <Link to="/#pro" className="hover:text-slate-950 text-indigo-700 font-extrabold transition">
+              Pro
+            </Link>
             <Link to="/#organizations" className="hover:text-slate-950 transition">
               For Universities
             </Link>

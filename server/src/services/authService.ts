@@ -1,9 +1,19 @@
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/db';
 import { MailService } from './mailService';
 
-export const DEFAULT_ROLES = ['Inventor', 'Guide', 'CoInventor', 'PatentExpert', 'Admin'] as const;
+export const DEFAULT_ROLES = ['Inventor', 'Guide', 'CoInventor', 'PatentExpert', 'Admin', 'OrganizationAdmin'] as const;
+
+export function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) return email || '';
+  const [localPart, domain] = email.split('@');
+  if (localPart.length <= 2) {
+    return `${localPart[0]}***@${domain}`;
+  }
+  return `${localPart[0]}***${localPart[localPart.length - 1]}@${domain}`;
+}
 
 // Ensure default roles exist in the database
 export const seedRoles = async () => {
@@ -17,12 +27,13 @@ export const seedRoles = async () => {
 };
 
 export interface RegisterInput {
+  accountType?: 'INDIVIDUAL' | 'ORGANIZATION';
   fullName: string;
   email: string;
   phone: string;
   institution?: string;
-  department: string;
-  designation: string;
+  department?: string;
+  designation?: string;
   userType:
     | 'Student'
     | 'Guide'
@@ -32,12 +43,19 @@ export interface RegisterInput {
     | 'CoInventor'
     | 'Co-Inventor'
     | 'Patent Expert'
-    | 'Administrator';
+    | 'Administrator'
+    | 'OrganizationAdmin'
+    | 'Organization Admin'
+    | 'OrgAdmin';
   employeeOrStudentId?: string;
+  organizationName?: string;
+  organizationType?: string;
+  organizationDomain?: string;
+  organizationLocation?: string;
 }
 
 export interface LoginInput {
-  emailOrUsername: string; // Used as username only now
+  emailOrUsername: string;
   password: string;
 }
 
@@ -68,6 +86,13 @@ export class AuthService {
     } else if (input.userType === 'CoInventor' || (input.userType as any) === 'Co-Inventor') {
       dbRoleName = 'CoInventor';
       prefix = 'COI2026';
+    } else if (
+      input.userType === 'OrganizationAdmin' ||
+      input.userType === 'Organization Admin' ||
+      (input.userType as any) === 'OrgAdmin'
+    ) {
+      dbRoleName = 'OrganizationAdmin';
+      prefix = 'OAD2026';
     } else if (input.userType === 'Admin' || (input.userType as any) === 'Administrator') {
       dbRoleName = 'Admin';
       prefix = 'ADM';
@@ -108,6 +133,42 @@ export class AuthService {
       offset++;
     }
 
+    // Determine accountType and Organization resolution
+    const accountType = input.accountType === 'ORGANIZATION' ? 'ORGANIZATION' : 'INDIVIDUAL';
+    let organizationId: string | null = null;
+    let institutionName = input.institution || null;
+
+    if (accountType === 'ORGANIZATION') {
+      const orgName = (input.organizationName || input.institution || '').trim();
+      if (!orgName) {
+        throw new Error('Organization name is required for organization accounts');
+      }
+      institutionName = orgName;
+
+      // Find existing organization (case-insensitive) or create a new one
+      let org = await prisma.organization.findFirst({
+        where: {
+          name: { equals: orgName, mode: 'insensitive' },
+        },
+      });
+
+      if (!org) {
+        const domain = input.organizationDomain || (input.email.includes('@') ? input.email.split('@')[1] : null);
+        org = await prisma.organization.create({
+          data: {
+            name: orgName,
+            type: input.organizationType || 'UNIVERSITY',
+            domain: domain,
+            location: input.organizationLocation || null,
+            contactEmail: input.email,
+            status: 'ACTIVE',
+            verificationStatus: 'VERIFIED',
+          },
+        });
+      }
+      organizationId = org.id;
+    }
+
     // Generate 6-digit activation OTP and temp password hash
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -120,7 +181,9 @@ export class AuthService {
         username: generatedUsername,
         email: input.email,
         password: hashedPassword,
-        institution: input.institution || null,
+        institution: institutionName,
+        accountType: accountType as any,
+        organizationId: organizationId,
         roleId: role.id,
         isActive: false, // Inactive pending OTP verification
         employeeOrStudentId: input.employeeOrStudentId || null,
@@ -131,10 +194,10 @@ export class AuthService {
             phone: input.phone,
             dob: new Date('2000-01-01'), // Default placeholder
             gender: 'Prefer not to say', // Default placeholder
-            institution: input.institution || '',
-            department: input.department,
-            designation: input.designation || 'Student',
-            organization: input.institution || null,
+            institution: institutionName || '',
+            department: input.department || 'General',
+            designation: input.designation || (accountType === 'ORGANIZATION' ? 'Member' : 'Student'),
+            organization: institutionName,
             researchDomain: 'Computer Science', // Default placeholder
             profileCompleted: false,
           },
@@ -142,6 +205,7 @@ export class AuthService {
       },
       include: {
         role: true,
+        organization: true,
         profile: true,
       },
     });
@@ -154,6 +218,10 @@ export class AuthService {
     console.log(`[USER REGISTRATION SUCCESS]`);
     console.log(`FullName: ${user.fullName}`);
     console.log(`Generated Username: ${user.username}`);
+    console.log(`Account Type: ${user.accountType}`);
+    if (user.organization) {
+      console.log(`Organization: ${user.organization.name} (${user.organization.id})`);
+    }
     console.log(`Activation OTP: ${otp}`);
     console.log(`Email Sent Status: ${emailSent ? 'Delivered via SMTP' : 'Fallback / Local Only'}`);
     console.log(`==================================================\n`);
@@ -165,6 +233,13 @@ export class AuthService {
         username: user.username,
         email: user.email,
         role: user.role.name,
+        accountType: user.accountType,
+        organizationId: user.organizationId,
+        organization: user.organization ? {
+          id: user.organization.id,
+          name: user.organization.name,
+          type: user.organization.type,
+        } : null,
       },
       emailSent,
     };
@@ -222,7 +297,7 @@ export class AuthService {
   static async activateAccount(input: { username: string; otp: string; newPassword: string }) {
     const user = await prisma.user.findUnique({
       where: { username: input.username },
-      include: { role: true },
+      include: { role: true, organization: true },
     });
 
     if (!user) {
@@ -256,7 +331,13 @@ export class AuthService {
 
     // Create a new JWT token
     const token = jwt.sign(
-      { userId: user.id, username: user.username, role: user.role.name },
+      {
+        userId: user.id,
+        username: user.username,
+        role: user.role.name,
+        accountType: user.accountType,
+        organizationId: user.organizationId,
+      },
       process.env.JWT_SECRET || 'patenthub_secret',
       { expiresIn: '7d' }
     );
@@ -270,19 +351,32 @@ export class AuthService {
         email: user.email,
         institution: user.institution,
         role: user.role.name,
+        accountType: user.accountType,
+        organizationId: user.organizationId,
+        organization: user.organization ? {
+          id: user.organization.id,
+          name: user.organization.name,
+          type: user.organization.type,
+          domain: user.organization.domain,
+        } : null,
       },
     };
   }
 
   static async login(input: LoginInput) {
+    const trimmedIdentifier = (input.emailOrUsername || '').trim();
+    if (!trimmedIdentifier || !input.password) {
+      throw new Error('Invalid credentials');
+    }
+
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { username: input.emailOrUsername },
-          { email: input.emailOrUsername.toLowerCase() }
+          { username: trimmedIdentifier },
+          { email: trimmedIdentifier.toLowerCase() }
         ]
       },
-      include: { role: true },
+      include: { role: true, organization: true },
     });
 
     if (!user) {
@@ -299,12 +393,19 @@ export class AuthService {
     }
 
     const token = jwt.sign(
-      { userId: user.id, username: user.username, role: user.role.name },
+      {
+        userId: user.id,
+        username: user.username,
+        role: user.role.name,
+        accountType: user.accountType,
+        organizationId: user.organizationId,
+      },
       process.env.JWT_SECRET || 'patenthub_secret',
       { expiresIn: '7d' }
     );
 
     return {
+      message: 'Login successful',
       token,
       user: {
         id: user.id,
@@ -313,6 +414,14 @@ export class AuthService {
         email: user.email,
         institution: user.institution,
         role: user.role.name,
+        accountType: user.accountType,
+        organizationId: user.organizationId,
+        organization: user.organization ? {
+          id: user.organization.id,
+          name: user.organization.name,
+          type: user.organization.type,
+          domain: user.organization.domain,
+        } : null,
       },
     };
   }
@@ -326,6 +435,17 @@ export class AuthService {
         username: true,
         email: true,
         institution: true,
+        accountType: true,
+        organizationId: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            domain: true,
+            location: true,
+          },
+        },
         createdAt: true,
         updatedAt: true,
         role: {
@@ -358,6 +478,9 @@ export class AuthService {
       username: user.username,
       email: user.email,
       institution: user.institution,
+      accountType: user.accountType,
+      organizationId: user.organizationId,
+      organization: user.organization,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       role: user.role.name,

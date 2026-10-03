@@ -16,42 +16,59 @@ import {
   Briefcase,
   Layers,
   Fingerprint,
+  Building2,
   X,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { signInWithGoogleFirebase } from '../config/firebase';
 import { useState } from 'react';
 
-const registerSchema = z.object({
-  fullName: z
-    .string()
-    .trim()
-    .min(2, 'Full name must be at least 2 characters')
-    .max(100, 'Full name cannot exceed 100 characters')
-    .regex(/^[a-zA-Z\s'-]+$/, 'Full name can only contain letters, spaces, hyphens, and apostrophes'),
-  email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number'),
-  institution: z.string().trim().min(1, 'Institution is required'),
-  department: z.string().trim().min(1, 'Department is required'),
-  designation: z.string().trim().min(1, 'Designation is required'),
-  userType: z.enum([
-    'Student',
-    'Guide',
-    'PatentExpert',
-    'Admin',
-    'Inventor',
-    'Co-Inventor',
-    'Patent Expert',
-    'Administrator',
-  ]),
-  employeeOrStudentId: z.string().trim().max(50).optional(),
-  agreeTerms: z.boolean().refine((val) => val === true, {
-    message: 'You must agree to the terms and conditions',
-  }),
-});
+const registerSchema = z
+  .object({
+    accountType: z.enum(['INDIVIDUAL', 'ORGANIZATION']),
+    fullName: z
+      .string()
+      .trim()
+      .min(2, 'Full name must be at least 2 characters')
+      .max(100, 'Full name cannot exceed 100 characters')
+      .regex(/^[a-zA-Z\s'-]+$/, 'Full name can only contain letters, spaces, hyphens, and apostrophes'),
+    email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
+    phone: z
+      .string()
+      .trim()
+      .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number'),
+    institution: z.string().trim().max(150).optional(),
+    department: z.string().trim().max(100).optional(),
+    designation: z.string().trim().max(100).optional(),
+    userType: z.enum([
+      'Student',
+      'Guide',
+      'PatentExpert',
+      'Admin',
+      'Inventor',
+      'Co-Inventor',
+      'Patent Expert',
+      'Administrator',
+    ]),
+    employeeOrStudentId: z.string().trim().max(50).optional(),
+    organizationName: z.string().trim().max(150).optional(),
+    organizationType: z.string().trim().max(100).optional(),
+    agreeTerms: z.boolean().refine((val) => val === true, {
+      message: 'You must agree to the terms and conditions',
+    }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.accountType === 'ORGANIZATION') {
+      const orgName = data.organizationName || data.institution;
+      if (!orgName || orgName.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Organization / Institution name is required',
+          path: ['organizationName'],
+        });
+      }
+    }
+  });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
@@ -124,10 +141,13 @@ export const RegisterPage: React.FC = () => {
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      accountType: 'INDIVIDUAL',
       fullName: '',
       email: '',
       phone: '',
@@ -136,21 +156,28 @@ export const RegisterPage: React.FC = () => {
       designation: '',
       userType: 'Inventor' as any,
       employeeOrStudentId: '',
+      organizationName: '',
+      organizationType: 'UNIVERSITY',
       agreeTerms: undefined,
     },
   });
 
+  const selectedAccountType = watch('accountType');
+
   const onSubmit: SubmitHandler<RegisterFormValues> = async (data) => {
     try {
       const response = await api.post('/auth/register', {
+        accountType: data.accountType,
         fullName: data.fullName,
         email: data.email,
         phone: data.phone,
-        institution: data.institution,
-        department: data.department,
-        designation: data.designation,
+        institution: data.accountType === 'ORGANIZATION' ? data.organizationName : data.institution,
+        department: data.department || (data.accountType === 'ORGANIZATION' ? 'General' : 'Independent'),
+        designation: data.designation || (data.accountType === 'ORGANIZATION' ? 'Member' : 'Student'),
         userType: data.userType,
         employeeOrStudentId: data.employeeOrStudentId || undefined,
+        organizationName: data.accountType === 'ORGANIZATION' ? data.organizationName : undefined,
+        organizationType: data.accountType === 'ORGANIZATION' ? data.organizationType : undefined,
       });
 
       const generatedUsername = response.data.user.username;
@@ -222,11 +249,112 @@ export const RegisterPage: React.FC = () => {
 
         {/* Registration Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          
-          {/* Full Name & User Type */}
+          {/* Account Type Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+              Registration / Account Type
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setValue('accountType', 'INDIVIDUAL')}
+                className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
+                  selectedAccountType === 'INDIVIDUAL'
+                    ? 'bg-blue-50/80 border-blue-600 text-blue-950 shadow-xs ring-1 ring-blue-600/20'
+                    : 'bg-slate-50/50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'
+                }`}
+              >
+                <div
+                  className={`p-2 rounded-xl shrink-0 ${
+                    selectedAccountType === 'INDIVIDUAL' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  <UserIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold leading-tight">Individual Account</p>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    Independent inventor, researcher, or student
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setValue('accountType', 'ORGANIZATION')}
+                className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
+                  selectedAccountType === 'ORGANIZATION'
+                    ? 'bg-blue-50/80 border-blue-600 text-blue-950 shadow-xs ring-1 ring-blue-600/20'
+                    : 'bg-slate-50/50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'
+                }`}
+              >
+                <div
+                  className={`p-2 rounded-xl shrink-0 ${
+                    selectedAccountType === 'ORGANIZATION' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  <Building className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold leading-tight">Organization Account</p>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    University, college, enterprise, or R&D lab
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Conditional Organization Fields */}
+          {selectedAccountType === 'ORGANIZATION' && (
+            <div className="p-4 bg-slate-50/70 border border-slate-200 rounded-2xl space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-800 pb-1 border-b border-slate-200/80">
+                <Building2 className="w-4 h-4 text-blue-600" /> Organization Details
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1 uppercase tracking-wider">
+                    Organization / Institution Name <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Building className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      {...register('organizationName')}
+                      placeholder="e.g. Amal Jyothi College of Engineering"
+                      className="w-full h-10 pl-10 pr-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 font-semibold transition-all shadow-2xs"
+                    />
+                  </div>
+                  {errors.organizationName && (
+                    <p className="mt-1 text-[11px] text-rose-600 font-semibold">{errors.organizationName.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1 uppercase tracking-wider">
+                    Organization Type
+                  </label>
+                  <select
+                    {...register('organizationType')}
+                    className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 font-semibold transition-all shadow-2xs cursor-pointer"
+                  >
+                    <option value="UNIVERSITY">University / College</option>
+                    <option value="RESEARCH_INSTITUTE">Research Institute</option>
+                    <option value="CORPORATE">Corporate Enterprise</option>
+                    <option value="STARTUP">Startup / Incubator</option>
+                    <option value="LAW_FIRM">Patent / Legal Firm</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Full Name & User Role */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">Full Name</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                Full Name <span className="text-rose-500">*</span>
+              </label>
               <div className="relative">
                 <UserIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -240,7 +368,9 @@ export const RegisterPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">Assigned Role</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                Your Role <span className="text-rose-500">*</span>
+              </label>
               <div className="relative">
                 <Layers className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <select
@@ -251,7 +381,6 @@ export const RegisterPage: React.FC = () => {
                   <option value="Co-Inventor">Co-Inventor (Collaborator)</option>
                   <option value="Guide">Faculty Guide (Supervisor / Reviewer)</option>
                   <option value="PatentExpert">Patent Expert (Legal Counsel / Examiner)</option>
-                  <option value="Admin">Administrator</option>
                 </select>
               </div>
               {errors.userType && <p className="mt-1 text-[11px] text-rose-600 font-semibold">{errors.userType.message}</p>}
@@ -261,13 +390,16 @@ export const RegisterPage: React.FC = () => {
           {/* Email & Mobile Number */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">Email Address</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                {selectedAccountType === 'ORGANIZATION' ? 'Official / Work Email' : 'Email Address'}{' '}
+                <span className="text-rose-500">*</span>
+              </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="email"
                   {...register('email')}
-                  placeholder="name@university.edu"
+                  placeholder={selectedAccountType === 'ORGANIZATION' ? 'name@institution.edu' : 'name@example.com'}
                   className="w-full h-11 pl-10 pr-3 bg-slate-50/50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 font-semibold transition-all shadow-2xs"
                 />
               </div>
@@ -275,7 +407,9 @@ export const RegisterPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">Mobile Number</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                Mobile Number <span className="text-rose-500">*</span>
+              </label>
               <div className="relative">
                 <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -289,24 +423,12 @@ export const RegisterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Institution & Department */}
+          {/* Department & Designation */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">Institution</label>
-              <div className="relative">
-                <Building className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  {...register('institution')}
-                  placeholder="University / College"
-                  className="w-full h-11 pl-10 pr-3 bg-slate-50/50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 font-semibold transition-all shadow-2xs"
-                />
-              </div>
-              {errors.institution && <p className="mt-1 text-[11px] text-rose-600 font-semibold">{errors.institution.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">Department</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                Department {selectedAccountType === 'INDIVIDUAL' && <span className="text-slate-400 font-normal">(Optional)</span>}
+              </label>
               <div className="relative">
                 <Bookmark className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -318,12 +440,11 @@ export const RegisterPage: React.FC = () => {
               </div>
               {errors.department && <p className="mt-1 text-[11px] text-rose-600 font-semibold">{errors.department.message}</p>}
             </div>
-          </div>
 
-          {/* Designation & Employee/Student ID */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">Designation</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                Designation {selectedAccountType === 'INDIVIDUAL' && <span className="text-slate-400 font-normal">(Optional)</span>}
+              </label>
               <div className="relative">
                 <Briefcase className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -335,9 +456,31 @@ export const RegisterPage: React.FC = () => {
               </div>
               {errors.designation && <p className="mt-1 text-[11px] text-rose-600 font-semibold">{errors.designation.message}</p>}
             </div>
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">Employee / Student ID (Optional)</label>
+          {/* Institution (for Individual only) & Employee ID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {selectedAccountType === 'INDIVIDUAL' ? (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Affiliation / College <span className="text-slate-400 font-normal">(Optional)</span>
+                </label>
+                <div className="relative">
+                  <Building className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    {...register('institution')}
+                    placeholder="Independent or College Name"
+                    className="w-full h-11 pl-10 pr-3 bg-slate-50/50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 font-semibold transition-all shadow-2xs"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <div className={selectedAccountType === 'ORGANIZATION' ? 'sm:col-span-2' : ''}>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                Employee / Student ID <span className="text-slate-400 font-normal">(Optional)</span>
+              </label>
               <div className="relative">
                 <Fingerprint className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input

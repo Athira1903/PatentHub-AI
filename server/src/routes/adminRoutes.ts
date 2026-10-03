@@ -29,6 +29,17 @@ import {
   getOrganizationDetails,
   getRolePermissions,
   updateRolePermissions,
+  updateOrganizationStatus,
+  getPolicies,
+  createPolicy,
+  updatePolicy,
+  updatePolicyStatus,
+  getSubscriptions,
+  getPayments,
+  getEntitlements,
+  getAuditLogs,
+  getSystemHealth,
+  toggleNotificationStatus,
 } from '../controllers/adminController';
 
 const router = Router();
@@ -59,6 +70,7 @@ router.post('/verifications/:id/decision', processVerification as any);
 router.get('/organizations', getOrganizations as any);
 router.get('/organizations/:id', getOrganizationDetails as any);
 router.post('/organizations', createOrganization as any);
+router.put('/organizations/:id/status', updateOrganizationStatus as any);
 
 // Projects Ecosystem
 router.get('/projects', getProjects as any);
@@ -69,17 +81,34 @@ router.get('/reviews', getReviewsOversight as any);
 router.get('/claims-fto-oversight', getClaimsFtoOversight as any);
 router.get('/ai-operations', getAiOperations as any);
 
+// Policies Platform Governance
+router.get('/policies', getPolicies as any);
+router.post('/policies', createPolicy as any);
+router.put('/policies/:id', updatePolicy as any);
+router.put('/policies/:id/status', updatePolicyStatus as any);
+
+// Subscriptions & Billing Oversight
+router.get('/subscriptions', getSubscriptions as any);
+router.get('/payments', getPayments as any);
+router.get('/entitlements', getEntitlements as any);
+
 // Activity Logs & Audit Trail
 router.get('/activity-logs', getActivityLogs as any);
+router.get('/audit-logs', getAuditLogs as any);
 
 // Notifications & Broadcasts
 router.get('/notifications', getNotifications as any);
+router.post('/notifications', broadcastNotification as any);
 router.post('/notifications/broadcast', broadcastNotification as any);
+router.put('/notifications/:id/toggle', toggleNotificationStatus as any);
 
 // Announcements & Settings
 router.get('/announcements', getAnnouncements as any);
 router.post('/announcements', createAnnouncement as any);
 router.get('/settings', getSettings as any);
 router.put('/settings', updateSettings as any);
+
+// Live System Health Probe
+router.get('/health', getSystemHealth as any);
 
 export default router;

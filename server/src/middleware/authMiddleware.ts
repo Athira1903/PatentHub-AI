@@ -6,6 +6,8 @@ export interface AuthenticatedRequest extends Request {
     userId: string;
     username: string;
     role: string;
+    accountType?: 'INDIVIDUAL' | 'ORGANIZATION';
+    organizationId?: string | null;
   };
 }
 
@@ -26,7 +28,13 @@ export const authenticateToken = (
     const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET || 'patenthub_secret'
-    ) as { userId: string; username: string; role: string };
+    ) as {
+      userId: string;
+      username: string;
+      role: string;
+      accountType?: 'INDIVIDUAL' | 'ORGANIZATION';
+      organizationId?: string | null;
+    };
 
     req.user = decoded;
     next();

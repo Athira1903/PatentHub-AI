@@ -4,11 +4,21 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = exports.seedRoles = exports.DEFAULT_ROLES = void 0;
+exports.maskEmail = maskEmail;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = require("../config/db");
 const mailService_1 = require("./mailService");
-exports.DEFAULT_ROLES = ['Inventor', 'Guide', 'CoInventor', 'PatentExpert', 'Admin'];
+exports.DEFAULT_ROLES = ['Inventor', 'Guide', 'CoInventor', 'PatentExpert', 'Admin', 'OrganizationAdmin'];
+function maskEmail(email) {
+    if (!email || !email.includes('@'))
+        return email || '';
+    const [localPart, domain] = email.split('@');
+    if (localPart.length <= 2) {
+        return `${localPart[0]}***@${domain}`;
+    }
+    return `${localPart[0]}***${localPart[localPart.length - 1]}@${domain}`;
+}
 // Ensure default roles exist in the database
 const seedRoles = async () => {
     for (const roleName of exports.DEFAULT_ROLES) {
@@ -46,6 +56,12 @@ class AuthService {
         else if (input.userType === 'CoInventor' || input.userType === 'Co-Inventor') {
             dbRoleName = 'CoInventor';
             prefix = 'COI2026';
+        }
+        else if (input.userType === 'OrganizationAdmin' ||
+            input.userType === 'Organization Admin' ||
+            input.userType === 'OrgAdmin') {
+            dbRoleName = 'OrganizationAdmin';
+            prefix = 'OAD2026';
         }
         else if (input.userType === 'Admin' || input.userType === 'Administrator') {
             dbRoleName = 'Admin';
@@ -87,6 +103,38 @@ class AuthService {
                 break;
             offset++;
         }
+        // Determine accountType and Organization resolution
+        const accountType = input.accountType === 'ORGANIZATION' ? 'ORGANIZATION' : 'INDIVIDUAL';
+        let organizationId = null;
+        let institutionName = input.institution || null;
+        if (accountType === 'ORGANIZATION') {
+            const orgName = (input.organizationName || input.institution || '').trim();
+            if (!orgName) {
+                throw new Error('Organization name is required for organization accounts');
+            }
+            institutionName = orgName;
+            // Find existing organization (case-insensitive) or create a new one
+            let org = await db_1.prisma.organization.findFirst({
+                where: {
+                    name: { equals: orgName, mode: 'insensitive' },
+                },
+            });
+            if (!org) {
+                const domain = input.organizationDomain || (input.email.includes('@') ? input.email.split('@')[1] : null);
+                org = await db_1.prisma.organization.create({
+                    data: {
+                        name: orgName,
+                        type: input.organizationType || 'UNIVERSITY',
+                        domain: domain,
+                        location: input.organizationLocation || null,
+                        contactEmail: input.email,
+                        status: 'ACTIVE',
+                        verificationStatus: 'VERIFIED',
+                    },
+                });
+            }
+            organizationId = org.id;
+        }
         // Generate 6-digit activation OTP and temp password hash
         const otp = String(Math.floor(100000 + Math.random() * 900000));
         const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -98,7 +146,9 @@ class AuthService {
                 username: generatedUsername,
                 email: input.email,
                 password: hashedPassword,
-                institution: input.institution || null,
+                institution: institutionName,
+                accountType: accountType,
+                organizationId: organizationId,
                 roleId: role.id,
                 isActive: false, // Inactive pending OTP verification
                 employeeOrStudentId: input.employeeOrStudentId || null,
@@ -109,10 +159,10 @@ class AuthService {
                         phone: input.phone,
                         dob: new Date('2000-01-01'), // Default placeholder
                         gender: 'Prefer not to say', // Default placeholder
-                        institution: input.institution || '',
-                        department: input.department,
-                        designation: input.designation || 'Student',
-                        organization: input.institution || null,
+                        institution: institutionName || '',
+                        department: input.department || 'General',
+                        designation: input.designation || (accountType === 'ORGANIZATION' ? 'Member' : 'Student'),
+                        organization: institutionName,
                         researchDomain: 'Computer Science', // Default placeholder
                         profileCompleted: false,
                     },
@@ -120,6 +170,7 @@ class AuthService {
             },
             include: {
                 role: true,
+                organization: true,
                 profile: true,
             },
         });
@@ -130,6 +181,10 @@ class AuthService {
         console.log(`[USER REGISTRATION SUCCESS]`);
         console.log(`FullName: ${user.fullName}`);
         console.log(`Generated Username: ${user.username}`);
+        console.log(`Account Type: ${user.accountType}`);
+        if (user.organization) {
+            console.log(`Organization: ${user.organization.name} (${user.organization.id})`);
+        }
         console.log(`Activation OTP: ${otp}`);
         console.log(`Email Sent Status: ${emailSent ? 'Delivered via SMTP' : 'Fallback / Local Only'}`);
         console.log(`==================================================\n`);
@@ -140,6 +195,13 @@ class AuthService {
                 username: user.username,
                 email: user.email,
                 role: user.role.name,
+                accountType: user.accountType,
+                organizationId: user.organizationId,
+                organization: user.organization ? {
+                    id: user.organization.id,
+                    name: user.organization.name,
+                    type: user.organization.type,
+                } : null,
             },
             emailSent,
         };
@@ -188,7 +250,7 @@ class AuthService {
     static async activateAccount(input) {
         const user = await db_1.prisma.user.findUnique({
             where: { username: input.username },
-            include: { role: true },
+            include: { role: true, organization: true },
         });
         if (!user) {
             throw new Error('User account not found');
@@ -214,7 +276,13 @@ class AuthService {
             },
         });
         // Create a new JWT token
-        const token = jsonwebtoken_1.default.sign({ userId: user.id, username: user.username, role: user.role.name }, process.env.JWT_SECRET || 'patenthub_secret', { expiresIn: '7d' });
+        const token = jsonwebtoken_1.default.sign({
+            userId: user.id,
+            username: user.username,
+            role: user.role.name,
+            accountType: user.accountType,
+            organizationId: user.organizationId,
+        }, process.env.JWT_SECRET || 'patenthub_secret', { expiresIn: '7d' });
         return {
             token,
             user: {
@@ -224,18 +292,30 @@ class AuthService {
                 email: user.email,
                 institution: user.institution,
                 role: user.role.name,
+                accountType: user.accountType,
+                organizationId: user.organizationId,
+                organization: user.organization ? {
+                    id: user.organization.id,
+                    name: user.organization.name,
+                    type: user.organization.type,
+                    domain: user.organization.domain,
+                } : null,
             },
         };
     }
     static async login(input) {
+        const trimmedIdentifier = (input.emailOrUsername || '').trim();
+        if (!trimmedIdentifier || !input.password) {
+            throw new Error('Invalid credentials');
+        }
         const user = await db_1.prisma.user.findFirst({
             where: {
                 OR: [
-                    { username: input.emailOrUsername },
-                    { email: input.emailOrUsername.toLowerCase() }
+                    { username: trimmedIdentifier },
+                    { email: trimmedIdentifier.toLowerCase() }
                 ]
             },
-            include: { role: true },
+            include: { role: true, organization: true },
         });
         if (!user) {
             throw new Error('Invalid credentials');
@@ -247,8 +327,15 @@ class AuthService {
         if (!isPasswordMatch) {
             throw new Error('Invalid credentials');
         }
-        const token = jsonwebtoken_1.default.sign({ userId: user.id, username: user.username, role: user.role.name }, process.env.JWT_SECRET || 'patenthub_secret', { expiresIn: '7d' });
+        const token = jsonwebtoken_1.default.sign({
+            userId: user.id,
+            username: user.username,
+            role: user.role.name,
+            accountType: user.accountType,
+            organizationId: user.organizationId,
+        }, process.env.JWT_SECRET || 'patenthub_secret', { expiresIn: '7d' });
         return {
+            message: 'Login successful',
             token,
             user: {
                 id: user.id,
@@ -257,6 +344,14 @@ class AuthService {
                 email: user.email,
                 institution: user.institution,
                 role: user.role.name,
+                accountType: user.accountType,
+                organizationId: user.organizationId,
+                organization: user.organization ? {
+                    id: user.organization.id,
+                    name: user.organization.name,
+                    type: user.organization.type,
+                    domain: user.organization.domain,
+                } : null,
             },
         };
     }
@@ -269,6 +364,17 @@ class AuthService {
                 username: true,
                 email: true,
                 institution: true,
+                accountType: true,
+                organizationId: true,
+                organization: {
+                    select: {
+                        id: true,
+                        name: true,
+                        type: true,
+                        domain: true,
+                        location: true,
+                    },
+                },
                 createdAt: true,
                 updatedAt: true,
                 role: {
@@ -299,6 +405,9 @@ class AuthService {
             username: user.username,
             email: user.email,
             institution: user.institution,
+            accountType: user.accountType,
+            organizationId: user.organizationId,
+            organization: user.organization,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
             role: user.role.name,

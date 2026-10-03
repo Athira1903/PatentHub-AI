@@ -79,16 +79,23 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
   onNavigateTab,
 }) => {
   const [reviews, setReviews] = useState<ProjectReviewRecord[]>(project?.projectReviews || []);
+  const [comments, setComments] = useState<any[]>(project?.comments || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
 
-  // Sync reviews when project prop updates
+  // Sync reviews and comments when project prop updates
   useEffect(() => {
-    if (project?.projectReviews && project.projectReviews.length > 0 && reviews.length === 0) {
+    if (project?.projectReviews && project.projectReviews.length > 0) {
       setReviews(project.projectReviews);
     }
-  }, [project]);
+  }, [project?.projectReviews]);
+
+  useEffect(() => {
+    if (project?.comments) {
+      setComments(project.comments);
+    }
+  }, [project?.comments]);
 
   // Filing Readiness & Artifacts state
   const [readinessData, setReadinessData] = useState<FilingReadinessData | null>(null);
@@ -105,6 +112,7 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
   const [submittingDecision, setSubmittingDecision] = useState(false);
   const [submittingResubmit, setSubmittingResubmit] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [showEditDeck, setShowEditDeck] = useState(false);
 
   // Review Timeline filter
   const [timelineFilter, setTimelineFilter] = useState<'ALL' | 'GUIDE_REVIEW' | 'EXPERT_REVIEW'>('ALL');
@@ -207,18 +215,29 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
     }
   }, [projectId]);
 
+const formatRoleName = (role: any): string => {
+  if (!role) return 'Member';
+  if (typeof role === 'object') return role.name || 'Member';
+  return String(role);
+};
+
   // Derived user roles and permissions
   const currentUserId = currentUser?.id || currentUser?.userId;
-  const isOwner = project?.ownerId === currentUserId || currentUser?.role === 'Admin';
+  const currentUserRole = typeof currentUser?.role === 'object' ? currentUser?.role?.name : currentUser?.role;
+  const isOwner = project?.ownerId === currentUserId || currentUserRole === 'Admin';
   const memberRecord = project?.members?.find((m: any) => m.userId === currentUserId || m.user?.id === currentUserId);
-  const userRole = memberRecord?.role || userProjectRole;
+  const memberRole = typeof memberRecord?.role === 'object' ? memberRecord?.role?.name : memberRecord?.role;
+  const userRole = memberRole || userProjectRole;
 
-  const isAssignedGuide = userRole === 'GUIDE' || ((currentUser?.role === 'Guide' || currentUser?.role === 'GUIDE') && memberRecord?.role === 'GUIDE');
-  const isAssignedExpert = userRole === 'PATENT_EXPERT' || ((currentUser?.role === 'PatentExpert' || currentUser?.role === 'PATENT_EXPERT') && memberRecord?.role === 'PATENT_EXPERT');
-  const isAdmin = currentUser?.role === 'Admin';
+  const isAssignedGuide = userRole === 'GUIDE' || ((currentUserRole === 'Guide' || currentUserRole === 'GUIDE') && memberRole === 'GUIDE');
+  const isAssignedExpert = userRole === 'PATENT_EXPERT' || ((currentUserRole === 'PatentExpert' || currentUserRole === 'PATENT_EXPERT') && memberRole === 'PATENT_EXPERT');
+  const isAdmin = currentUserRole === 'Admin';
+  const isReviewer = isAssignedGuide || isAssignedExpert || isAdmin;
 
   const canReviewGuide = (isAssignedGuide || isAdmin) && project?.stage === 'GUIDE_REVIEW';
   const canReviewExpert = (isAssignedExpert || isAdmin) && project?.stage === 'PATENT_EXPERT_REVIEW';
+  const isActiveReviewStage = canReviewGuide || canReviewExpert;
+
   const canSubmitForReview =
     (isOwner || memberRecord?.permissionLevel === 'SUBMIT') &&
     (project?.stage === 'DOCUMENTATION' ||
@@ -232,6 +251,7 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
   const expertReviews = reviews.filter((r) => r.reviewType === 'EXPERT_REVIEW');
   const latestGuideReview = guideReviews[0];
   const latestExpertReview = expertReviews[0];
+  const existingReviewForUser = isAssignedGuide ? latestGuideReview : isAssignedExpert ? latestExpertReview : (latestGuideReview || latestExpertReview);
 
   const assignedGuide = project?.members?.find((m: any) => m.role === 'GUIDE')?.user;
   const assignedExpert = project?.members?.find((m: any) => m.role === 'PATENT_EXPERT')?.user;
@@ -279,12 +299,15 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
     if (!commentInput.trim()) return;
     setSubmittingComment(true);
     try {
-      await api.post(`/projects/${projectId}/comments`, { content: commentInput.trim() });
-      toast.success('Observation comment posted successfully.');
+      const res = await api.post(`/projects/${projectId}/comments`, { content: commentInput.trim() });
+      toast.success('Observation note posted successfully.');
+      if (res.data?.comment) {
+        setComments((prev) => [res.data.comment, ...prev]);
+      }
       setCommentInput('');
       if (onRefreshProject) onRefreshProject();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to post comment.');
+      toast.error(err.response?.data?.message || 'Failed to post note.');
     } finally {
       setSubmittingComment(false);
     }
@@ -294,10 +317,10 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
   const handleSubmitReviewDecision = async (
     reviewType: 'GUIDE_REVIEW' | 'EXPERT_REVIEW',
     decision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED',
-    comments?: string,
+    commentsText?: string,
     snapshotData?: any
   ) => {
-    if ((decision === 'CHANGES_REQUESTED' || decision === 'REJECTED') && (!comments || !comments.trim())) {
+    if ((decision === 'CHANGES_REQUESTED' || decision === 'REJECTED') && (!commentsText || !commentsText.trim())) {
       toast.error('A written explanation is required for this action.');
       return;
     }
@@ -307,14 +330,14 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
       const payload: any = {
         reviewType,
         decision,
-        comments: comments?.trim() || null,
+        comments: commentsText?.trim() || null,
       };
 
       if (snapshotData) {
         payload.checklistSnapshot = snapshotData;
       }
 
-      await api.post(`/projects/${projectId}/reviews`, payload);
+      const res = await api.post(`/projects/${projectId}/reviews`, payload);
 
       const actionText =
         decision === 'APPROVED'
@@ -324,9 +347,15 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
           : 'Review rejected.';
       toast.success(actionText);
 
+      // Optimistically update local review list
+      if (res.data?.review) {
+        setReviews((prev) => [res.data.review, ...prev.filter((r) => r.id !== res.data.review.id)]);
+      }
+
       // Reset
       setModalReason('');
       setDeckComments('');
+      setShowEditDeck(false);
 
       // Refresh data
       fetchReviews();
@@ -342,7 +371,7 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
 
   // Submit directly from the Active Reviewer Action Deck
   const handleDeckSubmit = () => {
-    const reviewType = canReviewGuide ? 'GUIDE_REVIEW' : 'EXPERT_REVIEW';
+    const reviewType = isAssignedGuide || (!isAssignedExpert && canReviewGuide) ? 'GUIDE_REVIEW' : 'EXPERT_REVIEW';
     const snapshot = {
       checklist: rubricChecklist,
       scores: rubricScores,
@@ -934,235 +963,324 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
       </div>
 
       {/* 4. Active Reviewer Evaluation Deck & Interactive Scoring Matrix */}
-      {(canReviewGuide || canReviewExpert) && (
+      {isReviewer && (
         <div className="bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 text-white rounded-3xl p-7 shadow-lg border border-slate-800 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-4">
             <div>
               <div className="flex items-center gap-2.5">
                 <ShieldCheck className="w-6 h-6 text-blue-400" />
                 <h3 className="text-lg font-black tracking-tight">
-                  {canReviewGuide ? 'Faculty Guide Evaluation Deck' : 'Patent Expert Legal Examination Deck'}
+                  {isAssignedGuide || (!isAssignedExpert && canReviewGuide)
+                    ? 'Faculty Guide Evaluation Deck'
+                    : 'Patent Expert Legal Examination Deck'}
                 </h3>
               </div>
               <p className="text-xs text-slate-400 mt-1 font-medium">
-                {canReviewGuide
+                {isAssignedGuide || (!isAssignedExpert && canReviewGuide)
                   ? 'Examine student disclosures, score novelty criteria, provide actionable instructions, and record your formal endorsement.'
                   : 'Validate legal claim boundaries, check Form 1/2/3/5 compliance, and certify the invention for statutory IPO filing readiness.'}
               </p>
             </div>
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30 shrink-0 self-start sm:self-auto">
-              Active Reviewer Access
-            </span>
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+              {existingReviewForUser && !showEditDeck && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (existingReviewForUser.comments) {
+                      setDeckComments(existingReviewForUser.comments);
+                    }
+                    if (existingReviewForUser.decision) {
+                      setActiveDecisionSelection(existingReviewForUser.decision as any);
+                    }
+                    setShowEditDeck(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Update Notes / Decision</span>
+                </button>
+              )}
+              {showEditDeck && (
+                <button
+                  type="button"
+                  onClick={() => setShowEditDeck(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer"
+                >
+                  <span>Hide Editor</span>
+                </button>
+              )}
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                {isActiveReviewStage ? 'Active Review Stage' : 'Official Review Logged'}
+              </span>
+            </div>
           </div>
 
-          {/* Interactive Rubric Checklist & Scoring Matrix */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1">
-            {/* Left: Statutory Compliance Checklist */}
-            <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                  <CheckSquare className="w-4 h-4 text-emerald-400" />
-                  Statutory Evaluation Checklist
-                </h4>
-                <span className="text-[11px] text-slate-400 font-semibold">
-                  {Object.values(rubricChecklist).filter(Boolean).length} of 6 Checked
+          {/* If review already completed and editor not toggled, show the completed review dossier banner */}
+          {!isActiveReviewStage && existingReviewForUser && !showEditDeck ? (
+            <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  <div>
+                    <h4 className="text-sm font-black text-white">Your Evaluation Has Been Formally Recorded</h4>
+                    <p className="text-xs text-slate-400">
+                      Logged by {existingReviewForUser.reviewer?.fullName || 'Assigned Reviewer'} on {existingReviewForUser.createdAt ? new Date(existingReviewForUser.createdAt).toLocaleDateString() : 'Recent'}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                    existingReviewForUser.decision === 'APPROVED'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : existingReviewForUser.decision === 'CHANGES_REQUESTED'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  }`}
+                >
+                  {(existingReviewForUser.decision || 'LOGGED').replace(/_/g, ' ')}
                 </span>
               </div>
 
-              <div className="space-y-2 text-xs">
-                {[
-                  { id: 'novelty', label: 'Novelty & Inventive Step (Non-obvious over prior art citations)' },
-                  { id: 'nonObviousness', label: 'Technical Enablement & Sufficient Disclosure Description' },
-                  { id: 'statutorySubjectMatter', label: 'Section 3 & 4 Statutory Eligibility (Non-excluded subject matter)' },
-                  { id: 'claimsPrecision', label: 'Claims Drafting Precision (Independent Claim 1 + Dependent Hierarchy)' },
-                  { id: 'drawingCompliance', label: 'Drawing Sheets Compliance (Black/white line art, Rule 15 numerals)' },
-                  { id: 'statutoryForms', label: 'Mandatory IPO Forms Completeness (Form 1, 2, 3, 5 Validated)' },
-                ].map((item) => (
-                  <label
-                    key={item.id}
-                    className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-slate-700/40 cursor-pointer transition select-none"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={rubricChecklist[item.id]}
-                      onChange={(e) =>
-                        setRubricChecklist((prev) => ({ ...prev, [item.id]: e.target.checked }))
-                      }
-                      className="mt-0.5 rounded text-blue-500 focus:ring-0 cursor-pointer"
-                    />
-                    <span className="text-slate-300 leading-snug font-medium">{item.label}</span>
+              {existingReviewForUser.comments && (
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Official Supervisor Remarks:</span>
+                  <div className="text-xs text-slate-200 bg-slate-900/90 p-3.5 rounded-xl border border-slate-700 font-medium leading-relaxed italic">
+                    "{existingReviewForUser.comments}"
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (existingReviewForUser.comments) {
+                      setDeckComments(existingReviewForUser.comments);
+                    }
+                    if (existingReviewForUser.decision) {
+                      setActiveDecisionSelection(existingReviewForUser.decision as any);
+                    }
+                    setShowEditDeck(true);
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Update Notes / Re-evaluate</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Interactive Rubric Checklist & Scoring Matrix */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1">
+                {/* Left: Statutory Compliance Checklist */}
+                <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                      <CheckSquare className="w-4 h-4 text-emerald-400" />
+                      Statutory Evaluation Checklist
+                    </h4>
+                    <span className="text-[11px] text-slate-400 font-semibold">
+                      {Object.values(rubricChecklist).filter(Boolean).length} of 6 Checked
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    {[
+                      { id: 'novelty', label: 'Novelty & Inventive Step (Non-obvious over prior art citations)' },
+                      { id: 'nonObviousness', label: 'Technical Enablement & Sufficient Disclosure Description' },
+                      { id: 'statutorySubjectMatter', label: 'Section 3 & 4 Statutory Eligibility (Non-excluded subject matter)' },
+                      { id: 'claimsPrecision', label: 'Claims Drafting Precision (Independent Claim 1 + Dependent Hierarchy)' },
+                      { id: 'drawingCompliance', label: 'Drawing Sheets Compliance (Black/white line art, Rule 15 numerals)' },
+                      { id: 'statutoryForms', label: 'Mandatory IPO Forms Completeness (Form 1, 2, 3, 5 Validated)' },
+                    ].map((item) => (
+                      <label
+                        key={item.id}
+                        className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-slate-700/40 cursor-pointer transition select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={rubricChecklist[item.id]}
+                          onChange={(e) =>
+                            setRubricChecklist((prev) => ({ ...prev, [item.id]: e.target.checked }))
+                          }
+                          className="mt-0.5 rounded text-blue-500 focus:ring-0 cursor-pointer"
+                        />
+                        <span className="text-slate-300 leading-snug font-medium">{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right: Rubric Scoring Sliders */}
+                <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-blue-400" />
+                      Quantitative Evaluation Score
+                    </h4>
+                    <span className="px-2.5 py-0.5 rounded-lg text-xs font-black bg-blue-500/30 text-blue-300 border border-blue-400/30">
+                      Avg: {computedRubricAverage} / 10
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <div className="flex justify-between text-slate-300 font-semibold mb-1">
+                        <span>Novelty & Inventive Step</span>
+                        <span className="text-blue-400 font-bold">{rubricScores.noveltyScore}/10</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={rubricScores.noveltyScore}
+                        onChange={(e) => setRubricScores({ ...rubricScores, noveltyScore: Number(e.target.value) })}
+                        className="w-full accent-blue-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-slate-300 font-semibold mb-1">
+                        <span>Specification & Claims Clarity</span>
+                        <span className="text-blue-400 font-bold">{rubricScores.specificationClarity}/10</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={rubricScores.specificationClarity}
+                        onChange={(e) => setRubricScores({ ...rubricScores, specificationClarity: Number(e.target.value) })}
+                        className="w-full accent-blue-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-slate-300 font-semibold mb-1">
+                        <span>Industrial Applicability & Practicality</span>
+                        <span className="text-blue-400 font-bold">{rubricScores.industrialApplicability}/10</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={rubricScores.industrialApplicability}
+                        onChange={(e) => setRubricScores({ ...rubricScores, industrialApplicability: Number(e.target.value) })}
+                        className="w-full accent-blue-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-slate-300 font-semibold mb-1">
+                        <span>Freedom to Operate & Risk Clearance</span>
+                        <span className="text-blue-400 font-bold">{rubricScores.ftoRiskClearance}/10</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={rubricScores.ftoRiskClearance}
+                        onChange={(e) => setRubricScores({ ...rubricScores, ftoRiskClearance: Number(e.target.value) })}
+                        className="w-full accent-blue-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Decision & Written Notes Form */}
+              <div className="space-y-4 pt-2 border-t border-slate-800">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Evaluation Decision:
                   </label>
-                ))}
-              </div>
-            </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setActiveDecisionSelection('APPROVED')}
+                      className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition ${
+                        activeDecisionSelection === 'APPROVED'
+                          ? 'bg-emerald-600 border-emerald-500 text-white shadow-md ring-2 ring-emerald-400/40'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Approve & Advance</span>
+                    </button>
 
-            {/* Right: Rubric Scoring Sliders */}
-            <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-blue-400" />
-                  Quantitative Evaluation Score
-                </h4>
-                <span className="px-2.5 py-0.5 rounded-lg text-xs font-black bg-blue-500/30 text-blue-300 border border-blue-400/30">
-                  Avg: {computedRubricAverage} / 10
-                </span>
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDecisionSelection('CHANGES_REQUESTED')}
+                      className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition ${
+                        activeDecisionSelection === 'CHANGES_REQUESTED'
+                          ? 'bg-amber-600 border-amber-500 text-white shadow-md ring-2 ring-amber-400/40'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Request Revisions</span>
+                    </button>
 
-              <div className="space-y-3 text-xs">
-                <div>
-                  <div className="flex justify-between text-slate-300 font-semibold mb-1">
-                    <span>Novelty & Inventive Step</span>
-                    <span className="text-blue-400 font-bold">{rubricScores.noveltyScore}/10</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDecisionSelection('REJECTED')}
+                      className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition ${
+                        activeDecisionSelection === 'REJECTED'
+                          ? 'bg-rose-600 border-rose-500 text-white shadow-md ring-2 ring-rose-400/40'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <XCircle className="w-4 h-4" />
+                      <span>Reject Submission</span>
+                    </button>
                   </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={rubricScores.noveltyScore}
-                    onChange={(e) => setRubricScores({ ...rubricScores, noveltyScore: Number(e.target.value) })}
-                    className="w-full accent-blue-500 cursor-pointer"
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Official Review Notes & Actionable Feedback:
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={deckComments}
+                    onChange={(e) => setDeckComments(e.target.value)}
+                    placeholder={
+                      activeDecisionSelection === 'APPROVED'
+                        ? 'State formal endorsement rationale, supervisor approval notes, or filing sign-off comments...'
+                        : 'Specify exact corrections needed (e.g. clarify claims 2-4, label Figure 3 components, complete Form 2)...'
+                    }
+                    className="w-full px-4 py-3 text-xs bg-slate-800 border border-slate-700 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
-                <div>
-                  <div className="flex justify-between text-slate-300 font-semibold mb-1">
-                    <span>Specification & Claims Clarity</span>
-                    <span className="text-blue-400 font-bold">{rubricScores.specificationClarity}/10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={rubricScores.specificationClarity}
-                    onChange={(e) => setRubricScores({ ...rubricScores, specificationClarity: Number(e.target.value) })}
-                    className="w-full accent-blue-500 cursor-pointer"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 font-semibold mb-1">
-                    <span>Industrial Applicability & Practicality</span>
-                    <span className="text-blue-400 font-bold">{rubricScores.industrialApplicability}/10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={rubricScores.industrialApplicability}
-                    onChange={(e) => setRubricScores({ ...rubricScores, industrialApplicability: Number(e.target.value) })}
-                    className="w-full accent-blue-500 cursor-pointer"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 font-semibold mb-1">
-                    <span>Freedom to Operate & Risk Clearance</span>
-                    <span className="text-blue-400 font-bold">{rubricScores.ftoRiskClearance}/10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={rubricScores.ftoRiskClearance}
-                    onChange={(e) => setRubricScores({ ...rubricScores, ftoRiskClearance: Number(e.target.value) })}
-                    className="w-full accent-blue-500 cursor-pointer"
-                  />
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    disabled={submittingDecision || (activeDecisionSelection !== 'APPROVED' && !deckComments.trim())}
+                    onClick={handleDeckSubmit}
+                    className={`px-6 py-3 rounded-xl text-xs font-black shadow-lg flex items-center gap-2 cursor-pointer disabled:opacity-50 transition ${
+                      activeDecisionSelection === 'APPROVED'
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        : activeDecisionSelection === 'CHANGES_REQUESTED'
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                        : 'bg-rose-600 hover:bg-rose-500 text-white'
+                    }`}
+                  >
+                    {submittingDecision ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    <span>
+                      {activeDecisionSelection === 'APPROVED'
+                        ? canReviewGuide
+                          ? 'Submit Approval & Advance to Legal Review'
+                          : 'Submit Legal Approval & Mark Filing Ready'
+                        : activeDecisionSelection === 'CHANGES_REQUESTED'
+                        ? 'Submit Changes Request'
+                        : 'Confirm Review Rejection'}
+                    </span>
+                  </button>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Decision & Written Notes Form */}
-          <div className="space-y-4 pt-2 border-t border-slate-800">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Evaluation Decision:
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveDecisionSelection('APPROVED')}
-                  className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition ${
-                    activeDecisionSelection === 'APPROVED'
-                      ? 'bg-emerald-600 border-emerald-500 text-white shadow-md ring-2 ring-emerald-400/40'
-                      : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Approve & Advance</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveDecisionSelection('CHANGES_REQUESTED')}
-                  className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition ${
-                    activeDecisionSelection === 'CHANGES_REQUESTED'
-                      ? 'bg-amber-600 border-amber-500 text-white shadow-md ring-2 ring-amber-400/40'
-                      : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <AlertCircle className="w-4 h-4" />
-                  <span>Request Revisions</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveDecisionSelection('REJECTED')}
-                  className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition ${
-                    activeDecisionSelection === 'REJECTED'
-                      ? 'bg-rose-600 border-rose-500 text-white shadow-md ring-2 ring-rose-400/40'
-                      : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <XCircle className="w-4 h-4" />
-                  <span>Reject Submission</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Official Review Notes & Actionable Feedback:
-              </label>
-              <textarea
-                rows={3}
-                value={deckComments}
-                onChange={(e) => setDeckComments(e.target.value)}
-                placeholder={
-                  activeDecisionSelection === 'APPROVED'
-                    ? 'State formal endorsement rationale, supervisor approval notes, or filing sign-off comments...'
-                    : 'Specify exact corrections needed (e.g. clarify claims 2-4, label Figure 3 components, complete Form 2)...'
-                }
-                className="w-full px-4 py-3 text-xs bg-slate-800 border border-slate-700 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                disabled={submittingDecision || (activeDecisionSelection !== 'APPROVED' && !deckComments.trim())}
-                onClick={handleDeckSubmit}
-                className={`px-6 py-3 rounded-xl text-xs font-black shadow-lg flex items-center gap-2 cursor-pointer disabled:opacity-50 transition ${
-                  activeDecisionSelection === 'APPROVED'
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                    : activeDecisionSelection === 'CHANGES_REQUESTED'
-                    ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                    : 'bg-rose-600 hover:bg-rose-500 text-white'
-                }`}
-              >
-                {submittingDecision ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                <span>
-                  {activeDecisionSelection === 'APPROVED'
-                    ? canReviewGuide
-                      ? 'Submit Approval & Advance to Legal Review'
-                      : 'Submit Legal Approval & Mark Filing Ready'
-                    : activeDecisionSelection === 'CHANGES_REQUESTED'
-                    ? 'Submit Changes Request'
-                    : 'Confirm Review Rejection'}
-                </span>
-              </button>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1516,18 +1634,18 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
                             : 'bg-rose-100 text-rose-800'
                         }`}
                       >
-                        {rev.decision.replace(/_/g, ' ')}
+                        {(rev.decision || 'LOGGED').replace(/_/g, ' ')}
                       </span>
                     </div>
 
                     <span className="text-[11px] text-slate-500 font-semibold">
-                      {new Date(rev.createdAt).toLocaleDateString('en-GB', {
+                      {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString('en-GB', {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit',
-                      })}
+                      }) : 'N/A'}
                     </span>
                   </div>
 
@@ -1544,7 +1662,7 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
                       {rev.reviewer?.username})
                       {rev.reviewer?.role && (
                         <span className="ml-1.5 px-1.5 py-0.5 bg-slate-100 rounded text-[9px] uppercase font-bold text-slate-600">
-                          {rev.reviewer.role}
+                          {formatRoleName(rev.reviewer.role)}
                         </span>
                       )}
                     </div>
@@ -1570,7 +1688,7 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
             <h3 className="text-sm font-black text-slate-900">Project Review Dialogue & Observations</h3>
             <p className="text-xs text-slate-500 font-medium">Direct communication between inventors and reviewers</p>
           </div>
-          <span className="text-xs font-bold text-slate-400">{project?.comments?.length || 0} notes</span>
+          <span className="text-xs font-bold text-slate-400">{comments.length} notes</span>
         </div>
 
         {/* Comment input */}
@@ -1596,14 +1714,14 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
 
         {/* Comments list */}
         <div className="space-y-2.5 pt-2">
-          {project?.comments && project.comments.length > 0 ? (
-            project.comments.map((c: any) => (
+          {comments && comments.length > 0 ? (
+            comments.map((c: any) => (
               <div key={c.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1.5">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-1">
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-slate-900">{c.user?.fullName || c.user?.username || 'User'}</span>
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-200 text-slate-700">
-                      {c.user?.role || 'Member'}
+                      {formatRoleName(c.user?.role)}
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400">
@@ -1725,19 +1843,19 @@ export const ProjectReviewCenter: React.FC<ProjectReviewCenterProps> = ({
                         : 'bg-rose-100 text-rose-800'
                     }`}
                   >
-                    {selectedReviewDetails.decision.replace(/_/g, ' ')}
+                    {(selectedReviewDetails.decision || 'LOGGED').replace(/_/g, ' ')}
                   </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold">Reviewer</span>
                   <span className="font-bold text-slate-800">
-                    {selectedReviewDetails.reviewer?.fullName || 'Reviewer'} (@{selectedReviewDetails.reviewer?.username})
+                    {selectedReviewDetails.reviewer?.fullName || 'Reviewer'} (@{selectedReviewDetails.reviewer?.username || 'user'})
                   </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold">Date & Time</span>
                   <span className="text-slate-700 font-medium">
-                    {new Date(selectedReviewDetails.createdAt).toLocaleString()}
+                    {selectedReviewDetails.createdAt ? new Date(selectedReviewDetails.createdAt).toLocaleString() : 'N/A'}
                   </span>
                 </div>
               </div>

@@ -40,6 +40,11 @@ export interface UpdateProjectInput {
 
 export class ProjectService {
   static async createProject(input: CreateProjectInput) {
+    const owner = await prisma.user.findUnique({
+      where: { id: input.ownerId },
+      select: { id: true, organizationId: true },
+    });
+
     return prisma.patentProject.create({
       data: {
         title: input.title,
@@ -56,6 +61,7 @@ export class ProjectService {
         expectedFilingDate: input.expectedFilingDate || null,
         patentType: input.patentType || null,
         visibility: input.visibility || 'PRIVATE',
+        organizationId: owner?.organizationId || null,
         ownerId: input.ownerId,
         stage: 'IDEA',
         isArchived: false,
@@ -63,6 +69,9 @@ export class ProjectService {
       include: {
         owner: {
           select: { id: true, fullName: true, username: true, email: true },
+        },
+        organization: {
+          select: { id: true, name: true },
         },
         members: {
           include: {
@@ -76,16 +85,27 @@ export class ProjectService {
   static async getUserProjects(userId: string, userRole?: string, includeArchived = false) {
     const baseWhere = includeArchived ? {} : { isArchived: false };
 
-    const whereClause =
-      userRole === 'Admin'
-        ? baseWhere
-        : {
-          ...baseWhere,
-          OR: [
-            { ownerId: userId },
-            { members: { some: { userId } } },
-          ],
-        };
+    let whereClause: any = baseWhere;
+    if (userRole === 'Admin') {
+      whereClause = baseWhere;
+    } else if (userRole === 'OrganizationAdmin') {
+      const adminUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { organizationId: true },
+      });
+      whereClause = {
+        ...baseWhere,
+        organizationId: adminUser?.organizationId || '__NO_ORG__',
+      };
+    } else {
+      whereClause = {
+        ...baseWhere,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } },
+        ],
+      };
+    }
 
     const projects = await prisma.patentProject.findMany({
       where: whereClause,

@@ -106,17 +106,24 @@ export const LoginPage: React.FC = () => {
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
     try {
-      const response = await api.post('/auth/login', data);
-      localStorage.setItem('patenthub_token', response.data.token);
-      toast.success('Welcome back!');
-      const userRole = response.data.user?.role;
-      if (userRole === 'Admin' || userRole === 'Administrator') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
+      const response = await api.post('/auth/login', {
+        identifier: data.emailOrUsername,
+        emailOrUsername: data.emailOrUsername,
+        password: data.password,
+      });
+
+      if (response.data.token) {
+        localStorage.setItem('patenthub_token', response.data.token);
+        toast.success('Welcome back!');
+        const userRole = response.data.user?.role;
+        if (userRole === 'Admin' || userRole === 'Administrator') {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Login failed. Please check your credentials.');
+      toast.error(error.response?.data?.message || 'Invalid credentials');
     }
   };
 
