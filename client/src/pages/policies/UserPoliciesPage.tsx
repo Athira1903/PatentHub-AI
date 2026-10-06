@@ -163,7 +163,7 @@ export const UserPoliciesPage: React.FC = () => {
                         </h3>
                         <span className="text-[11px] text-slate-500 font-medium inline-flex items-center gap-1 mt-0.5">
                           <Building2 className="w-3 h-3 text-slate-400" />
-                          {policy.organizationName}
+                          {typeof policy.organizationName === 'object' ? (policy.organizationName as any)?.name : (policy.organizationName || policy.organization?.name || 'Platform Scope')}
                         </span>
                       </div>
                     </div>

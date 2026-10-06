@@ -114,7 +114,7 @@ export const CompleteProfilePage: React.FC = () => {
           institution: userData.institution || '',
           department: userData.department || '',
           designation: userData.designation || '',
-          organization: userData.organization || '',
+          organization: (typeof userData.organization === 'object' ? userData.organization?.name : userData.organization) || '',
           role: (userData.role || 'Inventor') as any,
           researchDomain: userData.researchDomain || '',
           bio: userData.bio || '',

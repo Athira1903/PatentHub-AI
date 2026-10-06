@@ -98,7 +98,7 @@ export const ProfilePage: React.FC = () => {
       institution: u.institution || u.profile?.institution || '',
       department: u.department || u.profile?.department || '',
       designation: u.designation || u.profile?.designation || '',
-      organization: u.organization || u.profile?.organization || '',
+      organization: (typeof u.organization === 'object' ? u.organization?.name : u.organization) || (typeof u.profile?.organization === 'object' ? u.profile?.organization?.name : u.profile?.organization) || '',
       researchDomain: u.researchDomain || u.profile?.researchDomain || '',
       bio: u.bio || u.profile?.bio || '',
     });
@@ -534,7 +534,11 @@ export const ProfilePage: React.FC = () => {
                 ) : (
                   <div className="flex items-center gap-2.5 text-slate-900 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 font-semibold">
                     <Building className="w-4 h-4 text-slate-400" />
-                    <span>{user?.organization || user?.profile?.organization || 'Campus Innovation Lab'}</span>
+                    <span>
+                      {(typeof user?.organization === 'object' ? user?.organization?.name : user?.organization) ||
+                        (typeof user?.profile?.organization === 'object' ? user?.profile?.organization?.name : user?.profile?.organization) ||
+                        'Campus Innovation Lab'}
+                    </span>
                   </div>
                 )}
               </div>

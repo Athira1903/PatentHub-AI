@@ -697,7 +697,9 @@ export const AdminDashboardPage: React.FC = () => {
       !projectSearchTerm.trim() ||
       p.title.toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
       p.inventor.toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
-      p.organization.toLowerCase().includes(projectSearchTerm.toLowerCase());
+      (typeof p.organization === 'object' ? p.organization?.name : p.organization || '')
+        .toLowerCase()
+        .includes(projectSearchTerm.toLowerCase());
     return matchStage && matchSearch;
   });
 
@@ -1267,7 +1269,7 @@ export const AdminDashboardPage: React.FC = () => {
                               <span className="w-2 h-2 rounded-full bg-[#315C55] shrink-0" />
                               <span>{act.user}</span>
                             </td>
-                            <td className="py-3 px-3 text-[#5C6B67]">{act.organization || 'Independent'}</td>
+                            <td className="py-3 px-3 text-[#5C6B67]">{typeof act.organization === 'object' ? act.organization?.name : (act.organization || 'Independent')}</td>
                             <td className="py-3 px-3 font-semibold text-[#253330]">{act.action}</td>
                             <td className="py-3 px-3 text-[#71807C] truncate max-w-xs">{act.target}</td>
                             <td className="py-3 px-3 font-mono text-[11px] text-[#71807C]">{act.date || act.time}</td>
@@ -1761,7 +1763,9 @@ export const AdminDashboardPage: React.FC = () => {
                               <span className="text-[10px] text-[#71807C]">{p.category || 'Invention'}</span>
                             </td>
                             <td className="py-3.5 px-4 font-bold text-[#5C6B67]">{p.inventor}</td>
-                            <td className="py-3.5 px-4 text-[#71807C] truncate max-w-[130px]">{p.organization}</td>
+                            <td className="py-3.5 px-4 text-[#71807C] truncate max-w-[130px]">
+                              {typeof p.organization === 'object' ? p.organization?.name : (p.organization || 'Independent')}
+                            </td>
                             <td className="py-3.5 px-4">
                               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
                                 {p.stage.replace('_', ' ')}
@@ -2011,7 +2015,9 @@ export const AdminDashboardPage: React.FC = () => {
                                 {app.roleApplied}
                               </span>
                             </td>
-                            <td className="py-3.5 px-4 text-[#5C6B67]">{app.organization}</td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">
+                              {typeof app.organization === 'object' ? app.organization?.name : (app.organization || 'Independent')}
+                            </td>
                             <td className="py-3.5 px-4 text-[#71807C]">{app.specialization}</td>
                             <td className="py-3.5 px-4 text-xs font-medium text-slate-700">{app.email}</td>
                             <td className="py-3.5 px-4">
@@ -2133,7 +2139,7 @@ export const AdminDashboardPage: React.FC = () => {
                               {index + 1}
                             </td>
                             <td className="py-3.5 px-4 font-bold text-[#253330]">{rev.projectTitle}</td>
-                            <td className="py-3.5 px-4 text-[#5C6B67]">{rev.organization || 'Independent'}</td>
+                            <td className="py-3.5 px-4 text-[#5C6B67]">{typeof rev.organization === 'object' ? rev.organization?.name : (rev.organization || 'Independent')}</td>
                             <td className="py-3.5 px-4 text-[#5C6B67]">{rev.inventor}</td>
                             <td className="py-3.5 px-4 text-[#315C55] font-bold">{rev.reviewer}</td>
                             <td className="py-3.5 px-4 text-[#71807C]">{rev.type}</td>
@@ -3700,7 +3706,9 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-[10px] text-[#71807C] font-bold block uppercase">Organization</span>
-                  <span className="font-bold text-[#253330]">{selectedVerification.organization}</span>
+                  <span className="font-bold text-[#253330]">
+                    {typeof selectedVerification.organization === 'object' ? selectedVerification.organization?.name : (selectedVerification.organization || 'Independent')}
+                  </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-[#71807C] font-bold block uppercase">Qualification</span>
