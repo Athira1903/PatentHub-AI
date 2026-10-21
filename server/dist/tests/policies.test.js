@@ -2975,6 +2975,50 @@ test('Task 9 (6.1): FtoAnalysisService.generateClaimChart generates overlap brea
     db_1.prisma.patentReference.findUnique = origFindRef;
     db_1.prisma.$transaction = origTransaction;
 });
+test('Task 9 (6.1b): FtoAnalysisService.generateClaimChart auto-extracts technical elements when claimElements is empty', async () => {
+    const origFindClaim = db_1.prisma.patentClaim.findUnique;
+    const origFindRef = db_1.prisma.patentReference.findUnique;
+    const origTransaction = db_1.prisma.$transaction;
+    const origCreateElement = db_1.prisma.claimElement.create;
+    db_1.prisma.patentClaim.findUnique = async () => ({
+        id: 'c2',
+        projectId: 'p1',
+        claimNumber: 1,
+        preamble: 'An automated security system comprising:',
+        body: 'a telemetry sensor configured to track transmissions; an anomaly classification engine configured to detect exfiltration; a policy controller configured to block unauthorized access.',
+        claimElements: [] // initially empty
+    });
+    db_1.prisma.patentReference.findUnique = async () => ({
+        id: 'ref1',
+        projectId: 'p1',
+        patentNumber: 'US-9999999-B2',
+        title: 'Security and Access Controller System',
+        abstract: 'A telemetry sensor and policy controller for digital security.'
+    });
+    db_1.prisma.claimElement.create = async ({ data }) => ({
+        id: 'auto_el_' + Math.random(),
+        ...data
+    });
+    db_1.prisma.$transaction = async (fn) => {
+        const txMock = {
+            claimChart: {
+                upsert: async () => ({ id: 'chart2', projectId: 'p1', referenceId: 'ref1', overallRisk: 'MEDIUM' })
+            },
+            claimChartElement: {
+                deleteMany: async () => ({}),
+                create: async () => ({})
+            }
+        };
+        return await fn(txMock);
+    };
+    const chart = await ftoAnalysisService_1.FtoAnalysisService.generateClaimChart('p1', 'c2', 'ref1', 'u1');
+    assert_1.default.strictEqual(chart.id, 'chart2');
+    assert_1.default.ok(chart.elements.length >= 2, 'Should auto-extract at least 2 technical elements');
+    db_1.prisma.patentClaim.findUnique = origFindClaim;
+    db_1.prisma.patentReference.findUnique = origFindRef;
+    db_1.prisma.$transaction = origTransaction;
+    db_1.prisma.claimElement.create = origCreateElement;
+});
 test('Task 9 (6.2): FtoAnalysisService computes deterministic overall risk (LOW, MEDIUM, HIGH)', async () => {
     // If elements have identical/equivalent -> HIGH risk
     const elementsHigh = [{ overlapLevel: 'IDENTICAL' }, { overlapLevel: 'NONE' }];

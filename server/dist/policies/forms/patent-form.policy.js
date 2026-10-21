@@ -7,10 +7,34 @@ class PatentFormPolicy {
      * Compares the document name (case-insensitive check for e.g. "Form 1" or "Form 1 ").
      */
     static hasForm(project, formNumber) {
-        if (!project || !project.documents)
+        if (!project)
             return false;
         const searchStr = `Form ${formNumber}`.toLowerCase();
-        return project.documents.some((doc) => doc.name.toLowerCase().includes(searchStr));
+        const searchNum = `form_${formNumber}`.toLowerCase();
+        const searchAlt = `form${formNumber}`.toLowerCase();
+        // 1. Check project.documents (uploaded form PDFs)
+        if (project.documents && Array.isArray(project.documents)) {
+            const docMatch = project.documents.some((doc) => {
+                const name = (doc.name || '').toLowerCase();
+                return name.includes(searchStr) || name.includes(searchNum) || name.includes(searchAlt);
+            });
+            if (docMatch)
+                return true;
+        }
+        // 2. Check project.patentForms (structured form entities in database)
+        if (project.patentForms && Array.isArray(project.patentForms)) {
+            const formMatch = project.patentForms.some((f) => {
+                const type = (f.formType || '').toLowerCase();
+                return type === searchStr || type === `form ${formNumber}`.toLowerCase() || type === formNumber;
+            });
+            if (formMatch)
+                return true;
+        }
+        // 3. Form 2 is the Specification (Patents Act Section 10 / Rule 13)
+        if (formNumber === '2' && (project.specifications?.length > 0 || project.specification || project.novelFeatures || project.keywords)) {
+            return true;
+        }
+        return false;
     }
     /**
      * Validate dependencies for a specific form.

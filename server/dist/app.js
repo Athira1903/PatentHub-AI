@@ -39,6 +39,7 @@ app.use('/api/projects', projectRoutes_1.default);
 app.use('/api/profile', profileRoutes_1.default);
 app.use('/api/users', userRoutes_1.default);
 app.use('/api/collaboration', collaborationRoutes_1.default);
+app.use('/api/invitations', collaborationRoutes_1.default);
 app.use('/api/notifications', notificationRoutes_1.default);
 app.use('/api/documents', documentRoutes_1.default);
 app.use('/api/admin', adminRoutes_1.default);

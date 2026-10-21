@@ -15,7 +15,7 @@ function getGenAI(): GoogleGenerativeAI {
 
 export function getPreferredModel(params?: Partial<ModelParams>): GenerativeModel {
   const client = getGenAI();
-  const modelName = params?.model || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const modelName = params?.model || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   return client.getGenerativeModel({
     model: modelName,
     ...params
@@ -24,6 +24,7 @@ export function getPreferredModel(params?: Partial<ModelParams>): GenerativeMode
 
 const FALLBACK_MODELS = [
   process.env.GEMINI_MODEL,
+  'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-1.5-flash',
   'gemini-1.5-pro',

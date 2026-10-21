@@ -14,6 +14,8 @@ class ReviewService {
             include: {
                 members: { include: { user: true } },
                 documents: true,
+                patentForms: true,
+                specifications: true,
                 owner: true
             }
         });
@@ -25,7 +27,7 @@ class ReviewService {
             throw new Error('Unauthorized. You are not an assigned reviewer for this project.');
         }
         if (data.decision === 'APPROVED') {
-            if (!review_policy_1.ReviewPolicy.canApprove(reviewer, project)) {
+            if (!review_policy_1.ReviewPolicy.canApprove(reviewer, project, data.checklistSnapshot)) {
                 throw new Error('Approval denied. Review approval conditions or mandatory forms (Form 1, 2, 3, 5) are incomplete.');
             }
         }
@@ -125,8 +127,8 @@ class ReviewService {
                 : data.decision === 'APPROVED'
                     ? `${reviewerName} approved "${project.title}". Workflow stage is now ${nextStage}.`
                     : `${reviewerName} rejected review for "${project.title}": ${data.comments?.trim() || ''}`;
-            const membersToNotify = project.members.filter(m => m.userId !== (reviewer.userId || reviewer.id));
-            const notificationPromises = membersToNotify.map(m => db_1.prisma.notification.create({
+            const membersToNotify = (project.members || []).filter((m) => m.userId !== (reviewer.userId || reviewer.id));
+            const notificationPromises = membersToNotify.map((m) => db_1.prisma.notification.create({
                 data: {
                     userId: m.userId,
                     projectId,

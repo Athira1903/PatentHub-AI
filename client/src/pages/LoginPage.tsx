@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { Lock, User as UserIcon, ArrowRight, Shield, ShieldCheck, Eye, EyeOff, KeyRound, X } from 'lucide-react';
 import { api } from '../services/api';
 import { signInWithGoogleFirebase } from '../config/firebase';
+import { normalizeUserRole } from '../utils/roleUtils';
 
 const loginSchema = z.object({
   emailOrUsername: z.string().min(1, 'Username is required'),
@@ -35,10 +36,15 @@ export const LoginPage: React.FC = () => {
         googleId: firebaseUser.uid,
       });
       localStorage.setItem('patenthub_token', response.data.token);
+      if (response.data.user) {
+        localStorage.setItem('patenthub_user', JSON.stringify(response.data.user));
+      }
       toast.success('Signed in with Google!');
-      const userRole = response.data.user?.role;
-      if (userRole === 'Admin' || userRole === 'Administrator') {
+      const normalizedRole = normalizeUserRole(response.data.user?.role);
+      if (normalizedRole === 'ADMIN') {
         navigate('/admin');
+      } else if (normalizedRole === 'ORGANIZATION_ADMIN') {
+        navigate('/org-admin');
       } else {
         navigate('/dashboard');
       }
@@ -69,11 +75,16 @@ export const LoginPage: React.FC = () => {
         fullName: googleFallbackName.trim() || googleFallbackEmail.split('@')[0],
       });
       localStorage.setItem('patenthub_token', response.data.token);
+      if (response.data.user) {
+        localStorage.setItem('patenthub_user', JSON.stringify(response.data.user));
+      }
       toast.success('Signed in with Google Account!');
       setGoogleFallbackOpen(false);
-      const userRole = response.data.user?.role;
-      if (userRole === 'Admin' || userRole === 'Administrator') {
+      const normalizedRole = normalizeUserRole(response.data.user?.role);
+      if (normalizedRole === 'ADMIN') {
         navigate('/admin');
+      } else if (normalizedRole === 'ORGANIZATION_ADMIN') {
+        navigate('/org-admin');
       } else {
         navigate('/dashboard');
       }
@@ -114,10 +125,15 @@ export const LoginPage: React.FC = () => {
 
       if (response.data.token) {
         localStorage.setItem('patenthub_token', response.data.token);
+        if (response.data.user) {
+          localStorage.setItem('patenthub_user', JSON.stringify(response.data.user));
+        }
         toast.success('Welcome back!');
-        const userRole = response.data.user?.role;
-        if (userRole === 'Admin' || userRole === 'Administrator') {
+        const normalizedRole = normalizeUserRole(response.data.user?.role);
+        if (normalizedRole === 'ADMIN') {
           navigate('/admin');
+        } else if (normalizedRole === 'ORGANIZATION_ADMIN') {
+          navigate('/org-admin');
         } else {
           navigate('/dashboard');
         }
@@ -185,11 +201,11 @@ export const LoginPage: React.FC = () => {
       {/* Main Login Card */}
       <div className="glass-card border border-slate-200/80 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
         {/* Top Accent Gradient Line */}
-        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500"></div>
+        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-[#1B453F] via-[#235952] to-[#3B82F6]"></div>
 
         {/* Header */}
         <div className="text-center mb-8 pt-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-600 text-white shadow-xs mb-3">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#235952] text-white shadow-xs mb-3">
             <Shield className="w-6 h-6 fill-white" />
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Institutional Login</h1>
@@ -273,7 +289,7 @@ export const LoginPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-11 rounded-xl font-bold bg-blue-900 hover:bg-blue-950 text-white text-xs shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-50 mt-5 cursor-pointer"
+            className="w-full h-11 rounded-xl font-bold bg-[#235952] hover:bg-[#1B453F] text-white text-xs shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-50 mt-5 cursor-pointer"
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'} <ArrowRight className="w-4 h-4" />
           </button>
@@ -281,13 +297,13 @@ export const LoginPage: React.FC = () => {
           <div className="pt-5 border-t border-slate-100 flex flex-col gap-2.5 text-center text-xs text-slate-500 font-medium">
             <div>
               Don't have an account?{' '}
-              <Link to="/register" className="font-extrabold text-blue-600 hover:text-blue-700 hover:underline">
+              <Link to="/register" className="font-extrabold text-[#235952] hover:text-[#1B453F] hover:underline">
                 Create an account
               </Link>
             </div>
-            <div className="text-[11px] text-slate-400 bg-slate-50 p-2.5 rounded-lg border border-slate-100/60">
+            <div className="text-[11px] text-slate-500 bg-[#F4F5F4] p-2.5 rounded-lg border border-[#E5E7E5]">
               Need to activate a new account?{' '}
-              <Link to="/activate" className="font-bold text-blue-600 hover:text-blue-700 hover:underline">
+              <Link to="/activate" className="font-bold text-[#235952] hover:text-[#1B453F] hover:underline">
                 Activate Account here
               </Link>
             </div>
@@ -307,7 +323,7 @@ export const LoginPage: React.FC = () => {
             </button>
 
             <div className="flex items-center gap-2.5">
-              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+              <div className="p-2.5 bg-[#E4F0EC] text-[#235952] rounded-xl">
                 <KeyRound className="w-5 h-5" />
               </div>
               <div>
@@ -328,14 +344,14 @@ export const LoginPage: React.FC = () => {
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                     placeholder="name@university.edu"
-                    className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 text-xs focus:outline-none focus:border-blue-600 font-semibold"
+                    className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 text-xs focus:outline-none focus:border-[#235952] font-semibold"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={resetSending}
-                  className="w-full h-11 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer"
+                  className="w-full h-11 bg-[#235952] text-white rounded-xl text-xs font-bold hover:bg-[#1B453F] transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {resetSending ? 'Sending OTP...' : 'Send Verification OTP'}
                 </button>
@@ -388,7 +404,7 @@ export const LoginPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={resetSending}
-                    className="w-2/3 h-11 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer"
+                    className="w-2/3 h-11 bg-[#235952] text-white rounded-xl text-xs font-bold hover:bg-[#1B453F] transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {resetSending ? 'Resetting...' : 'Verify & Reset'}
                   </button>
@@ -405,7 +421,7 @@ export const LoginPage: React.FC = () => {
           <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                <div className="p-2 rounded-xl bg-[#E4F0EC] text-[#235952]">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
@@ -421,7 +437,7 @@ export const LoginPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-3 bg-blue-50/70 border border-blue-150 rounded-xl text-xs text-blue-900 leading-relaxed font-medium">
+            <div className="p-3 bg-[#F0F7F6] border border-[#DCECE9] rounded-xl text-xs text-[#1B453F] leading-relaxed font-medium">
               Popup communication was blocked by your browser on localhost. Enter your Google Account email below to sign in directly.
             </div>
 
@@ -435,7 +451,7 @@ export const LoginPage: React.FC = () => {
                   value={googleFallbackEmail}
                   onChange={(e) => setGoogleFallbackEmail(e.target.value)}
                   placeholder="name@university.edu or name@gmail.com"
-                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#235952]"
                   required
                 />
               </div>
@@ -449,7 +465,7 @@ export const LoginPage: React.FC = () => {
                   value={googleFallbackName}
                   onChange={(e) => setGoogleFallbackName(e.target.value)}
                   placeholder="Your Full Name"
-                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#235952]"
                 />
               </div>
 
@@ -464,7 +480,7 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isGoogleLoading}
-                  className="w-2/3 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold shadow-xs transition disabled:opacity-50"
+                  className="w-2/3 py-2.5 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl font-bold shadow-xs transition disabled:opacity-50"
                 >
                   {isGoogleLoading ? 'Authenticating...' : 'Sign In with Google'}
                 </button>

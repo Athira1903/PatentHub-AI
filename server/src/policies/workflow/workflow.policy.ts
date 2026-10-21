@@ -35,10 +35,15 @@ export class WorkflowPolicy {
       return true;
     }
 
-    // Allow submission / re-submission to GUIDE_REVIEW from DOCUMENTATION or FORMS_PREPARATION
+    // Allow submission / re-submission to GUIDE_REVIEW from any pre-review stage
+    // (IDEA, LITERATURE_REVIEW, PROTOTYPE, DOCUMENTATION, FORMS_PREPARATION)
     if (
       nextStage === 'GUIDE_REVIEW' &&
-      (currentStage === 'DOCUMENTATION' || currentStage === 'FORMS_PREPARATION')
+      (currentStage === 'IDEA' ||
+        currentStage === 'LITERATURE_REVIEW' ||
+        currentStage === 'PROTOTYPE' ||
+        currentStage === 'DOCUMENTATION' ||
+        currentStage === 'FORMS_PREPARATION')
     ) {
       return true;
     }

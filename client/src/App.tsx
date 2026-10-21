@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { ThemeProvider } from './context/ThemeContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Navbar } from './components/Navbar';
 import { HomePage } from './pages/HomePage';
@@ -29,9 +30,10 @@ import { BillingPage } from './pages/admin/BillingPage';
 
 export const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-        <ErrorBoundary fallbackTitle="Application Workspace Encountered an Issue">
+    <ThemeProvider>
+      <BrowserRouter>
+        <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#0B0F17] text-[#202124] dark:text-[#F8FAFC] flex flex-col font-sans transition-colors duration-200">
+          <ErrorBoundary fallbackTitle="Application Workspace Encountered an Issue">
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<HomePage />} />
@@ -143,6 +145,7 @@ export const App: React.FC = () => {
         />
       </div>
     </BrowserRouter>
+    </ThemeProvider>
   );
 };
 

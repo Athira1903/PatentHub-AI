@@ -20,6 +20,7 @@ import {
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import { NextActionCard } from '../project/NextActionCard';
+import { KpiCard } from '../ui/KpiCard';
 
 interface PatentExpertDashboardProps {
   user: any;
@@ -175,11 +176,19 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
       {/* 1. TOP HEADER & FILTER TOOLBAR */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
         <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+              Patent Expert Clearance Workspace
+            </span>
+            {user?.institution && (
+              <span className="text-xs text-slate-500 font-medium">• {user.institution}</span>
+            )}
+          </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight flex items-center gap-2">
             {getGreeting()}, {user?.fullName || user?.username || 'Patent Expert'} <span className="inline-block animate-wave">👋</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-            Here's your patent review workspace for today.
+            Here's your patent legal compliance, claim clearance, and FTO review workspace for today.
           </p>
         </div>
 
@@ -229,85 +238,44 @@ export const PatentExpertDashboard: React.FC<PatentExpertDashboardProps> = ({
 
       {/* 2. TOP 5 KPI SUMMARY CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {/* Pending Reviews */}
-        <div className="p-5 rounded-2xl bg-[#f5f3ff] border border-[#e0e7ff]/70 shadow-3xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-xl bg-white shadow-3xs text-purple-600">
-              <FileText className="w-4 h-4" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {kpis.pendingReviews}
-            </span>
-          </div>
-          <div>
-            <h4 className="text-xs font-extrabold text-slate-900">Pending Reviews</h4>
-            <p className="text-[11px] text-slate-500 font-medium leading-tight">Patent projects awaiting your review</p>
-          </div>
-        </div>
-
-        {/* FTO Analysis */}
-        <div className="p-5 rounded-2xl bg-[#ecfdf5] border border-[#d1fae5]/70 shadow-3xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-xl bg-white shadow-3xs text-teal-600">
-              <Scale className="w-4 h-4" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {kpis.ftoAnalysis}
-            </span>
-          </div>
-          <div>
-            <h4 className="text-xs font-extrabold text-slate-900">FTO Analysis</h4>
-            <p className="text-[11px] text-slate-500 font-medium leading-tight">Projects requiring FTO assessment</p>
-          </div>
-        </div>
-
-        {/* Claim Reviews */}
-        <div className="p-5 rounded-2xl bg-[#fff7ed] border border-[#ffedd5]/70 shadow-3xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-xl bg-white shadow-3xs text-amber-600">
-              <FileCheck className="w-4 h-4" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {kpis.claimReviews}
-            </span>
-          </div>
-          <div>
-            <h4 className="text-xs font-extrabold text-slate-900">Claim Reviews</h4>
-            <p className="text-[11px] text-slate-500 font-medium leading-tight">Claims awaiting expert feedback</p>
-          </div>
-        </div>
-
-        {/* Due This Week */}
-        <div className="p-5 rounded-2xl bg-[#eff6ff] border border-[#dbeafe]/70 shadow-3xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-xl bg-white shadow-3xs text-blue-600">
-              <Calendar className="w-4 h-4" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {kpis.dueThisWeek}
-            </span>
-          </div>
-          <div>
-            <h4 className="text-xs font-extrabold text-slate-900">Due This Week</h4>
-            <p className="text-[11px] text-slate-500 font-medium leading-tight">Reviews approaching deadline</p>
-          </div>
-        </div>
-
-        {/* Completed */}
-        <div className="p-5 rounded-2xl bg-[#f0fdf4] border border-[#dcfce7]/70 shadow-3xs space-y-2 col-span-2 sm:col-span-1">
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-xl bg-white shadow-3xs text-emerald-600">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {kpis.completedReviews}
-            </span>
-          </div>
-          <div>
-            <h4 className="text-xs font-extrabold text-slate-900">Completed</h4>
-            <p className="text-[11px] text-slate-500 font-medium leading-tight">Reviews completed by you</p>
-          </div>
-        </div>
+        <KpiCard
+          label="Pending Reviews"
+          value={kpis.pendingReviews}
+          subtext="Files awaiting review"
+          icon={<FileText className="w-4 h-4 text-[#235952]" />}
+          iconBgColor="bg-[#F0F7F6]"
+          onClick={() => setQueueTab('All')}
+        />
+        <KpiCard
+          label="FTO Analysis"
+          value={kpis.ftoAnalysis}
+          subtext="Clearance assessments"
+          icon={<Scale className="w-4 h-4 text-[#2B6194]" />}
+          iconBgColor="bg-[#F1F6FA]"
+          onClick={() => setQueueTab('FTO')}
+        />
+        <KpiCard
+          label="Claim Reviews"
+          value={kpis.claimReviews}
+          subtext="Statutory claim checks"
+          icon={<FileCheck className="w-4 h-4 text-[#55508C]" />}
+          iconBgColor="bg-[#F7F6FC]"
+          onClick={() => setQueueTab('Claims')}
+        />
+        <KpiCard
+          label="Due This Week"
+          value={kpis.dueThisWeek}
+          subtext="Approaching deadline"
+          icon={<Calendar className="w-4 h-4 text-[#B45309]" />}
+          iconBgColor="bg-[#FFFBEB]"
+        />
+        <KpiCard
+          label="Completed"
+          value={kpis.completedReviews}
+          subtext="Finalized evaluations"
+          icon={<CheckCircle2 className="w-4 h-4 text-[#15803D]" />}
+          iconBgColor="bg-[#F0FDF4]"
+        />
       </div>
 
       {/* PRIMARY NEXT-ACTION HERO CARD */}

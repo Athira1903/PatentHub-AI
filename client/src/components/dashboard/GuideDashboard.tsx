@@ -19,6 +19,7 @@ import {
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import { NextActionCard } from '../project/NextActionCard';
+import { KpiCard } from '../ui/KpiCard';
 
 interface GuideDashboardProps {
   user: any;
@@ -184,8 +185,16 @@ export const GuideDashboard: React.FC<GuideDashboardProps> = ({
       {/* 1. TOP HEADER & FILTER TOOLBAR */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
         <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200">
+              Faculty Guide Workspace
+            </span>
+            {user?.institution && (
+              <span className="text-xs text-slate-500 font-medium">• {user.institution}</span>
+            )}
+          </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight flex items-center gap-2">
-            {getGreeting()}, {user?.fullName || user?.username || 'Guide'} <span className="inline-block animate-wave">👋</span>
+            {getGreeting()}, {user?.fullName || user?.username || 'Faculty Guide'} <span className="inline-block animate-wave">👋</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
             Supervising {supervisedProjectsList.length} assigned patent innovation projects.
@@ -219,93 +228,38 @@ export const GuideDashboard: React.FC<GuideDashboardProps> = ({
 
       {/* 2. TOP 4 KPI SUMMARY CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Supervised Projects */}
-        <div
+        <KpiCard
+          label="Supervised Projects"
+          value={kpis.supervisedProjects}
+          subtext="Assigned invention files"
+          icon={<FolderKanban className="w-4 h-4 text-[#235952]" />}
+          iconBgColor="bg-[#F0F7F6]"
           onClick={() => navigate('/dashboard/projects')}
-          className="p-5 rounded-2xl bg-[#eff6ff] border border-[#dbeafe]/70 shadow-3xs space-y-2 cursor-pointer hover:shadow-xs transition"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-xl bg-white shadow-3xs text-blue-600">
-              <FolderKanban className="w-4 h-4" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {kpis.supervisedProjects}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-xs font-extrabold text-slate-900">Supervised Projects</h4>
-              <p className="text-[11px] text-slate-500 font-medium leading-tight">Projects currently assigned to you</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-        </div>
-
-        {/* Pending Reviews */}
-        <div
+        />
+        <KpiCard
+          label="Pending Reviews"
+          value={kpis.pendingReviews}
+          subtext="Awaiting your feedback"
+          icon={<MessageSquare className="w-4 h-4 text-[#235952]" />}
+          iconBgColor="bg-[#F0F7F6]"
           onClick={() => navigate('/dashboard/reviews')}
-          className="p-5 rounded-2xl bg-[#ecfdf5] border border-[#d1fae5]/70 shadow-3xs space-y-2 cursor-pointer hover:shadow-xs transition"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-xl bg-white shadow-3xs text-teal-600">
-              <MessageSquare className="w-4 h-4" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {kpis.pendingReviews}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-xs font-extrabold text-slate-900">Pending Reviews</h4>
-              <p className="text-[11px] text-slate-500 font-medium leading-tight">Projects waiting for your feedback</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-        </div>
-
-        {/* Needs Attention */}
-        <div
-          onClick={() => navigate('/dashboard/projects')}
-          className="p-5 rounded-2xl bg-[#fff7ed] border border-[#ffedd5]/70 shadow-3xs space-y-2 cursor-pointer hover:shadow-xs transition"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-xl bg-white shadow-3xs text-amber-600">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {kpis.needsAttention}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-xs font-extrabold text-slate-900">Needs Attention</h4>
-              <p className="text-[11px] text-slate-500 font-medium leading-tight">Projects with unresolved issues</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-        </div>
-
-        {/* Completed Reviews */}
-        <div
+        />
+        <KpiCard
+          label="Needs Attention"
+          value={kpis.needsAttention}
+          subtext="Critical revisions requested"
+          icon={<AlertTriangle className="w-4 h-4 text-[#B45309]" />}
+          iconBgColor="bg-[#FFFBEB]"
+          onClick={() => setFilterType('ATTENTION')}
+        />
+        <KpiCard
+          label="Completed Reviews"
+          value={kpis.completedReviews}
+          subtext="Evaluated this period"
+          icon={<CheckCircle2 className="w-4 h-4 text-[#15803D]" />}
+          iconBgColor="bg-[#F0FDF4]"
           onClick={() => navigate('/dashboard/reviews')}
-          className="p-5 rounded-2xl bg-[#f0fdf4] border border-[#dcfce7]/70 shadow-3xs space-y-2 cursor-pointer hover:shadow-xs transition"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-xl bg-white shadow-3xs text-emerald-600">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-              {kpis.completedReviews}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-xs font-extrabold text-slate-900">Completed Reviews</h4>
-              <p className="text-[11px] text-slate-500 font-medium leading-tight">Reviews completed this month</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-        </div>
+        />
       </div>
 
       {/* PRIMARY NEXT-ACTION HERO CARD */}

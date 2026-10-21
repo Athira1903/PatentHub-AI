@@ -135,7 +135,8 @@ const respondToInvitation = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized.' });
             return;
         }
-        let { invitationId, status, action } = req.body; // status: 'ACCEPTED' | 'REJECTED'
+        const invitationId = req.body.invitationId || req.params.id || req.params.invitationId;
+        let { status, action } = req.body; // status: 'ACCEPTED' | 'REJECTED'
         if (!status && action) {
             status = action.toLowerCase() === 'accept' ? 'ACCEPTED' : action.toLowerCase() === 'reject' ? 'REJECTED' : undefined;
         }

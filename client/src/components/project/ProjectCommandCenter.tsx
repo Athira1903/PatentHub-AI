@@ -453,7 +453,7 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
 
           <button
             onClick={() => setShowSettingsModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#064E3B] hover:bg-[#043E2F] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#235952] hover:bg-[#1B453F] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
           >
             <Settings className="w-4 h-4 text-white" />
             <span>Project Settings</span>
@@ -464,7 +464,7 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
       {/* PERSPECTIVE SWITCHER: GUIDED | ADVANCED */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl p-3 px-4 shadow-3xs">
         <div className="flex items-center gap-2">
-          <Compass className="w-4 h-4 text-[#064E3B]" />
+          <Compass className="w-4 h-4 text-[#235952]" />
           <span className="text-xs font-bold text-slate-800">Invention Workspace Mode:</span>
           <span className="text-xs text-slate-500 hidden sm:inline">
             {viewMode === 'guided'
@@ -490,7 +490,7 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
             onClick={() => handleToggleMode('advanced')}
             className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
               viewMode === 'advanced'
-                ? 'bg-[#064E3B] text-white shadow-3xs font-extrabold'
+                ? 'bg-[#235952] text-white shadow-3xs font-extrabold'
                 : 'text-slate-500 hover:text-slate-900'
             }`}
           >
@@ -555,7 +555,7 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
         <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-5">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-[#064E3B]" />
+              <Sliders className="w-4 h-4 text-[#235952]" />
               <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
                 Advanced Statutory & Classification Metadata
               </h3>
@@ -973,7 +973,7 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
               else if (!hasClaims) onNavigateTab('Claims Studio');
               else onNavigateTab('Forms & Filing');
             }}
-            className="w-full py-3 bg-[#064E3B] hover:bg-[#043E2F] text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>
               {!hasReferences
@@ -1219,7 +1219,7 @@ export const ProjectCommandCenter: React.FC<ProjectCommandCenterProps> = ({
                 <button
                   type="submit"
                   disabled={savingSettings}
-                  className="px-6 py-2.5 bg-[#064E3B] hover:bg-[#043E2F] text-white rounded-xl font-bold shadow-xs transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  className="px-6 py-2.5 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl font-bold shadow-xs transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
                   {savingSettings ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                   <span>Save Configuration</span>

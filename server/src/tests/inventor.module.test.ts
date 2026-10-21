@@ -96,9 +96,10 @@ assert.strictEqual(WorkflowPolicy.isStageTransitionValid('FORMS_PREPARATION', 'G
 assert.strictEqual(WorkflowPolicy.isStageTransitionValid('GUIDE_REVIEW', 'DOCUMENTATION'), true, 'GUIDE_REVIEW -> DOCUMENTATION (Changes Requested)');
 assert.strictEqual(WorkflowPolicy.isStageTransitionValid('PATENT_EXPERT_REVIEW', 'DOCUMENTATION'), true, 'PATENT_EXPERT_REVIEW -> DOCUMENTATION (Changes Requested)');
 
-// Invalid jumps
+// Valid submission & invalid jumps
+assert.strictEqual(WorkflowPolicy.isStageTransitionValid('IDEA', 'GUIDE_REVIEW'), true, 'Can submit from IDEA to GUIDE_REVIEW');
+assert.strictEqual(WorkflowPolicy.isStageTransitionValid('IDEA', 'PATENT_EXPERT_REVIEW'), false, 'Cannot skip from IDEA directly to PATENT_EXPERT_REVIEW');
 assert.strictEqual(WorkflowPolicy.isStageTransitionValid('IDEA', 'FILING_READY'), false, 'Cannot skip from IDEA directly to FILING_READY');
-assert.strictEqual(WorkflowPolicy.isStageTransitionValid('IDEA', 'GUIDE_REVIEW'), false, 'Cannot skip from IDEA directly to GUIDE_REVIEW');
 console.log('  ✓ Workflow stage transition rules passed.');
 
 // 6. Anti-Self-Approval & Review Execution

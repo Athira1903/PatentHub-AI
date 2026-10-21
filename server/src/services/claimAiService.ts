@@ -90,7 +90,7 @@ export class ClaimAiService {
 
     try {
       const model = aiClient.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
         generationConfig: { responseMimeType: 'application/json' }
       });
 

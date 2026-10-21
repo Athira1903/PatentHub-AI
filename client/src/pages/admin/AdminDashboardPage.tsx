@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -30,7 +30,6 @@ import {
   RotateCcw,
   Shield,
   CreditCard,
-  FileCheck,
   DollarSign,
   Cpu,
   Server,
@@ -38,17 +37,82 @@ import {
   Mail,
   Cloud,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
+import { KpiCard } from '../../components/ui/KpiCard';
+import { useTheme } from '../../context/ThemeContext';
 
 export const AdminDashboardPage: React.FC = () => {
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const [activeNav, setActiveNav] = useState<string>('dashboard');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabQuery = searchParams.get('tab');
+
+  const getInitialNav = () => {
+    if (tabQuery === 'system') return 'settings';
+    if (tabQuery === 'audit') return 'activity';
+    if (tabQuery) return tabQuery;
+    return 'dashboard';
+  };
+
+  const [activeNav, setActiveNav] = useState<string>(getInitialNav);
   const [searchGlobal, setSearchGlobal] = useState('');
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Sync tabQuery with activeNav when URL param changes
+  useEffect(() => {
+    if (tabQuery) {
+      const mapped = tabQuery === 'system' ? 'settings' : tabQuery === 'audit' ? 'activity' : tabQuery;
+      if (mapped !== activeNav) {
+        setActiveNav(mapped);
+      }
+    } else if (activeNav !== 'dashboard') {
+      setActiveNav('dashboard');
+    }
+  }, [tabQuery]);
+
+  // Sync activeNav changes back to URL search params
+  useEffect(() => {
+    const currentTab = searchParams.get('tab');
+    const targetTab = activeNav === 'dashboard' ? null : activeNav;
+    if (currentTab !== targetTab) {
+      if (targetTab) {
+        setSearchParams({ tab: targetTab }, { replace: true });
+      } else {
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [activeNav, searchParams, setSearchParams]);
+
+  // Auth and role guard
+  useEffect(() => {
+    const token = localStorage.getItem('patenthub_token');
+    if (!token) {
+      toast.error('Authentication required');
+      navigate('/login');
+      return;
+    }
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const role = String(payload?.role || '').toLowerCase();
+      if (role !== 'admin' && role !== 'administrator') {
+        toast.error('Unauthorized: Platform Administrator access required');
+        navigate('/dashboard');
+      }
+    } catch {
+      // Allow API calls to validate if decode fails
+    }
+  }, [navigate]);
+
+  const changeNav = (id: string) => {
+    setActiveNav(id);
+    setSearchParams(id === 'dashboard' ? {} : { tab: id });
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('patenthub_token');
@@ -788,7 +852,7 @@ export const AdminDashboardPage: React.FC = () => {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setActiveNav(item.id)}
+                    onClick={() => changeNav(item.id)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                       isActive
                         ? 'bg-[#315C55] text-white shadow-3xs'
@@ -884,6 +948,20 @@ export const AdminDashboardPage: React.FC = () => {
               />
             </div>
 
+            {/* Theme Switcher Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 bg-[#F7F9F8] hover:bg-[#F0F4F2] border border-[#E5EBE8] rounded-xl text-[#5C6B67] transition cursor-pointer"
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              aria-label="Toggle theme"
+            >
+              {isDark ? (
+                <Sun className="w-4 h-4 text-[#FBBC04]" />
+              ) : (
+                <Moon className="w-4 h-4 text-[#5F6368]" />
+              )}
+            </button>
+
             {/* Refresh Button */}
             <button
               onClick={fetchAllAdminData}
@@ -957,185 +1035,78 @@ export const AdminDashboardPage: React.FC = () => {
 
               {/* 12 Real Database Platform KPI Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-                {/* Total Users */}
-                <div
+                <KpiCard
+                  label="Total Users"
+                  value={metrics?.kpis?.totalUsers ?? usersList.length}
+                  subtext="Registered accounts"
+                  icon={<Users className="w-4 h-4 text-[#235952]" />}
+                  iconBgColor="bg-[#F0F7F6]"
                   onClick={() => setActiveNav('users')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Total Users</span>
-                    <Users className="w-4 h-4 text-[#315C55]" />
-                  </div>
-                  <p className="text-2xl font-black text-[#253330] font-mono">
-                    {metrics?.kpis?.totalUsers ?? usersList.length}
-                  </p>
-                  <span className="text-[10px] text-[#6F8F88] font-bold block">Registered accounts</span>
-                </div>
-
-                {/* Active Users */}
-                <div
+                />
+                <KpiCard
+                  label="Active Users"
+                  value={metrics?.kpis?.activeUsers ?? usersList.filter((u) => u.isActive).length}
+                  subtext="Active & verified"
+                  icon={<UserCheck className="w-4 h-4 text-[#15803D]" />}
+                  iconBgColor="bg-[#F0FDF4]"
                   onClick={() => setActiveNav('users')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Active Users</span>
-                    <UserCheck className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <p className="text-2xl font-black text-emerald-700 font-mono">
-                    {metrics?.kpis?.activeUsers ?? usersList.filter((u) => u.isActive).length}
-                  </p>
-                  <span className="text-[10px] text-emerald-700 font-bold block">Active & verified</span>
-                </div>
-
-                {/* Total Organizations */}
-                <div
+                />
+                <KpiCard
+                  label="Total Orgs"
+                  value={metrics?.kpis?.totalOrganizations ?? organizationsList.length}
+                  subtext="All institutions"
+                  icon={<Building2 className="w-4 h-4 text-[#2B6194]" />}
+                  iconBgColor="bg-[#F1F6FA]"
                   onClick={() => setActiveNav('organizations')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Total Orgs</span>
-                    <Building2 className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <p className="text-2xl font-black text-[#253330] font-mono">
-                    {metrics?.kpis?.totalOrganizations ?? organizationsList.length}
-                  </p>
-                  <span className="text-[10px] text-[#6F8F88] font-bold block">All institutions</span>
-                </div>
-
-                {/* Active Organizations */}
-                <div
+                />
+                <KpiCard
+                  label="Active Orgs"
+                  value={metrics?.kpis?.activeOrganizations ?? organizationsList.filter((o) => o.status === 'ACTIVE').length}
+                  subtext="Operating campuses"
+                  icon={<Building2 className="w-4 h-4 text-[#15803D]" />}
+                  iconBgColor="bg-[#F0FDF4]"
                   onClick={() => setActiveNav('organizations')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Active Orgs</span>
-                    <Building2 className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <p className="text-2xl font-black text-emerald-700 font-mono">
-                    {metrics?.kpis?.activeOrganizations ?? organizationsList.filter((o) => o.status === 'ACTIVE').length}
-                  </p>
-                  <span className="text-[10px] text-emerald-700 font-bold block">Operating campuses</span>
-                </div>
-
-                {/* Total Projects */}
-                <div
+                />
+                <KpiCard
+                  label="Total Projects"
+                  value={metrics?.kpis?.totalProjects ?? projectsList.length}
+                  subtext="Patent workspaces"
+                  icon={<FolderKanban className="w-4 h-4 text-[#55508C]" />}
+                  iconBgColor="bg-[#F7F6FC]"
                   onClick={() => setActiveNav('projects')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Total Projects</span>
-                    <FolderKanban className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <p className="text-2xl font-black text-[#253330] font-mono">
-                    {metrics?.kpis?.totalProjects ?? projectsList.length}
-                  </p>
-                  <span className="text-[10px] text-[#6F8F88] font-bold block">Patent workspaces</span>
-                </div>
-
-                {/* Active Projects */}
-                <div
-                  onClick={() => setActiveNav('projects')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Active Projects</span>
-                    <FolderKanban className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <p className="text-2xl font-black text-emerald-700 font-mono">
-                    {metrics?.kpis?.activeProjects ?? projectsList.length}
-                  </p>
-                  <span className="text-[10px] text-emerald-700 font-bold block">In active pipeline</span>
-                </div>
-
-                {/* Pending Reviews */}
-                <div
+                />
+                <KpiCard
+                  label="Pending Reviews"
+                  value={metrics?.kpis?.pendingReviews ?? pendingReviewsCount}
+                  subtext="Awaiting decision"
+                  icon={<Scale className="w-4 h-4 text-[#B45309]" />}
+                  iconBgColor="bg-[#FFFBEB]"
                   onClick={() => setActiveNav('reviews')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Pending Reviews</span>
-                    <Scale className="w-4 h-4 text-amber-600" />
-                  </div>
-                  <p className="text-2xl font-black text-amber-700 font-mono">
-                    {metrics?.kpis?.pendingReviews ?? pendingReviewsCount}
-                  </p>
-                  <span className="text-[10px] text-amber-700 font-bold block">Awaiting decision</span>
-                </div>
-
-                {/* Completed Reviews */}
-                <div
-                  onClick={() => setActiveNav('reviews')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Completed Reviews</span>
-                    <FileCheck className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <p className="text-2xl font-black text-emerald-700 font-mono">
-                    {metrics?.kpis?.completedReviews ?? 0}
-                  </p>
-                  <span className="text-[10px] text-emerald-700 font-bold block">Approved / Finished</span>
-                </div>
-
-                {/* Filing Ready */}
-                <div
-                  onClick={() => setActiveNav('projects')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Filing Ready</span>
-                    <Shield className="w-4 h-4 text-indigo-600" />
-                  </div>
-                  <p className="text-2xl font-black text-indigo-700 font-mono">
-                    {metrics?.kpis?.filingReadyProjects ?? (stageDist.FILING_READY || 0)}
-                  </p>
-                  <span className="text-[10px] text-indigo-700 font-bold block">Statutory clearance</span>
-                </div>
-
-                {/* Active Subscriptions */}
-                <div
+                />
+                <KpiCard
+                  label="Subscriptions"
+                  value={metrics?.kpis?.activeSubscriptions ?? subscriptionsData.subscriptions.filter((s) => s.status.toUpperCase() === 'ACTIVE').length}
+                  subtext="Active Pro plans"
+                  icon={<CreditCard className="w-4 h-4 text-[#235952]" />}
+                  iconBgColor="bg-[#F0F7F6]"
                   onClick={() => setActiveNav('subscriptions')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Subscriptions</span>
-                    <CreditCard className="w-4 h-4 text-[#315C55]" />
-                  </div>
-                  <p className="text-2xl font-black text-[#315C55] font-mono">
-                    {metrics?.kpis?.activeSubscriptions ?? subscriptionsData.subscriptions.filter((s) => s.status.toUpperCase() === 'ACTIVE').length}
-                  </p>
-                  <span className="text-[10px] text-[#6F8F88] font-bold block">Active Pro plans</span>
-                </div>
-
-                {/* Trial Organizations */}
-                <div
+                />
+                <KpiCard
+                  label="Trial Orgs"
+                  value={metrics?.kpis?.trialOrganizations ?? subscriptionsData.trials.filter((t) => t.status.toUpperCase() === 'ACTIVE').length}
+                  subtext="14-day free trials"
+                  icon={<Sparkles className="w-4 h-4 text-[#B45309]" />}
+                  iconBgColor="bg-[#FFFBEB]"
                   onClick={() => setActiveNav('subscriptions')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Trial Orgs</span>
-                    <Sparkles className="w-4 h-4 text-amber-600" />
-                  </div>
-                  <p className="text-2xl font-black text-amber-700 font-mono">
-                    {metrics?.kpis?.trialOrganizations ?? subscriptionsData.trials.filter((t) => t.status.toUpperCase() === 'ACTIVE').length}
-                  </p>
-                  <span className="text-[10px] text-amber-700 font-bold block">14-day free trials</span>
-                </div>
-
-                {/* Verifications */}
-                <div
+                />
+                <KpiCard
+                  label="Verifications"
+                  value={metrics?.kpis?.pendingVerifications ?? pendingVerifsCount}
+                  subtext="Awaiting review"
+                  icon={<ShieldAlert className="w-4 h-4 text-[#2B6194]" />}
+                  iconBgColor="bg-[#F1F6FA]"
                   onClick={() => setActiveNav('verifications')}
-                  className="p-4 rounded-2xl bg-white border border-[#E5EBE8] shadow-3xs space-y-1.5 cursor-pointer hover:border-[#315C55] transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#71807C]">Verifications</span>
-                    <ShieldAlert className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <p className="text-2xl font-black text-blue-700 font-mono">
-                    {metrics?.kpis?.pendingVerifications ?? pendingVerifsCount}
-                  </p>
-                  <span className="text-[10px] text-blue-700 font-bold block">Awaiting review</span>
-                </div>
+                />
               </div>
 
               {/* Distribution Sections */}

@@ -159,7 +159,8 @@ export const respondToInvitation = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    let { invitationId, status, action } = req.body; // status: 'ACCEPTED' | 'REJECTED'
+    const invitationId = req.body.invitationId || req.params.id || req.params.invitationId;
+    let { status, action } = req.body; // status: 'ACCEPTED' | 'REJECTED'
     if (!status && action) {
       status = action.toLowerCase() === 'accept' ? 'ACCEPTED' : action.toLowerCase() === 'reject' ? 'REJECTED' : undefined;
     }

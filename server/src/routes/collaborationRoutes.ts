@@ -37,9 +37,9 @@ router.post(
 );
 
 router.post(
-  '/respond',
+  ['/respond', '/:id/respond', '/invitations/:id/respond'],
   authorize(async (user, req) => {
-    const { invitationId } = req.body;
+    const invitationId = req.body?.invitationId || req.params?.id;
     if (!invitationId) return false;
     const invitation = await prisma.invitation.findUnique({
       where: { id: invitationId },

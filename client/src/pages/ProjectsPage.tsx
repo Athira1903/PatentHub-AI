@@ -117,7 +117,7 @@ export const ProjectsPage: React.FC = () => {
         </div>
         <Link
           to="/dashboard/create-project"
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition shrink-0"
+          className="px-4 py-2.5 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-3xs transition shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>New project</span>
@@ -131,26 +131,26 @@ export const ProjectsPage: React.FC = () => {
             onClick={() => setActiveTab('active')}
             className={`pb-3 relative transition cursor-pointer ${
               activeTab === 'active'
-                ? 'text-blue-600 font-extrabold'
+                ? 'text-[#235952] font-extrabold'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             <span>Active Projects ({activeTab === 'active' ? projects.length : '...'})</span>
             {activeTab === 'active' && (
-              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-600 rounded-full" />
+              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-[#235952] rounded-full" />
             )}
           </button>
           <button
             onClick={() => setActiveTab('archived')}
             className={`pb-3 relative transition cursor-pointer ${
               activeTab === 'archived'
-                ? 'text-blue-600 font-extrabold'
+                ? 'text-[#235952] font-extrabold'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             <span>Archived ({activeTab === 'archived' ? projects.length : '...'})</span>
             {activeTab === 'archived' && (
-              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-600 rounded-full" />
+              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-[#235952] rounded-full" />
             )}
           </button>
         </div>
@@ -172,7 +172,7 @@ export const ProjectsPage: React.FC = () => {
         <div className="p-16 text-center text-slate-400 text-sm font-medium">Loading patent workspace projects...</div>
       ) : filteredProjects.length === 0 ? (
         <div className="p-16 text-center app-card space-y-4">
-          <div className="w-12 h-12 mx-auto rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-[#E4F0EC] text-[#235952] flex items-center justify-center">
             <Folder className="w-6 h-6" />
           </div>
           <div>
@@ -188,7 +188,7 @@ export const ProjectsPage: React.FC = () => {
           {activeTab === 'active' && (
             <Link
               to="/dashboard/create-project"
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold shadow-3xs transition"
             >
               <Plus className="w-4 h-4" /> Create project
             </Link>
@@ -207,7 +207,7 @@ export const ProjectsPage: React.FC = () => {
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#E4F0EC] text-[#235952] border border-[#235952]/20">
                       {project.category}
                     </span>
                     <div className="flex items-center gap-2">
@@ -215,7 +215,7 @@ export const ProjectsPage: React.FC = () => {
                         <button
                           onClick={() => handleArchiveToggle(project.id, project.isArchived)}
                           title={project.isArchived ? 'Restore Project' : 'Archive Project'}
-                          className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition"
+                          className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition cursor-pointer"
                         >
                           <Archive className="w-3.5 h-3.5" />
                         </button>
@@ -228,13 +228,13 @@ export const ProjectsPage: React.FC = () => {
 
                   <Link
                     to={`/dashboard/projects/${project.id}`}
-                    className="font-extrabold text-sm text-slate-900 group-hover:text-blue-600 transition line-clamp-2 leading-snug"
+                    className="font-extrabold text-sm text-slate-900 group-hover:text-[#235952] transition line-clamp-2 leading-snug"
                   >
                     {project.title}
                   </Link>
 
                   <p className="text-[11px] text-slate-500 font-medium mt-1.5 flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#235952]" />
                     <span>Domain: {project.technicalDomain}</span>
                   </p>
 
@@ -262,7 +262,7 @@ export const ProjectsPage: React.FC = () => {
 
                   <Link
                     to={`/dashboard/projects/${project.id}`}
-                    className="px-3 py-1.5 rounded-xl border border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100/60 font-bold text-xs transition"
+                    className="px-3.5 py-1.5 rounded-xl border border-[#235952]/20 text-[#235952] bg-[#E4F0EC] hover:bg-[#D3E5E0] font-bold text-xs transition"
                   >
                     Open
                   </Link>

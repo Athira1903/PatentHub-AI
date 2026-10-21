@@ -3606,6 +3606,57 @@ test('Task 9 (6.1): FtoAnalysisService.generateClaimChart generates overlap brea
   (prisma as any).$transaction = origTransaction;
 });
 
+test('Task 9 (6.1b): FtoAnalysisService.generateClaimChart auto-extracts technical elements when claimElements is empty', async () => {
+  const origFindClaim = prisma.patentClaim.findUnique;
+  const origFindRef = prisma.patentReference.findUnique;
+  const origTransaction = prisma.$transaction;
+  const origCreateElement = prisma.claimElement.create;
+
+  (prisma.patentClaim as any).findUnique = async () => ({
+    id: 'c2',
+    projectId: 'p1',
+    claimNumber: 1,
+    preamble: 'An automated security system comprising:',
+    body: 'a telemetry sensor configured to track transmissions; an anomaly classification engine configured to detect exfiltration; a policy controller configured to block unauthorized access.',
+    claimElements: [] // initially empty
+  });
+
+  (prisma.patentReference as any).findUnique = async () => ({
+    id: 'ref1',
+    projectId: 'p1',
+    patentNumber: 'US-9999999-B2',
+    title: 'Security and Access Controller System',
+    abstract: 'A telemetry sensor and policy controller for digital security.'
+  });
+
+  (prisma.claimElement as any).create = async ({ data }: any) => ({
+    id: 'auto_el_' + Math.random(),
+    ...data
+  });
+
+  (prisma as any).$transaction = async (fn: any) => {
+    const txMock = {
+      claimChart: {
+        upsert: async () => ({ id: 'chart2', projectId: 'p1', referenceId: 'ref1', overallRisk: 'MEDIUM' })
+      },
+      claimChartElement: {
+        deleteMany: async () => ({}),
+        create: async () => ({})
+      }
+    };
+    return await fn(txMock);
+  };
+
+  const chart = await FtoAnalysisService.generateClaimChart('p1', 'c2', 'ref1', 'u1');
+  assert.strictEqual(chart.id, 'chart2');
+  assert.ok(chart.elements.length >= 2, 'Should auto-extract at least 2 technical elements');
+
+  (prisma.patentClaim as any).findUnique = origFindClaim;
+  (prisma.patentReference as any).findUnique = origFindRef;
+  (prisma as any).$transaction = origTransaction;
+  (prisma.claimElement as any).create = origCreateElement;
+});
+
 test('Task 9 (6.2): FtoAnalysisService computes deterministic overall risk (LOW, MEDIUM, HIGH)', async () => {
   // If elements have identical/equivalent -> HIGH risk
   const elementsHigh = [{ overlapLevel: 'IDENTICAL' }, { overlapLevel: 'NONE' }];

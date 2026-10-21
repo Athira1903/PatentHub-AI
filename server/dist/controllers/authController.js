@@ -203,6 +203,7 @@ const getProfile = async (req, res) => {
         res.status(200).json({
             status: 'success',
             user: profile,
+            ...profile,
         });
     }
     catch (error) {

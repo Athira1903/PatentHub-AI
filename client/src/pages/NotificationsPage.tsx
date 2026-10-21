@@ -316,7 +316,7 @@ export const NotificationsPage: React.FC = () => {
               Notifications
             </h1>
             {unreadCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-black">
+              <span className="px-2 py-0.5 rounded-full bg-[#E4F0EC] text-[#235952] text-xs font-black">
                 {unreadCount} unread
               </span>
             )}
@@ -367,7 +367,7 @@ export const NotificationsPage: React.FC = () => {
               onClick={() => setActiveCategory(tab.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeCategory === tab.id
-                  ? 'bg-blue-600 text-white shadow-xs'
+                  ? 'bg-[#235952] text-white shadow-xs'
                   : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
@@ -384,7 +384,7 @@ export const NotificationsPage: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search notifications..."
-            className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-blue-600 shadow-3xs"
+            className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#235952] shadow-3xs"
           />
         </div>
       </div>
@@ -396,7 +396,7 @@ export const NotificationsPage: React.FC = () => {
         </div>
       ) : filteredFeed.length === 0 ? (
         <div className="p-16 text-center bg-white rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+          <div className="w-12 h-12 rounded-2xl bg-[#E4F0EC] text-[#235952] flex items-center justify-center mx-auto">
             <Bell className="w-6 h-6" />
           </div>
           <h3 className="font-extrabold text-slate-900 text-base">You're all caught up.</h3>
@@ -414,10 +414,10 @@ export const NotificationsPage: React.FC = () => {
               <div
                 key={item.feedId}
                 onClick={() => handleItemClick(item)}
-                className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-3xs hover:border-blue-300 ${
+                className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-3xs hover:border-[#CCD0CD] ${
                   item.isRead
                     ? 'bg-white border-slate-200/80 text-slate-600'
-                    : 'bg-blue-50/40 border-blue-200 text-slate-900 font-medium'
+                    : 'bg-[#F0F7F6]/60 border-[#DCECE9] text-[#191F1D] font-medium'
                 }`}
               >
                 <div className="flex items-start gap-4 min-w-0">
@@ -440,11 +440,11 @@ export const NotificationsPage: React.FC = () => {
                       )}
 
                       {!item.isRead && (
-                        <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+                        <span className="w-2 h-2 rounded-full bg-[#235952] shrink-0"></span>
                       )}
                     </div>
 
-                    <h4 className="text-xs font-black text-slate-900 group-hover:text-blue-700 transition">
+                    <h4 className="text-xs font-black text-slate-900 group-hover:text-[#235952] transition">
                       {item.title}
                     </h4>
 
@@ -467,7 +467,7 @@ export const NotificationsPage: React.FC = () => {
                         onClick={(e) =>
                           handleRespondInvitation((item as any).rawInvite.id, 'ACCEPTED', e)
                         }
-                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+                        className="px-3.5 py-1.5 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                       >
                         Accept
                       </button>
@@ -488,7 +488,7 @@ export const NotificationsPage: React.FC = () => {
                     <>
                       <button
                         onClick={() => handleItemClick(item)}
-                        className="px-3 py-1.5 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 text-slate-700 hover:text-blue-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1.5 bg-slate-50 hover:bg-[#F0F7F6] border border-slate-200 hover:border-[#DCECE9] text-slate-700 hover:text-[#235952] rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
                       >
                         <span>{meta.actionLabel}</span>
                         <ChevronRight className="w-3.5 h-3.5" />

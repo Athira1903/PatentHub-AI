@@ -127,7 +127,7 @@ export const PriorArtEvidenceView: React.FC<PriorArtEvidenceViewProps> = (props:
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-10 py-3 bg-white border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 rounded-2xl text-xs font-semibold text-slate-900 shadow-xs"
+            className="w-full pl-11 pr-10 py-3 bg-white border border-slate-200 focus:border-[#235952] focus:ring-2 focus:ring-[#235952]/10 rounded-2xl text-xs font-semibold text-slate-900 shadow-3xs"
             placeholder="Search patents by keywords, semantic concept, or patent number..."
           />
           {searchQuery && (
@@ -144,7 +144,7 @@ export const PriorArtEvidenceView: React.FC<PriorArtEvidenceViewProps> = (props:
         <button
           type="submit"
           disabled={isSearching}
-          className="px-5 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-2xl text-xs font-bold shadow-xs transition disabled:opacity-50 cursor-pointer"
+          className="px-5 py-3 bg-[#235952] hover:bg-[#1B453F] text-white rounded-2xl text-xs font-bold shadow-3xs transition disabled:opacity-50 cursor-pointer"
         >
           {isSearching ? 'Searching...' : 'Search'}
         </button>
@@ -157,39 +157,39 @@ export const PriorArtEvidenceView: React.FC<PriorArtEvidenceViewProps> = (props:
             onClick={() => setActiveTab('semantic')}
             className={`pb-3 relative transition cursor-pointer ${
               activeTab === 'semantic'
-                ? 'text-blue-600 font-extrabold'
+                ? 'text-[#235952] font-extrabold'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             <span>Semantic Search</span>
             {activeTab === 'semantic' && (
-              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-600 rounded-full" />
+              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-[#235952] rounded-full" />
             )}
           </button>
           <button
             onClick={() => setActiveTab('keyword')}
             className={`pb-3 relative transition cursor-pointer ${
               activeTab === 'keyword'
-                ? 'text-blue-600 font-extrabold'
+                ? 'text-[#235952] font-extrabold'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             <span>Keyword Query</span>
             {activeTab === 'keyword' && (
-              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-600 rounded-full" />
+              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-[#235952] rounded-full" />
             )}
           </button>
           <button
             onClick={() => setActiveTab('classification')}
             className={`pb-3 relative transition cursor-pointer ${
               activeTab === 'classification'
-                ? 'text-blue-600 font-extrabold'
+                ? 'text-[#235952] font-extrabold'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             <span>IPC / CPC Classification</span>
             {activeTab === 'classification' && (
-              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-600 rounded-full" />
+              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-[#235952] rounded-full" />
             )}
           </button>
         </div>
@@ -215,8 +215,8 @@ export const PriorArtEvidenceView: React.FC<PriorArtEvidenceViewProps> = (props:
                     setSelectedPatent(result);
                     setShowRightPanel(true);
                   }}
-                  className={`bg-white border rounded-3xl p-5 shadow-xs transition cursor-pointer ${
-                    isSelected ? 'ring-2 ring-blue-600/30 border-blue-600/50' : 'border-slate-200 hover:border-slate-300'
+                  className={`bg-white border rounded-3xl p-5 shadow-3xs transition cursor-pointer ${
+                    isSelected ? 'ring-2 ring-[#235952]/30 border-[#235952]/50' : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
                   <div className="flex items-start gap-4">
@@ -229,7 +229,7 @@ export const PriorArtEvidenceView: React.FC<PriorArtEvidenceViewProps> = (props:
                       {/* Patent No & Publish Date */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-blue-700 font-mono">
+                          <span className="text-xs font-black text-[#235952] font-mono">
                             {result.patentNumber}
                           </span>
                           <span className="text-[11px] text-slate-400 font-mono">
@@ -243,7 +243,7 @@ export const PriorArtEvidenceView: React.FC<PriorArtEvidenceViewProps> = (props:
                         </div>
 
                         {/* Similarity Score Pill */}
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-black shrink-0">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E4F0EC] text-[#235952] text-[10px] font-black shrink-0">
                           <span>{result.similarityScore || 85}% Similar</span>
                         </div>
                       </div>
@@ -272,7 +272,7 @@ export const PriorArtEvidenceView: React.FC<PriorArtEvidenceViewProps> = (props:
                                 e.stopPropagation();
                                 handleAddReference(result);
                               }}
-                              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg bg-[#E4F0EC] hover:bg-[#D3E5E0] text-[#235952] font-bold flex items-center gap-1 cursor-pointer"
                             >
                               <Plus className="w-3 h-3" /> Add to Prior-Art
                             </button>
@@ -340,7 +340,7 @@ export const PriorArtEvidenceView: React.FC<PriorArtEvidenceViewProps> = (props:
                   </h3>
                   <p className="text-[10px] text-slate-400">Linked to this patent project</p>
                 </div>
-                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-mono font-bold">
+                <span className="px-2 py-0.5 rounded-full bg-[#E4F0EC] text-[#235952] text-xs font-mono font-bold">
                   {savedReferences.length}
                 </span>
               </div>
@@ -359,7 +359,7 @@ export const PriorArtEvidenceView: React.FC<PriorArtEvidenceViewProps> = (props:
                       className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 hover:bg-slate-100/70 transition"
                     >
                       <div className="flex justify-between items-start gap-2">
-                        <span className="text-xs font-black text-blue-700 font-mono">
+                        <span className="text-xs font-black text-[#235952] font-mono">
                           {ref.patentNumber}
                         </span>
                         <div className="flex items-center gap-1.5">

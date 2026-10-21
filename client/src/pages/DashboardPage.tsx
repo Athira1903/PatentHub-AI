@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, Navigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { CoInventorDashboard } from '../components/dashboard/CoInventorDashboard';
 import { PatentExpertDashboard } from '../components/dashboard/PatentExpertDashboard';
 import { GuideDashboard } from '../components/dashboard/GuideDashboard';
 import { InventorDashboard } from '../components/dashboard/InventorDashboard';
 import { OrganizationAdminDashboardPage } from './admin/OrganizationAdminDashboardPage';
+import { normalizeUserRole } from '../utils/roleUtils';
 
 interface Project {
   id: string;
@@ -19,7 +20,15 @@ interface Project {
 
 export const DashboardPage: React.FC = () => {
   const outletCtx = useOutletContext<{ user: any }>() || {};
-  const [currentUser, setCurrentUser] = useState<any>(outletCtx.user || null);
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    if (outletCtx.user) return outletCtx.user;
+    try {
+      const cached = localStorage.getItem('patenthub_user');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [projects, setProjects] = useState<Project[]>([]);
   const [, setLoading] = useState<boolean>(true);
 
@@ -36,7 +45,11 @@ export const DashboardPage: React.FC = () => {
         setProjects(fetchedProjects);
       }
       if (profileRes.status === 'fulfilled') {
-        setCurrentUser(profileRes.value.data.user);
+        const userObj = profileRes.value.data.user || profileRes.value.data;
+        if (userObj) {
+          setCurrentUser(userObj);
+          localStorage.setItem('patenthub_user', JSON.stringify(userObj));
+        }
       }
     } catch (err) {
       console.error('Failed to load dashboard data', err);
@@ -50,28 +63,30 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   const user = currentUser || outletCtx.user;
-  const userRole = user?.role || 'Inventor';
-  const isOrgAdminRole = userRole === 'OrganizationAdmin' || userRole === 'OrgAdmin';
-  const isGuideRole = userRole === 'Guide' || userRole === 'GUIDE';
-  const isPatentExpertRole = userRole === 'PatentExpert' || userRole === 'Patent Expert' || userRole === 'PATENT_EXPERT';
-  const isCoInventorRole = userRole === 'CoInventor' || userRole === 'CO_INVENTOR' || userRole === 'Co-Inventor';
+  const normalizedRole = normalizeUserRole(user?.role);
 
-  if (isOrgAdminRole) {
+  if (normalizedRole === 'ADMIN') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  if (normalizedRole === 'ORGANIZATION_ADMIN') {
     return <OrganizationAdminDashboardPage />;
   }
 
-  if (isGuideRole) {
+  if (normalizedRole === 'GUIDE') {
     return <GuideDashboard user={user} projects={projects} onRefresh={fetchDashboardData} />;
   }
 
-  if (isPatentExpertRole) {
+  if (normalizedRole === 'PATENT_EXPERT') {
     return <PatentExpertDashboard user={user} projects={projects} onRefresh={fetchDashboardData} />;
   }
 
-  if (isCoInventorRole) {
+  if (normalizedRole === 'CO_INVENTOR') {
     return <CoInventorDashboard user={user} projects={projects} onRefresh={fetchDashboardData} />;
   }
 
   // Default: Full Inventor Patent Innovation Command Center
   return <InventorDashboard user={user} onRefresh={fetchDashboardData} />;
 };
+
+export default DashboardPage;

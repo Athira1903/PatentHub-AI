@@ -270,7 +270,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
     remainingActions.push({
       id: remainingActions.length + 1,
       icon: Layers,
-      iconBg: 'bg-blue-50 text-blue-600',
+      iconBg: 'bg-[#E4F0EC] text-[#235952]',
       title: 'Search & Cite Prior Art',
       desc: 'Perform prior art search and cite at least one reference to establish novelty boundaries.',
       priority: 'High Priority',
@@ -283,7 +283,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
     remainingActions.push({
       id: remainingActions.length + 1,
       icon: FileCode,
-      iconBg: 'bg-blue-50 text-blue-600',
+      iconBg: 'bg-[#E4F0EC] text-[#235952]',
       title: 'Draft Patent Claims',
       desc: 'Use AI Claims Studio to draft structured independent and dependent claims.',
       priority: 'High Priority',
@@ -380,7 +380,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
                 onClick={() => setSelectedFormType(tab.id)}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                   selectedFormType === tab.id
-                    ? 'bg-blue-900 text-white shadow-md shadow-blue-900/15'
+                    ? 'bg-[#235952] text-white shadow-3xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80'
                 }`}
               >
@@ -422,7 +422,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/60">
           <div>
             <div className="flex items-center gap-3">
-              <span className="px-2.5 py-1 bg-blue-900 text-white rounded-lg text-xs font-black tracking-wide">
+              <span className="px-2.5 py-1 bg-[#235952] text-white rounded-lg text-xs font-black tracking-wide">
                 {selectedFormType.toUpperCase()}
               </span>
               <h2 className="text-sm font-extrabold text-slate-900">
@@ -474,7 +474,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
                 value={currentFormData.title ?? project?.title ?? ''}
                 onChange={(e) => handleFieldChange('title', e.target.value)}
                 placeholder="Enter complete technical title of the invention..."
-                className="w-full px-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 disabled:opacity-85"
+                className="w-full px-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#235952] disabled:opacity-85"
               />
             </div>
 
@@ -490,7 +490,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
                   value={currentFormData.applicantName ?? applicantNameDisplay}
                   onChange={(e) => handleFieldChange('applicantName', e.target.value)}
                   placeholder="Applicant Full Name"
-                  className="w-full px-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 disabled:opacity-85"
+                  className="w-full px-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#235952] disabled:opacity-85"
                 />
               </div>
 
@@ -504,7 +504,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
                   value={currentFormData.category ?? fieldOfInventionDisplay}
                   onChange={(e) => handleFieldChange('category', e.target.value)}
                   placeholder="e.g. Artificial Intelligence, Transportation Systems"
-                  className="w-full px-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 disabled:opacity-85"
+                  className="w-full px-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#235952] disabled:opacity-85"
                 />
               </div>
             </div>
@@ -523,7 +523,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
                 value={currentFormData.problemStatement ?? project?.problemStatement ?? ''}
                 onChange={(e) => handleFieldChange('problemStatement', e.target.value)}
                 placeholder="Describe conventional systems, state of prior art, limitations, and problems solved..."
-                className="w-full px-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-600 leading-relaxed disabled:opacity-85"
+                className="w-full px-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#235952] leading-relaxed disabled:opacity-85"
               />
             </div>
 
@@ -541,7 +541,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
                 value={currentFormData.proposedSolution ?? project?.proposedSolution ?? ''}
                 onChange={(e) => handleFieldChange('proposedSolution', e.target.value)}
                 placeholder="Explain the principal technical components, embodiment structure, and operational flow..."
-                className="w-full px-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-600 leading-relaxed disabled:opacity-85"
+                className="w-full px-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#235952] leading-relaxed disabled:opacity-85"
               />
             </div>
 
@@ -561,7 +561,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
                 value={currentFormData.claimsText ?? (project?.patentClaims?.length ? project.patentClaims.map((c: any) => `Claim ${c.claimNumber} (${c.claimType}): ${c.preamble || ''} ${c.body}`).join('\n\n') : `1. A computer-implemented or technical system for ${project?.title || 'the invention'}, comprising: ${project?.proposedSolution || 'the disclosed components.'}`)}
                 onChange={(e) => handleFieldChange('claimsText', e.target.value)}
                 placeholder="Claims language defining boundaries of legal exclusivity..."
-                className="w-full px-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-600 leading-relaxed disabled:opacity-85"
+                className="w-full px-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:border-[#235952] leading-relaxed disabled:opacity-85"
               />
             </div>
           </div>
@@ -649,7 +649,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
               type="button"
               onClick={handleSaveForm}
               disabled={savingForm}
-              className="px-5 py-2.5 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/15 flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
+              className="px-5 py-2.5 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold shadow-3xs flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
             >
               {savingForm ? (
                 <>
@@ -993,7 +993,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
           <button
             onClick={handleGeneratePackage}
             disabled={generatingPackage}
-            className="px-6 py-3 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/20 flex items-center gap-2 transition disabled:opacity-50 cursor-pointer"
+            className="px-6 py-3 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold shadow-3xs flex items-center gap-2 transition disabled:opacity-50 cursor-pointer"
           >
             {generatingPackage ? (
               <>
@@ -1010,8 +1010,8 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
         </div>
 
         {/* Disclaimer Banner */}
-        <div className="p-3.5 bg-blue-50/60 border border-blue-150 rounded-2xl flex items-center gap-3 text-xs text-blue-900">
-          <Info className="w-4 h-4 text-blue-600 shrink-0" />
+        <div className="p-3.5 bg-[#E4F0EC] border border-[#235952]/20 rounded-2xl flex items-center gap-3 text-xs text-[#235952]">
+          <Info className="w-4 h-4 text-[#235952] shrink-0" />
           <p className="text-[11px] leading-relaxed">
             <strong>Preliminary AI-assisted preparation.</strong> Final professional review required. No claim that the system is legally ready to file.
           </p>
@@ -1025,7 +1025,7 @@ export const FilingReadinessView: React.FC<FilingReadinessViewProps> = (props: a
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
               <div className="flex items-center gap-2.5">
-                <FileCheck2 className="w-5 h-5 text-blue-900" />
+                <FileCheck2 className="w-5 h-5 text-[#235952]" />
                 <h3 className="text-sm font-extrabold text-slate-900">
                   IPO {selectedFormType} Formal Preview
                 </h3>

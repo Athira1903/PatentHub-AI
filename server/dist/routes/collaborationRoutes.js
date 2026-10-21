@@ -22,8 +22,8 @@ router.post('/invite', (0, authorize_1.authorize)(async (user, req) => {
         return false;
     return invitation_policy_1.InvitationPolicy.canInvite(user, project, targetQuery, role);
 }), collaborationController_1.inviteMember);
-router.post('/respond', (0, authorize_1.authorize)(async (user, req) => {
-    const { invitationId } = req.body;
+router.post(['/respond', '/:id/respond', '/invitations/:id/respond'], (0, authorize_1.authorize)(async (user, req) => {
+    const invitationId = req.body?.invitationId || req.params?.id;
     if (!invitationId)
         return false;
     const invitation = await db_1.prisma.invitation.findUnique({

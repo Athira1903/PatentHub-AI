@@ -25,6 +25,7 @@ import {
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import { NextActionCard } from '../project/NextActionCard';
+import { KpiCard } from '../ui/KpiCard';
 
 interface InventorDashboardProps {
   user: any;
@@ -162,6 +163,9 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
         <div className="space-y-2 relative z-10 max-w-2xl">
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#E4F0EC] text-[#315C55] border border-[#A8C8BD]/50 shadow-3xs">
+              Lead Inventor Workspace
+            </span>
+            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200 shadow-3xs">
               Patent Innovation Command Center
             </span>
             {user?.institution && (
@@ -207,61 +211,30 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
       {/* 2. TOP 4 REAL DATABASE-DRIVEN KPI CARDS */}
       {/* ==================================================== */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Inventions */}
-        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
-          <div className="flex items-center justify-between text-[#71807C]">
-            <span className="text-[10px] font-black uppercase tracking-wider">My Projects</span>
-            <FolderKanban className="w-4 h-4 text-[#315C55]" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-[#253330] font-mono">
-            {kpis.myProjects < 10 ? `0${kpis.myProjects}` : kpis.myProjects}
-          </div>
-          <span className="inline-block text-[10px] font-bold text-[#6F8F88]">
-            Owned & collaborated files
-          </span>
-        </div>
-
-        {/* Active Projects */}
-        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
-          <div className="flex items-center justify-between text-[#71807C]">
-            <span className="text-[10px] font-black uppercase tracking-wider">Active Projects</span>
-            <Layers className="w-4 h-4 text-[#6F8F88]" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-[#253330] font-mono">
-            {kpis.activeProjects < 10 ? `0${kpis.activeProjects}` : kpis.activeProjects}
-          </div>
-          <span className="inline-block text-[10px] font-bold text-[#6F8F88]">
-            In invention pipeline
-          </span>
-        </div>
-
-        {/* Filing Readiness */}
-        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
-          <div className="flex items-center justify-between text-[#71807C]">
-            <span className="text-[10px] font-black uppercase tracking-wider">Filing Readiness</span>
-            <Award className="w-4 h-4 text-[#315C55]" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-[#315C55] font-mono">
-            {kpis.filingReadiness}%
-          </div>
-          <span className="inline-block text-[10px] font-bold text-[#315C55] bg-[#E4F0EC] px-2 py-0.5 rounded-md">
-            Statutory completeness index
-          </span>
-        </div>
-
-        {/* Pending Actions */}
-        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
-          <div className="flex items-center justify-between text-[#71807C]">
-            <span className="text-[10px] font-black uppercase tracking-wider">Pending Actions</span>
-            <AlertCircle className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-700 font-mono">
-            {kpis.pendingActions < 10 ? `0${kpis.pendingActions}` : kpis.pendingActions}
-          </div>
-          <span className="inline-block text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
-            Tasks, reviews & attention items
-          </span>
-        </div>
+        <KpiCard
+          label="My Projects"
+          value={kpis.myProjects < 10 ? `0${kpis.myProjects}` : kpis.myProjects}
+          subtext="Owned & collaborated files"
+          icon={<FolderKanban className="w-4 h-4 text-teal-700" />}
+        />
+        <KpiCard
+          label="Active Projects"
+          value={kpis.activeProjects < 10 ? `0${kpis.activeProjects}` : kpis.activeProjects}
+          subtext="In invention pipeline"
+          icon={<Layers className="w-4 h-4 text-teal-700" />}
+        />
+        <KpiCard
+          label="Filing Readiness"
+          value={`${kpis.filingReadiness}%`}
+          subtext="Statutory completeness"
+          icon={<Award className="w-4 h-4 text-teal-700" />}
+        />
+        <KpiCard
+          label="Pending Actions"
+          value={kpis.pendingActions < 10 ? `0${kpis.pendingActions}` : kpis.pendingActions}
+          subtext="Tasks, reviews & attention items"
+          icon={<AlertCircle className="w-4 h-4 text-amber-600" />}
+        />
       </div>
 
       {/* ==================================================== */}

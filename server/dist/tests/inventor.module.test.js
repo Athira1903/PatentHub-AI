@@ -89,9 +89,10 @@ assert_1.default.strictEqual(workflow_policy_1.WorkflowPolicy.isStageTransitionV
 // Changes requested sent back to DOCUMENTATION
 assert_1.default.strictEqual(workflow_policy_1.WorkflowPolicy.isStageTransitionValid('GUIDE_REVIEW', 'DOCUMENTATION'), true, 'GUIDE_REVIEW -> DOCUMENTATION (Changes Requested)');
 assert_1.default.strictEqual(workflow_policy_1.WorkflowPolicy.isStageTransitionValid('PATENT_EXPERT_REVIEW', 'DOCUMENTATION'), true, 'PATENT_EXPERT_REVIEW -> DOCUMENTATION (Changes Requested)');
-// Invalid jumps
+// Valid submission & invalid jumps
+assert_1.default.strictEqual(workflow_policy_1.WorkflowPolicy.isStageTransitionValid('IDEA', 'GUIDE_REVIEW'), true, 'Can submit from IDEA to GUIDE_REVIEW');
+assert_1.default.strictEqual(workflow_policy_1.WorkflowPolicy.isStageTransitionValid('IDEA', 'PATENT_EXPERT_REVIEW'), false, 'Cannot skip from IDEA directly to PATENT_EXPERT_REVIEW');
 assert_1.default.strictEqual(workflow_policy_1.WorkflowPolicy.isStageTransitionValid('IDEA', 'FILING_READY'), false, 'Cannot skip from IDEA directly to FILING_READY');
-assert_1.default.strictEqual(workflow_policy_1.WorkflowPolicy.isStageTransitionValid('IDEA', 'GUIDE_REVIEW'), false, 'Cannot skip from IDEA directly to GUIDE_REVIEW');
 console.log('  ✓ Workflow stage transition rules passed.');
 // 6. Anti-Self-Approval & Review Execution
 console.log('\n[Test 6] Review Decision Execution & Anti-Self-Approval:');

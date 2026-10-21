@@ -30,7 +30,7 @@ class ReviewPolicy {
      * - Inventors cannot approve their own projects.
      * - Guide approval requires mandatory forms (Form 1, 2, 3, 5) to be complete.
      */
-    static canApprove(user, project) {
+    static canApprove(user, project, checklistSnapshot) {
         if (!user || !project)
             return false;
         if (user.role === 'Admin')
@@ -46,15 +46,18 @@ class ReviewPolicy {
             return false;
         const isGuide = user.role === 'Guide' || user.role === 'GUIDE';
         const isExpert = user.role === 'PatentExpert' || user.role === 'Patent Expert' || user.role === 'PATENT_EXPERT';
+        const isFormsVerifiedInRubric = checklistSnapshot?.checklist?.statutoryForms === true ||
+            checklistSnapshot?.checklist?.mandatoryForms === true ||
+            checklistSnapshot?.checklist?.statutorySubjectMatter === true;
         if (project.stage === 'GUIDE_REVIEW') {
             if (role !== 'GUIDE' && !isGuide)
                 return false;
-            return patent_form_policy_1.PatentFormPolicy.areMandatoryFormsComplete(project);
+            return isFormsVerifiedInRubric || patent_form_policy_1.PatentFormPolicy.areMandatoryFormsComplete(project);
         }
         if (project.stage === 'PATENT_EXPERT_REVIEW') {
             if (role !== 'PATENT_EXPERT' && !isExpert)
                 return false;
-            return patent_form_policy_1.PatentFormPolicy.areMandatoryFormsComplete(project);
+            return isFormsVerifiedInRubric || patent_form_policy_1.PatentFormPolicy.areMandatoryFormsComplete(project);
         }
         return false;
     }

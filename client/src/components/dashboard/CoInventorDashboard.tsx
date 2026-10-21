@@ -26,6 +26,7 @@ import {
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import { NextActionCard } from '../project/NextActionCard';
+import { KpiCard } from '../ui/KpiCard';
 
 interface CoInventorDashboardProps {
   user: any;
@@ -216,61 +217,30 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
       {/* 2. TOP 4 REAL DATABASE-DRIVEN KPI CARDS */}
       {/* ==================================================== */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Inventions / My Projects */}
-        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
-          <div className="flex items-center justify-between text-[#71807C]">
-            <span className="text-[10px] font-black uppercase tracking-wider">My Projects</span>
-            <FolderKanban className="w-4 h-4 text-[#315C55]" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-[#253330] font-mono">
-            {kpis.myProjects < 10 ? `0${kpis.myProjects}` : kpis.myProjects}
-          </div>
-          <span className="inline-block text-[10px] font-bold text-[#6F8F88]">
-            Collaborating & accessible files
-          </span>
-        </div>
-
-        {/* Active Projects */}
-        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
-          <div className="flex items-center justify-between text-[#71807C]">
-            <span className="text-[10px] font-black uppercase tracking-wider">Active Projects</span>
-            <Layers className="w-4 h-4 text-[#6F8F88]" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-[#253330] font-mono">
-            {kpis.activeProjects < 10 ? `0${kpis.activeProjects}` : kpis.activeProjects}
-          </div>
-          <span className="inline-block text-[10px] font-bold text-[#6F8F88]">
-            In development pipeline
-          </span>
-        </div>
-
-        {/* My Tasks */}
-        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
-          <div className="flex items-center justify-between text-[#71807C]">
-            <span className="text-[10px] font-black uppercase tracking-wider">My Tasks</span>
-            <CheckSquare className="w-4 h-4 text-[#315C55]" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-[#315C55] font-mono">
-            {kpis.myTasks < 10 ? `0${kpis.myTasks}` : kpis.myTasks}
-          </div>
-          <span className="inline-block text-[10px] font-bold text-[#315C55] bg-[#E4F0EC] px-2 py-0.5 rounded-md">
-            Assigned to you
-          </span>
-        </div>
-
-        {/* Pending Reviews / Actions */}
-        <div className="bg-white border border-[#E5EBE8] rounded-2xl p-5 space-y-2 shadow-3xs">
-          <div className="flex items-center justify-between text-[#71807C]">
-            <span className="text-[10px] font-black uppercase tracking-wider">Pending Reviews</span>
-            <AlertCircle className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-700 font-mono">
-            {kpis.pendingReviews < 10 ? `0${kpis.pendingReviews}` : kpis.pendingReviews}
-          </div>
-          <span className="inline-block text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
-            Supervisor reviews pending
-          </span>
-        </div>
+        <KpiCard
+          label="My Projects"
+          value={kpis.myProjects < 10 ? `0${kpis.myProjects}` : kpis.myProjects}
+          subtext="Collaborating & accessible files"
+          icon={<FolderKanban className="w-4 h-4 text-teal-700" />}
+        />
+        <KpiCard
+          label="Active Projects"
+          value={kpis.activeProjects < 10 ? `0${kpis.activeProjects}` : kpis.activeProjects}
+          subtext="In development pipeline"
+          icon={<Layers className="w-4 h-4 text-teal-700" />}
+        />
+        <KpiCard
+          label="My Tasks"
+          value={kpis.myTasks < 10 ? `0${kpis.myTasks}` : kpis.myTasks}
+          subtext="Assigned to you"
+          icon={<CheckSquare className="w-4 h-4 text-teal-700" />}
+        />
+        <KpiCard
+          label="Pending Reviews"
+          value={kpis.pendingReviews < 10 ? `0${kpis.pendingReviews}` : kpis.pendingReviews}
+          subtext="Supervisor reviews pending"
+          icon={<AlertCircle className="w-4 h-4 text-amber-600" />}
+        />
       </div>
 
       {/* ==================================================== */}

@@ -271,10 +271,10 @@ export const CompleteProfilePage: React.FC = () => {
   if (needUsernameSelection) {
     return (
       <div className="flex-1 bg-slate-50 py-12 px-4 flex items-center justify-center font-sans">
-        <div className="w-full max-w-md bg-white border border-slate-200/80 rounded-3xl p-8 shadow-2xl space-y-6 relative overflow-hidden">
-          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500"></div>
+        <div className="w-full max-w-md bg-white border border-[#E5E7E5] rounded-3xl p-8 shadow-2xl space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-[#1B453F] via-[#235952] to-[#3B82F6]"></div>
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-600 text-white shadow-xs mb-1">
+            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#235952] text-white shadow-xs mb-1">
               <Shield className="w-6 h-6 fill-white" />
             </div>
             <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Choose your Username</h1>
@@ -293,7 +293,7 @@ export const CompleteProfilePage: React.FC = () => {
                     setUsernameError('');
                   }}
                   placeholder="e.g. your_username"
-                  className="w-full h-11 pl-8 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 font-medium transition-all shadow-3xs"
+                  className="w-full h-11 pl-8 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-[#235952] focus:ring-2 focus:ring-[#235952]/10 font-medium transition-all shadow-3xs"
                 />
               </div>
               {usernameError && <p className="mt-1 text-[11px] text-rose-600 font-semibold">{usernameError}</p>}
@@ -301,7 +301,7 @@ export const CompleteProfilePage: React.FC = () => {
             <button
               type="submit"
               disabled={savingUsername}
-              className="w-full h-11 rounded-xl font-bold bg-blue-900 hover:bg-blue-950 text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
+              className="w-full h-11 rounded-xl font-bold bg-[#235952] hover:bg-[#1B453F] text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
             >
               {savingUsername ? 'Saving Username...' : 'Set Username'}
             </button>
@@ -316,7 +316,7 @@ export const CompleteProfilePage: React.FC = () => {
       <div className="w-full max-w-3xl app-card p-8 space-y-8">
         {/* Header */}
         <div className="text-center space-y-1">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-600 text-white shadow-xs mb-2">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#235952] text-white shadow-xs mb-2">
             <Shield className="w-6 h-6 fill-white" />
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Complete Your Profile</h1>
@@ -334,7 +334,7 @@ export const CompleteProfilePage: React.FC = () => {
                   <UserIcon className="w-8 h-8 text-slate-300" />
                 )}
               </div>
-              <label className="absolute bottom-1 right-1 bg-blue-600 text-white p-2 rounded-2xl shadow-lg cursor-pointer hover:bg-blue-700 hover:scale-105 transition-all">
+              <label className="absolute bottom-1 right-1 bg-[#235952] text-white p-2 rounded-2xl shadow-lg cursor-pointer hover:bg-[#1B453F] hover:scale-105 transition-all">
                 <Camera className="w-4 h-4" />
                 <input type="file" onChange={handlePhotoChange} className="hidden" accept="image/jpeg,image/png,image/jpg" />
               </label>
@@ -595,7 +595,7 @@ export const CompleteProfilePage: React.FC = () => {
           <button
             type="submit"
             disabled={saving || !isValid}
-            className="w-full h-12 rounded-xl font-bold bg-blue-900 hover:bg-blue-950 text-white text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-12 rounded-xl font-bold bg-[#235952] hover:bg-[#1B453F] text-white text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <>

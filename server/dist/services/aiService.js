@@ -16,7 +16,7 @@ function getGenAI() {
 }
 function getPreferredModel(params) {
     const client = getGenAI();
-    const modelName = params?.model || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    const modelName = params?.model || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     return client.getGenerativeModel({
         model: modelName,
         ...params
@@ -24,6 +24,7 @@ function getPreferredModel(params) {
 }
 const FALLBACK_MODELS = [
     process.env.GEMINI_MODEL,
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
     'gemini-1.5-pro',

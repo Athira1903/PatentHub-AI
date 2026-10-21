@@ -96,7 +96,7 @@ export class AIProviderService {
           userId,
           analysisType: 'INNOVATION_OVERLAP',
           prompt,
-          model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+          model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
           inputReference: { title, priorArtCount: priorArtAbstracts.length },
           output: result as any,
           safetyDisclaimer: disclaimer,

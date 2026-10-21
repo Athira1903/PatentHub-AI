@@ -36,6 +36,7 @@ import { FilingReadinessView } from '../components/project/FilingReadinessView';
 import { PriorArtEvidenceView } from '../components/project/PriorArtEvidenceView';
 import { ProjectReviewCenter } from '../components/project/ProjectReviewCenter';
 import { SpecificationStudio } from '../components/project/SpecificationStudio';
+import { WorkflowProgress } from '../components/ui/WorkflowProgress';
 
 export interface ProjectDetail {
   id: string;
@@ -111,7 +112,7 @@ export const getStageProgress = (stage: string) => {
 
 export const ProjectDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const outletCtx = useOutletContext<{ user: any }>() || {};
   const [currentUser, setCurrentUser] = useState<any>(outletCtx.user || null);
 
@@ -151,10 +152,9 @@ export const ProjectDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const urlTab = searchParams.get('tab');
-  const isReviewsRoute = location.pathname.endsWith('/reviews');
 
   const computeActiveTab = () => {
-    if (isReviewsRoute) return 'Reviews';
+    if (location.pathname.endsWith('/reviews')) return 'Reviews';
     if (urlTab) {
       if (urlTab.toLowerCase() === 'draft' || urlTab.toLowerCase() === 'drafting') return 'Specification';
       return urlTab;
@@ -177,10 +177,8 @@ export const ProjectDetailsPage: React.FC = () => {
       navigate(`${baseProjectUrl}/reviews`);
     } else if (tabName === 'Overview') {
       navigate(baseProjectUrl);
-      setSearchParams({});
     } else {
       navigate(`${baseProjectUrl}?tab=${encodeURIComponent(tabName)}`);
-      setSearchParams({ tab: tabName });
     }
   };
 
@@ -1117,14 +1115,47 @@ export const ProjectDetailsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto py-2 animate-fade-in font-sans">
+      {/* Top Project Banner with Workflow Progress */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-[#E5E7E5] rounded-2xl p-5 shadow-3xs">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/projects')}
+                className="text-xs font-semibold text-[#5C6662] hover:text-[#191F1D] flex items-center gap-1 transition cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Projects</span>
+              </button>
+              <span className="text-[#5C6662]">•</span>
+              <span className="text-xs font-mono text-[#5C6662] uppercase">
+                PH-{project.id.substring(0, 8)}
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#191F1D] tracking-tight">
+              {project.title}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#E4F0EC] text-[#235952] border border-[#235952]/20">
+              {(project.stage || 'IDEA').replace(/_/g, ' ')}
+            </span>
+          </div>
+        </div>
+
+        {/* Global Statutory Workflow Stepper */}
+        <WorkflowProgress currentStage={project.stage} />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Project Sidebar (3 cols) */}
         <aside className="lg:col-span-3 lg:sticky lg:top-4 h-fit space-y-5">
           {/* Main Patent Journey Nav Card */}
-          <div className="app-card p-4 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Patent Journey</span>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+          <div className="app-card p-4 space-y-4 shadow-3xs">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5E7E5]">
+              <span className="text-[10px] font-bold text-[#5C6662] uppercase tracking-wider">Patent Journey</span>
+              <span className="px-2.5 py-0.5 rounded-full bg-[#E4F0EC] text-[#235952] text-[10px] font-bold">
                 {(project?.stage || 'IDEA').replace(/_/g, ' ')}
               </span>
             </div>
@@ -1133,24 +1164,20 @@ export const ProjectDetailsPage: React.FC = () => {
             <nav className="space-y-1">
               {sidebarLinks.map((link) => {
                 const Icon = link.icon;
-                const isReviewsItem = link.tab === 'Reviews';
                 const isActive =
                   activeTab === link.tab ||
-                  (isReviewsItem &&
-                    (activeTab === 'Reviews' ||
-                      activeTab === 'Guide Reviews' ||
-                      location.pathname.endsWith('/reviews')));
+                  (link.tab === 'Reviews' && activeTab === 'Guide Reviews');
                 return (
                   <button
                     key={link.label}
                     onClick={() => handleSelectTab(link.tab)}
                     className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all text-left cursor-pointer ${
                       isActive
-                        ? 'bg-blue-900 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
+                        ? 'bg-[#235952] text-white shadow-3xs'
+                        : 'text-[#5C6662] hover:text-[#191F1D] hover:bg-[#F4F5F4]'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#5C6662]'}`} />
                     <span>{link.label}</span>
                   </button>
                 );
@@ -1198,7 +1225,7 @@ export const ProjectDetailsPage: React.FC = () => {
             </div>
 
             <button
-              onClick={() => setActiveTab('Forms & Filing')}
+              onClick={() => handleSelectTab('Forms & Filing')}
               className="w-full py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-3xs"
             >
               <span>View Details</span>
@@ -1210,7 +1237,7 @@ export const ProjectDetailsPage: React.FC = () => {
         {/* Right Content Panel (9 cols) */}
         <div className="lg:col-span-9 space-y-6">
           {/* T_COMMAND_CENTER: COMMAND CENTER OVERVIEW */}
-          {(activeTab === 'Overview' || (activeTab as any) === 'Command center') && !location.pathname.endsWith('/reviews') && (
+          {(activeTab === 'Overview' || (activeTab as any) === 'Command center') && (
             <ProjectCommandCenter
               project={project}
               analyticsSummary={analyticsSummary}
@@ -1347,7 +1374,7 @@ export const ProjectDetailsPage: React.FC = () => {
               project={project}
               analyticsSummary={analyticsSummary}
               onRefreshProject={fetchProject}
-              onNavigateTab={(tab) => setActiveTab(tab as any)}
+              onNavigateTab={(tab) => handleSelectTab(tab as any)}
             />
           )}
 
@@ -3250,7 +3277,7 @@ export const ProjectDetailsPage: React.FC = () => {
           )}
 
           {/* T10: PROJECT REVIEW CENTER */}
-          {(activeTab === 'Guide Reviews' || activeTab === 'Reviews' || location.pathname.endsWith('/reviews')) && (
+          {(activeTab === 'Guide Reviews' || activeTab === 'Reviews') && (
             <ErrorBoundary fallbackTitle="Review Center Error">
               <ProjectReviewCenter
                 projectId={id!}

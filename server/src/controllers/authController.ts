@@ -212,6 +212,7 @@ export const getProfile = async (req: AuthenticatedRequest, res: Response): Prom
     res.status(200).json({
       status: 'success',
       user: profile,
+      ...profile,
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to fetch user profile' });

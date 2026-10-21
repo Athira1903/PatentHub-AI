@@ -22,6 +22,8 @@ export class ReviewService {
       include: {
         members: { include: { user: true } },
         documents: true,
+        patentForms: true,
+        specifications: true,
         owner: true
       }
     });
@@ -36,7 +38,7 @@ export class ReviewService {
     }
 
     if (data.decision === 'APPROVED') {
-      if (!ReviewPolicy.canApprove(reviewer, project)) {
+      if (!ReviewPolicy.canApprove(reviewer, project, data.checklistSnapshot)) {
         throw new Error('Approval denied. Review approval conditions or mandatory forms (Form 1, 2, 3, 5) are incomplete.');
       }
     } else if (data.decision === 'REJECTED' || data.decision === 'CHANGES_REQUESTED') {
@@ -142,8 +144,8 @@ export class ReviewService {
         ? `${reviewerName} approved "${project.title}". Workflow stage is now ${nextStage}.`
         : `${reviewerName} rejected review for "${project.title}": ${data.comments?.trim() || ''}`;
 
-      const membersToNotify = project.members.filter(m => m.userId !== (reviewer.userId || reviewer.id));
-      const notificationPromises = membersToNotify.map(m =>
+      const membersToNotify = ((project as any).members || []).filter((m: any) => m.userId !== (reviewer.userId || reviewer.id));
+      const notificationPromises = membersToNotify.map((m: any) =>
         prisma.notification.create({
           data: {
             userId: m.userId,

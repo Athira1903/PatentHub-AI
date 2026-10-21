@@ -41,6 +41,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/collaboration', collaborationRoutes);
+app.use('/api/invitations', collaborationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);

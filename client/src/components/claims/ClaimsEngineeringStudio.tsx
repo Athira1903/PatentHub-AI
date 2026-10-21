@@ -366,7 +366,7 @@ const filteredTreeClaims = claims.filter((c) =>
             disabled={!canEdit || savingClaim || !selectedClaim}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer ${
               isDirty
-                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 animate-pulse'
+                ? 'bg-[#235952] hover:bg-[#1B453F] text-white shadow-3xs animate-pulse'
                 : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
             }`}
             title="Save Claim (Ctrl+S)"
@@ -407,9 +407,9 @@ const filteredTreeClaims = claims.filter((c) =>
           <button
             onClick={handleGenerateAiSet}
             disabled={!canEdit || generatingAi}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold shadow-sm shadow-blue-600/25 transition disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#235952] hover:bg-[#1B453F] text-white text-xs font-bold shadow-3xs transition disabled:opacity-50 cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-200 animate-pulse" />
+            <Sparkles className="w-3.5 h-3.5 text-teal-200 animate-pulse" />
             <span>{generatingAi ? 'Generating...' : 'Generate claim set'}</span>
           </button>
         </div>
@@ -424,7 +424,7 @@ const filteredTreeClaims = claims.filter((c) =>
             {canEdit && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center gap-1 text-xs font-bold cursor-pointer"
+                className="p-1.5 rounded-lg bg-[#E4F0EC] hover:bg-[#D3E5E0] text-[#235952] border border-[#235952]/20 flex items-center gap-1 text-xs font-bold cursor-pointer"
                 title="Add new claim"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -441,7 +441,7 @@ const filteredTreeClaims = claims.filter((c) =>
               value={searchTree}
               onChange={(e) => setSearchTree(e.target.value)}
               placeholder="Search claims..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#235952]"
             />
           </div>
 
@@ -455,7 +455,7 @@ const filteredTreeClaims = claims.filter((c) =>
                   onClick={() => setSelectedClaimId(c.id)}
                   className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition text-xs font-bold ${
                     isSelected
-                      ? 'bg-blue-50/80 text-blue-700 border border-blue-200 shadow-3xs'
+                      ? 'bg-[#E4F0EC] text-[#235952] border border-[#235952]/30 shadow-3xs'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
@@ -466,7 +466,7 @@ const filteredTreeClaims = claims.filter((c) =>
                   <span
                     className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
                       c.claimType === 'INDEPENDENT'
-                        ? 'bg-blue-100/70 text-blue-700'
+                        ? 'bg-white/80 text-[#235952]'
                         : 'bg-slate-100 text-slate-500'
                     }`}
                   >
@@ -481,7 +481,7 @@ const filteredTreeClaims = claims.filter((c) =>
                 <p>No claims found.</p>
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="text-blue-600 font-bold hover:underline"
+                  className="text-[#235952] font-bold hover:underline cursor-pointer"
                 >
                   + Create your first claim
                 </button>
@@ -656,10 +656,10 @@ const filteredTreeClaims = claims.filter((c) =>
 
             <button
               onClick={handleFormatClausesWysiwyg}
-              className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-800 text-[11px] font-extrabold cursor-pointer transition hover:bg-blue-50 hover:text-blue-700"
+              className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-800 text-[11px] font-extrabold cursor-pointer transition hover:bg-[#E4F0EC] hover:text-[#235952]"
               title="Auto-format clauses into statutory (a), (b), (c)... points"
             >
-              <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#235952]" />
               <span>(a), (b), (c) Clauses</span>
             </button>
 
@@ -688,7 +688,7 @@ const filteredTreeClaims = claims.filter((c) =>
                   setIsDirty(true);
                 }}
                 placeholder="A smart monitoring system for industrial equipment, comprising:"
-                className="w-full p-3 bg-white border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-2xl text-xs font-bold text-slate-900 leading-relaxed shadow-3xs outline-none transition"
+                className="w-full p-3 bg-white border border-slate-200 focus:border-[#235952] focus:ring-2 focus:ring-[#235952]/10 rounded-2xl text-xs font-bold text-slate-900 leading-relaxed shadow-3xs outline-none transition"
               />
             </div>
 
@@ -698,7 +698,7 @@ const filteredTreeClaims = claims.filter((c) =>
                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
                   Body & Structural Limitations (Rich Text WYSIWYG Editor)
                 </label>
-                <span className="text-[10px] text-blue-600 font-bold">
+                <span className="text-[10px] text-[#235952] font-bold">
                   Tip: Highlight text and click B / I / U or press Ctrl+B / Ctrl+I / Ctrl+U
                 </span>
               </div>
@@ -710,7 +710,7 @@ const filteredTreeClaims = claims.filter((c) =>
                 onInput={() => canEdit && setIsDirty(true)}
                 className={`w-full min-h-[220px] max-h-[360px] overflow-y-auto p-4 bg-white border rounded-2xl text-xs font-medium leading-relaxed shadow-3xs outline-none transition ${
                   canEdit
-                    ? 'border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-slate-900'
+                    ? 'border-slate-200 focus:border-[#235952] focus:ring-2 focus:ring-[#235952]/10 text-slate-900'
                     : 'border-slate-150 bg-slate-50/50 text-slate-600 cursor-not-allowed'
                 }`}
                 style={{
@@ -731,10 +731,10 @@ const filteredTreeClaims = claims.filter((c) =>
             </span>
           </div>
 
-          <div className="p-2.5 bg-blue-50/70 border border-blue-100 rounded-xl text-xs font-bold text-blue-800 flex items-center justify-between">
+          <div className="p-2.5 bg-[#E4F0EC] border border-[#235952]/20 rounded-xl text-xs font-bold text-[#235952] flex items-center justify-between">
             <span>{editableClaimType === 'INDEPENDENT' ? 'Independent Claim' : 'Dependent Claim'}</span>
             {editableClaimType === 'DEPENDENT' && (
-              <span className="text-[10px] text-blue-600">→ Claim {editableDependsOnNumber || 1}</span>
+              <span className="text-[10px] text-[#235952]">→ Claim {editableDependsOnNumber || 1}</span>
             )}
           </div>
 
@@ -817,10 +817,10 @@ const filteredTreeClaims = claims.filter((c) =>
 
       {/* Bottom Drawer / Panel: AI Proposal Review */}
       {aiProposal && (
-        <div className="bg-white border border-blue-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <div className="bg-white border border-[#235952]/20 rounded-3xl p-6 shadow-3xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-blue-50 text-blue-600 shrink-0">
+              <div className="p-2 rounded-xl bg-[#E4F0EC] text-[#235952] shrink-0">
                 <Sparkles className="w-5 h-5 animate-pulse" />
               </div>
               <div>
@@ -837,7 +837,7 @@ const filteredTreeClaims = claims.filter((c) =>
               <button
                 onClick={handleAcceptSelectedProposal}
                 disabled={importingProposal || selectedProposedIndices.length === 0}
-                className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold shadow-3xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>Accept selected</span>
@@ -879,7 +879,7 @@ const filteredTreeClaims = claims.filter((c) =>
                               setSelectedProposedIndices(selectedProposedIndices.filter((i) => i !== idx));
                             }
                           }}
-                          className="rounded text-blue-600 focus:ring-blue-500"
+                          className="rounded text-[#235952] focus:ring-[#235952]"
                         />
                       </td>
                       <td className="py-2.5 font-mono text-slate-400">{idx + 1}</td>
@@ -888,7 +888,7 @@ const filteredTreeClaims = claims.filter((c) =>
                         <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">{pc.body}</p>
                       </td>
                       <td className="py-2.5">
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold uppercase">
+                        <span className="px-2 py-0.5 bg-[#E4F0EC] text-[#235952] rounded text-[10px] font-bold uppercase">
                           {pc.claimType || 'New Claim'}
                         </span>
                       </td>
@@ -985,7 +985,7 @@ const filteredTreeClaims = claims.filter((c) =>
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold shadow-xs"
+                  className="px-4 py-2 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl font-bold shadow-3xs cursor-pointer"
                 >
                   Create Claim
                 </button>

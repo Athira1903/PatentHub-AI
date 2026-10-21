@@ -206,7 +206,7 @@ export const ReviewsPage: React.FC = () => {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               Reviews
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-black">
+            <span className="px-2.5 py-0.5 rounded-full bg-[#E4F0EC] text-[#235952] text-xs font-black">
               {reviews.length} Total Records
             </span>
           </div>
@@ -217,10 +217,10 @@ export const ReviewsPage: React.FC = () => {
 
         <button
           onClick={fetchReviews}
-          className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 rounded-xl transition cursor-pointer shadow-xs self-end sm:self-auto"
+          className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 rounded-xl transition cursor-pointer shadow-3xs self-end sm:self-auto"
           title="Refresh reviews"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#235952]' : ''}`} />
         </button>
       </div>
 
@@ -228,14 +228,14 @@ export const ReviewsPage: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         <div
           onClick={() => setStatusFilter('PENDING')}
-          className={`p-4 bg-white rounded-2xl border transition cursor-pointer shadow-3xs hover:border-blue-300 ${
-            statusFilter === 'PENDING' ? 'border-blue-600 ring-2 ring-blue-100' : 'border-slate-200/80'
+          className={`p-4 bg-white rounded-2xl border transition cursor-pointer shadow-3xs hover:border-[#235952]/40 ${
+            statusFilter === 'PENDING' ? 'border-[#235952] ring-2 ring-[#235952]/20' : 'border-slate-200/80'
           }`}
         >
-          <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
+          <span className="text-[10px] font-extrabold text-[#235952] uppercase tracking-wider block">
             Pending Reviews
           </span>
-          <span className="text-2xl font-black text-blue-700 mt-1 block">{pendingCount}</span>
+          <span className="text-2xl font-black text-[#235952] mt-1 block">{pendingCount}</span>
         </div>
 
         <div
@@ -291,7 +291,7 @@ export const ReviewsPage: React.FC = () => {
               onClick={() => setStatusFilter(tab.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 statusFilter === tab.id
-                  ? 'bg-blue-600 text-white shadow-xs'
+                  ? 'bg-[#235952] text-white shadow-3xs'
                   : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
@@ -306,7 +306,7 @@ export const ReviewsPage: React.FC = () => {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as any)}
-            className="w-full sm:w-44 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-600 shadow-3xs cursor-pointer"
+            className="w-full sm:w-44 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-[#235952] shadow-3xs cursor-pointer"
           >
             <option value="ALL">All Review Types</option>
             <option value="GUIDE_REVIEW">Faculty Guide Reviews</option>
@@ -321,7 +321,7 @@ export const ReviewsPage: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search reviews by project, reviewer..."
-              className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-blue-600 shadow-3xs"
+              className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#235952] shadow-3xs"
             />
           </div>
         </div>
@@ -333,8 +333,8 @@ export const ReviewsPage: React.FC = () => {
           Loading project reviews...
         </div>
       ) : filteredReviews.length === 0 ? (
-        <div className="p-16 text-center bg-white rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+        <div className="p-16 text-center bg-white rounded-3xl border border-slate-200/80 shadow-3xs space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-[#E4F0EC] text-[#235952] flex items-center justify-center mx-auto">
             <ClipboardCheck className="w-6 h-6" />
           </div>
           <h3 className="font-extrabold text-slate-900 text-base">No reviews available for your projects.</h3>

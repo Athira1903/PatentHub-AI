@@ -22,6 +22,7 @@ import {
 import { api } from '../services/api';
 import { signInWithGoogleFirebase } from '../config/firebase';
 import { useState } from 'react';
+import { normalizeUserRole } from '../utils/roleUtils';
 
 const registerSchema = z
   .object({
@@ -89,10 +90,15 @@ export const RegisterPage: React.FC = () => {
         googleId: firebaseUser.uid,
       });
       localStorage.setItem('patenthub_token', response.data.token);
+      if (response.data.user) {
+        localStorage.setItem('patenthub_user', JSON.stringify(response.data.user));
+      }
       toast.success('Registered with Google via Firebase!');
-      const userRole = response.data.user?.role;
-      if (userRole === 'Admin' || userRole === 'Administrator') {
+      const normalizedRole = normalizeUserRole(response.data.user?.role);
+      if (normalizedRole === 'ADMIN') {
         navigate('/admin');
+      } else if (normalizedRole === 'ORGANIZATION_ADMIN') {
+        navigate('/org-admin');
       } else {
         navigate('/dashboard');
       }
@@ -123,11 +129,16 @@ export const RegisterPage: React.FC = () => {
         fullName: googleFallbackName.trim() || googleFallbackEmail.split('@')[0],
       });
       localStorage.setItem('patenthub_token', response.data.token);
+      if (response.data.user) {
+        localStorage.setItem('patenthub_user', JSON.stringify(response.data.user));
+      }
       toast.success('Registered with Google Account!');
       setGoogleFallbackOpen(false);
-      const userRole = response.data.user?.role;
-      if (userRole === 'Admin' || userRole === 'Administrator') {
+      const normalizedRole = normalizeUserRole(response.data.user?.role);
+      if (normalizedRole === 'ADMIN') {
         navigate('/admin');
+      } else if (normalizedRole === 'ORGANIZATION_ADMIN') {
+        navigate('/org-admin');
       } else {
         navigate('/dashboard');
       }
@@ -198,15 +209,15 @@ export const RegisterPage: React.FC = () => {
   return (
     <div className="w-full max-w-xl mx-auto px-4 font-sans my-auto py-12 animate-fade-in relative z-10">
       {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#235952]/10 rounded-full blur-3xl pointer-events-none -z-10" />
 
-      <div className="app-card p-6 sm:p-8 bg-white border border-slate-200/90 rounded-3xl shadow-xl space-y-6">
+      <div className="app-card p-6 sm:p-8 bg-white border border-[#E5E7E5] rounded-3xl shadow-xl space-y-6">
         {/* Header */}
         <div className="text-center space-y-1">
-          <div className="inline-flex p-3 rounded-2xl bg-blue-50 text-blue-900 mb-2 border border-blue-100">
-            <ShieldCheck className="w-6 h-6 text-blue-600" />
+          <div className="inline-flex p-3 rounded-2xl bg-[#E4F0EC] text-[#235952] mb-2 border border-[#DCECE9]">
+            <ShieldCheck className="w-6 h-6 text-[#235952]" />
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-950 tracking-tight">Create Workspace Account</h2>
+          <h2 className="text-2xl font-extrabold text-[#191F1D] tracking-tight">Create Workspace Account</h2>
           <p className="text-xs font-semibold text-slate-500 max-w-sm mx-auto leading-relaxed">
             Register your institution credentials to create and collaborate on patent projects.
           </p>
@@ -260,13 +271,13 @@ export const RegisterPage: React.FC = () => {
                 onClick={() => setValue('accountType', 'INDIVIDUAL')}
                 className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
                   selectedAccountType === 'INDIVIDUAL'
-                    ? 'bg-blue-50/80 border-blue-600 text-blue-950 shadow-xs ring-1 ring-blue-600/20'
+                    ? 'bg-[#F0F7F6] border-[#235952] text-[#191F1D] shadow-xs ring-1 ring-[#235952]/20'
                     : 'bg-slate-50/50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'
                 }`}
               >
                 <div
                   className={`p-2 rounded-xl shrink-0 ${
-                    selectedAccountType === 'INDIVIDUAL' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+                    selectedAccountType === 'INDIVIDUAL' ? 'bg-[#235952] text-white' : 'bg-slate-200 text-slate-600'
                   }`}
                 >
                   <UserIcon className="w-4 h-4" />
@@ -284,13 +295,13 @@ export const RegisterPage: React.FC = () => {
                 onClick={() => setValue('accountType', 'ORGANIZATION')}
                 className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
                   selectedAccountType === 'ORGANIZATION'
-                    ? 'bg-blue-50/80 border-blue-600 text-blue-950 shadow-xs ring-1 ring-blue-600/20'
+                    ? 'bg-[#F0F7F6] border-[#235952] text-[#191F1D] shadow-xs ring-1 ring-[#235952]/20'
                     : 'bg-slate-50/50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'
                 }`}
               >
                 <div
                   className={`p-2 rounded-xl shrink-0 ${
-                    selectedAccountType === 'ORGANIZATION' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+                    selectedAccountType === 'ORGANIZATION' ? 'bg-[#235952] text-white' : 'bg-slate-200 text-slate-600'
                   }`}
                 >
                   <Building className="w-4 h-4" />
@@ -514,7 +525,7 @@ export const RegisterPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-11 rounded-xl font-bold bg-blue-900 hover:bg-blue-950 text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
+            className="w-full h-11 rounded-xl font-bold bg-[#235952] hover:bg-[#1B453F] text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
           >
             {isSubmitting ? 'Registering Account...' : 'Register Account'} <ArrowRight className="w-4 h-4" />
           </button>
@@ -524,12 +535,12 @@ export const RegisterPage: React.FC = () => {
         <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-medium">
           <p className="text-slate-500">
             Already have an account?{' '}
-            <Link to="/login" className="font-bold text-blue-600 hover:text-blue-700 hover:underline">
+            <Link to="/login" className="font-bold text-[#235952] hover:text-[#1B453F] hover:underline">
               Sign in
             </Link>
           </p>
           <span className="flex items-center gap-1 text-[11px] text-slate-400 font-semibold">
-            <ShieldCheck className="w-4 h-4 text-blue-600" /> IPO Compliant
+            <ShieldCheck className="w-4 h-4 text-[#235952]" /> IPO Compliant
           </span>
         </div>
       </div>
@@ -540,7 +551,7 @@ export const RegisterPage: React.FC = () => {
           <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                <div className="p-2 rounded-xl bg-[#E4F0EC] text-[#235952]">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
@@ -556,7 +567,7 @@ export const RegisterPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-3 bg-blue-50/70 border border-blue-150 rounded-xl text-xs text-blue-900 leading-relaxed font-medium">
+            <div className="p-3 bg-[#F0F7F6] border border-[#DCECE9] rounded-xl text-xs text-[#1B453F] leading-relaxed font-medium">
               Popup communication was blocked by your browser on localhost. Enter your Google Account email below to register directly.
             </div>
 
@@ -570,7 +581,7 @@ export const RegisterPage: React.FC = () => {
                   value={googleFallbackEmail}
                   onChange={(e) => setGoogleFallbackEmail(e.target.value)}
                   placeholder="name@university.edu or name@gmail.com"
-                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#235952]"
                   required
                 />
               </div>
@@ -584,7 +595,7 @@ export const RegisterPage: React.FC = () => {
                   value={googleFallbackName}
                   onChange={(e) => setGoogleFallbackName(e.target.value)}
                   placeholder="Your Full Name"
-                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#235952]"
                 />
               </div>
 
@@ -599,7 +610,7 @@ export const RegisterPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isGoogleLoading}
-                  className="w-2/3 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold shadow-xs transition disabled:opacity-50"
+                  className="w-2/3 py-2.5 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl font-bold shadow-xs transition disabled:opacity-50"
                 >
                   {isGoogleLoading ? 'Registering...' : 'Register with Google'}
                 </button>

@@ -17,11 +17,15 @@ import {
   Activity,
   Award,
   CreditCard,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { BillingPage } from './BillingPage';
+import { KpiCard } from '../../components/ui/KpiCard';
+import { useTheme } from '../../context/ThemeContext';
 
 interface Organization {
   id: string;
@@ -114,6 +118,7 @@ interface AssignmentHistoryItem {
 }
 
 export const OrganizationAdminDashboardPage: React.FC = () => {
+  const { isDark, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'projects' | 'policies' | 'billing' | 'settings'>('overview');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -530,44 +535,58 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#FAF9F6] text-[#191F1D] flex flex-col font-sans">
       {/* Top Organization Header */}
-      <header className="bg-white border-b border-slate-200/90 sticky top-0 z-30 shadow-2xs">
+      <header className="bg-white border-b border-[#E5E7E5] sticky top-0 z-30 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/20 shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#235952] flex items-center justify-center text-white shadow-xs shrink-0">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-black tracking-tight text-slate-950">
+                <h1 className="text-xl font-black tracking-tight text-[#191F1D]">
                   {org?.name || 'Organization Workspace'}
                 </h1>
-                <span className="px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-extrabold uppercase">
+                <span className="px-2 py-0.5 rounded-full bg-[#F0F7F6] border border-[#DCECE9] text-[#1B453F] text-[10px] font-extrabold uppercase">
                   {org?.type || 'UNIVERSITY'}
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-extrabold uppercase">
+                <span className="px-2 py-0.5 rounded-full bg-[#F0FDF4] border border-[#DCFCE7] text-[#15803D] text-[10px] font-extrabold uppercase">
                   {org?.status || 'ACTIVE'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
+              <p className="text-xs text-[#5C6662] font-medium mt-0.5">
                 Multi-Tenant Administration, Policy Enforcement & Governance Hub
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl bg-[#F4F5F4] hover:bg-[#ECEEEC] text-[#191F1D] border border-[#E5E7E5] transition cursor-pointer"
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              aria-label="Toggle theme"
+            >
+              {isDark ? (
+                <Sun className="w-4 h-4 text-[#FBBC04]" />
+              ) : (
+                <Moon className="w-4 h-4 text-[#5F6368]" />
+              )}
+            </button>
+
             <button
               onClick={fetchOrgOverview}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#F4F5F4] hover:bg-[#ECEEEC] text-[#191F1D] border border-[#E5E7E5] text-xs font-bold transition disabled:opacity-50 cursor-pointer"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-[#235952]' : ''}`} />
               Refresh
             </button>
             <button
               onClick={() => setShowAddUserModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#235952] hover:bg-[#1B453F] text-white text-xs font-bold shadow-xs transition cursor-pointer"
             >
               <UserPlus className="w-3.5 h-3.5" />
               Invite Member
@@ -576,7 +595,7 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 border-t border-slate-100 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 border-t border-[#E5E7E5] overflow-x-auto">
           {[
             { id: 'overview', label: 'Dashboard', icon: Activity },
             { id: 'users', label: 'Users', icon: Users, badge: (metrics.totalInventors + metrics.totalGuides + metrics.totalPatentExperts) },
@@ -591,17 +610,17 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                    : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'border-[#235952] text-[#235952] bg-[#F0F7F6]/50'
+                    : 'border-transparent text-[#5C6662] hover:text-[#191F1D] hover:bg-[#F4F5F4]'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 <span>{tab.label}</span>
                 {tab.badge !== undefined && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                    isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                    isActive ? 'bg-[#E0ECE9] text-[#1B453F]' : 'bg-[#ECEEEC] text-[#5C6662]'
                   }`}>
                     {tab.badge}
                   </span>
@@ -621,65 +640,51 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
           <div className="space-y-8">
             {/* Metric Cards Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-                <div className="flex items-center justify-between text-slate-500">
-                  <span className="text-xs font-bold uppercase tracking-wider">Total Inventors</span>
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Users className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-slate-950">{metrics.totalInventors}</div>
-                <p className="text-[11px] text-slate-500 font-medium">Students & Independent Inventors</p>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-                <div className="flex items-center justify-between text-slate-500">
-                  <span className="text-xs font-bold uppercase tracking-wider">Total Guides</span>
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <UserCheck className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-slate-950">{metrics.totalGuides}</div>
-                <p className="text-[11px] text-slate-500 font-medium">Faculty Supervisors</p>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-                <div className="flex items-center justify-between text-slate-500">
-                  <span className="text-xs font-bold uppercase tracking-wider">Patent Experts</span>
-                  <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                    <Award className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-slate-950">{metrics.totalPatentExperts}</div>
-                <p className="text-[11px] text-slate-500 font-medium">Attorneys & IP Officers</p>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-                <div className="flex items-center justify-between text-slate-500">
-                  <span className="text-xs font-bold uppercase tracking-wider">Total Projects</span>
-                  <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                    <FolderKanban className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-slate-950">{metrics.totalProjects}</div>
-                <p className="text-[11px] text-slate-500 font-medium">Inventions in Pipeline</p>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2 col-span-2 lg:col-span-1">
-                <div className="flex items-center justify-between text-slate-500">
-                  <span className="text-xs font-bold uppercase tracking-wider">Active Policies</span>
-                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-slate-950">{metrics.activePolicies}</div>
-                <p className="text-[11px] text-slate-500 font-medium">Enforced Institutional Rules</p>
-              </div>
+              <KpiCard
+                label="Total Inventors"
+                value={metrics.totalInventors}
+                subtext="Researchers & students"
+                icon={<Users className="w-4 h-4 text-[#235952]" />}
+                iconBgColor="bg-[#F0F7F6]"
+                onClick={() => setActiveTab('users')}
+              />
+              <KpiCard
+                label="Total Guides"
+                value={metrics.totalGuides}
+                subtext="Faculty supervisors"
+                icon={<UserCheck className="w-4 h-4 text-[#15803D]" />}
+                iconBgColor="bg-[#F0FDF4]"
+                onClick={() => setActiveTab('users')}
+              />
+              <KpiCard
+                label="Patent Experts"
+                value={metrics.totalPatentExperts}
+                subtext="IP officers & attorneys"
+                icon={<Award className="w-4 h-4 text-[#55508C]" />}
+                iconBgColor="bg-[#F7F6FC]"
+                onClick={() => setActiveTab('users')}
+              />
+              <KpiCard
+                label="Total Projects"
+                value={metrics.totalProjects}
+                subtext="Invention workspaces"
+                icon={<FolderKanban className="w-4 h-4 text-[#B45309]" />}
+                iconBgColor="bg-[#FFFBEB]"
+                onClick={() => setActiveTab('projects')}
+              />
+              <KpiCard
+                label="Active Policies"
+                value={metrics.activePolicies}
+                subtext="Governance rules"
+                icon={<ShieldCheck className="w-4 h-4 text-[#235952]" />}
+                iconBgColor="bg-[#F0F7F6]"
+                onClick={() => setActiveTab('policies')}
+              />
             </div>
 
             {/* Quick Actions & Policy Shortcuts */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-lg space-y-4 flex flex-col justify-between">
+              <div className="bg-white border border-[#E5E7E5] rounded-2xl p-6 shadow-3xs space-y-4 flex flex-col justify-between">
                 <div>
                   <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white mb-3">
                     <Shield className="w-5 h-5" />

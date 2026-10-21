@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
+import { getRoleDisplayName } from '../utils/roleUtils';
 
 interface UserContext {
   user?: {
@@ -203,7 +204,7 @@ export const ProfilePage: React.FC = () => {
         {!isEditing ? (
           <button
             onClick={() => setIsEditing(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer w-fit"
+            className="px-4 py-2 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer w-fit"
           >
             <Edit3 className="w-4 h-4" />
             <span>Edit Profile</span>
@@ -243,7 +244,7 @@ export const ProfilePage: React.FC = () => {
           </p>
           <button
             onClick={() => setIsEditing(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+            className="px-4 py-2 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
           >
             Create Profile Now
           </button>
@@ -256,7 +257,7 @@ export const ProfilePage: React.FC = () => {
               <div className="flex items-center gap-5">
                 {/* Profile Photo */}
                 <div className="relative group">
-                  <div className="w-20 h-20 rounded-2xl bg-blue-900 flex items-center justify-center text-white text-2xl font-black shadow-xs overflow-hidden shrink-0">
+                  <div className="w-20 h-20 rounded-2xl bg-[#235952] flex items-center justify-center text-white text-2xl font-black shadow-xs overflow-hidden shrink-0">
                     {resolvedAvatar ? (
                       <img
                         src={resolvedAvatar}
@@ -288,14 +289,14 @@ export const ProfilePage: React.FC = () => {
 
                 <div className="space-y-1">
                   <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                    {user?.fullName || 'Inventor Profile'}
+                    {user?.fullName || `${getRoleDisplayName(user?.role)} Profile`}
                   </h3>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">
-                      {user?.role || 'Inventor'}
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#E4F0EC] text-[#235952] text-xs font-bold border border-[#DCECE9]">
+                      {getRoleDisplayName(user?.role)}
                     </span>
                     <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-bold flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Verified Inventor Identity
+                      <ShieldCheck className="w-3 h-3" /> Verified {getRoleDisplayName(user?.role)} Identity
                     </span>
                   </div>
                 </div>
@@ -548,7 +549,7 @@ export const ProfilePage: React.FC = () => {
           {/* Section 3: Research & Technical Expertise */}
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-              <div className="p-2 bg-blue-50 text-blue-700 rounded-xl">
+              <div className="p-2 bg-[#E4F0EC] text-[#235952] rounded-xl">
                 <Bookmark className="w-4 h-4" />
               </div>
               <div>
@@ -572,12 +573,12 @@ export const ProfilePage: React.FC = () => {
                     value={formData.researchDomain}
                     onChange={(e) => setFormData({ ...formData, researchDomain: e.target.value })}
                     placeholder="e.g. Artificial Intelligence, Clean Energy, Biomedical Devices"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-blue-600 focus:outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-[#235952] focus:outline-none"
                     required
                   />
                 ) : (
-                  <div className="flex items-center gap-2.5 text-blue-900 bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 font-bold">
-                    <Bookmark className="w-4 h-4 text-blue-600" />
+                  <div className="flex items-center gap-2.5 text-[#1B453F] bg-[#F0F7F6] p-2.5 rounded-xl border border-[#DCECE9] font-bold">
+                    <Bookmark className="w-4 h-4 text-[#235952]" />
                     <span>{user?.researchDomain || user?.profile?.researchDomain || 'Multidisciplinary Engineering'}</span>
                   </div>
                 )}

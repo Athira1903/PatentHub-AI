@@ -1,0 +1,808 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 4058
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0 g
+267.4777952755905517 785.1970866141732586 Td
+(FORM 2) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+200.0677952755905835 765.3545669291338527 Td
+(THE PATENTS ACT, 1970 \(39 of 1970\)) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+218.8777952755905858 751.1813385826771992 Td
+(& THE PATENTS RULES, 2003) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+209.822795275590579 731.3388188976377933 Td
+(COMPLETE SPECIFICATION) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+235.2877952755905824 717.1655905511811397 Td
+(\(See section 10 and rule 13\)) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 683.1498425196850803 Td
+(1. TITLE OF THE INVENTION:) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 666.1419685039369369 Td
+(A System for Detecting and Preventing Unauthorized Access to Digital Documents Using Adaptive Access Control) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 637.7955118110235162 Td
+(2. APPLICANT\(S\):) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 620.7876377952754865 Td
+(Applicant information to be designated upon official lodgment.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 586.7718897637794271 Td
+(3. ABSTRACT) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 569.7640157480313974 Td
+(A computer-implemented document security system comprising an access request processor, a contextual risk) Tj
+T* (assessment module, and an adaptive access control engine configured to evaluate access conditions and modify) Tj
+T* (document access permissions in response to detected security risks.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 510.2364566929133503 Td
+(4. FIELD OF THE INVENTION & BACKGROUND) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 493.2285826771653205 Td
+(## 2. Background of the Invention) Tj
+T* () Tj
+T* (The present invention relates to the field of cybersecurity and digital document access management, particularly) Tj
+T* (systems and methods for controlling access to sensitive electronic documents based on user permissions and) Tj
+T* (contextual security conditions.) Tj
+T* () Tj
+T* (Existing document management systems employ access control mechanisms such as role-based access control,) Tj
+T* (identity verification, multi-factor authentication, and predefined permission policies to regulate access to digital) Tj
+T* (information. These mechanisms help protect confidential documents by restricting access to authorized users and) Tj
+T* (maintaining records of document-related activities. Some advanced systems also incorporate behavioral monitoring) Tj
+T* (and risk-based authentication to identify potentially suspicious access attempts.) Tj
+T* () Tj
+T* (However, conventional access management approaches may rely substantially on predefined permissions and) Tj
+T* (authentication decisions made at the time of access. Changes in user behavior, device conditions, access context,) Tj
+T* (or other security indicators may not always result in timely adjustments to existing document permissions.) Tj
+T* (Furthermore, security monitoring and access enforcement may operate as separate processes, potentially delaying) Tj
+T* (responses to suspicious activities.) Tj
+T* () Tj
+T* (These limitations highlight the technical need for an integrated document access management mechanism capable) Tj
+T* (of evaluating relevant security parameters, identifying potentially unauthorized access, and applying appropriate) Tj
+T* (access restrictions according to the assessed risk. Such a mechanism may improve the responsiveness,) Tj
+T* (consistency, and traceability of document security operations while supporting controlled access to sensitive) Tj
+T* (information.) Tj
+T* () Tj
+T* (The invention is proposed in this technical context and aims to address the identified limitations through an) Tj
+T* (appropriate combination of contextual risk assessment and adaptive access control mechanisms. The specific) Tj
+T* (technical features and their potential advantages are described in the subsequent sections of this disclosure.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/Length 8957
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 785.1970866141732586 Td
+(5. TECHNICAL DEFECTS & PROBLEM STATEMENT) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 768.1892125984252289 Td
+(Existing document-sharing systems may allow unauthorized users to access sensitive information when access) Tj
+T* (permissions are improperly configured or user credentials are compromised. Conventional access control) Tj
+T* (mechanisms may not respond dynamically to suspicious access patterns, increasing the risk of data leakage.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 708.6616535433070112 Td
+(6. PROPOSED TECHNICAL SOLUTION) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 691.6537795275589815 Td
+(The proposed system monitors document access requests and evaluates user permissions, device information, and) Tj
+T* (access patterns. A risk assessment module identifies potentially unauthorized activity and dynamically applies) Tj
+T* (access restrictions, additional verification, or access denial based on configurable security rules.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 632.1262204724408775 Td
+(7. SUMMARY OF THE INVENTION) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 615.1183464566928478 Td
+(## 5. Summary of the Invention) Tj
+T* () Tj
+T* (The present invention relates to a system and method for adaptive access control of digital documents using) Tj
+T* (contextual security assessment. The invention is intended to address limitations associated with conventional) Tj
+T* (document access management systems that rely primarily on predefined permissions and static authentication) Tj
+T* (decisions.) Tj
+T* () Tj
+T* (In one embodiment, the system comprises a document access request processing module, a user identity and) Tj
+T* (permission verification module, a contextual risk assessment module, an access control decision engine, and an) Tj
+T* (audit logging module. The system evaluates an access request using relevant parameters, which may include user) Tj
+T* (permissions, device information, authentication status, access history, and detected behavioral patterns. Based on) Tj
+T* (the evaluated conditions, the system determines whether access should be granted, restricted, subjected to) Tj
+T* (additional verification, or denied.) Tj
+T* () Tj
+T* (In another embodiment, the system dynamically reassesses access conditions during a document access session) Tj
+T* (or when significant security-related events occur. The access control decision engine may update applicable) Tj
+T* (permissions or initiate additional security measures when the assessed risk changes. The resulting decisions and) Tj
+T* (associated security events may be recorded to support traceability, monitoring, and subsequent review.) Tj
+T* () Tj
+T* (In an alternative embodiment, the system may be implemented as a web-based application, an enterprise document) Tj
+T* (management component, a cloud-based security service, or an application programming interface integrated with) Tj
+T* (an existing document repository. The contextual risk assessment may employ rule-based evaluation, statistical) Tj
+T* (analysis, or machine-learning techniques, depending on the implementation requirements.) Tj
+T* () Tj
+T* (The proposed system aims to provide a coordinated mechanism for contextual risk evaluation and access) Tj
+T* (enforcement, thereby improving the responsiveness and consistency of digital document protection. The particular) Tj
+T* (technical implementation, operational parameters, and combination of features are to be defined in the detailed) Tj
+T* (description and claims of the invention.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 201.2600787401573825 Td
+(8. DETAILED DESCRIPTION OF PREFERRED EMBODIMENTS) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 184.2522047244093528 Td
+(### 6. Detailed Description) Tj
+T* () Tj
+T* (The present invention relates to a system and method for adaptive access control of digital documents using) Tj
+T* (contextual security assessment. The system is configured to evaluate document access requests, determine) Tj
+T* (applicable access permissions, assess security-related conditions, and execute access control decisions based on) Tj
+T* (the evaluation.) Tj
+T* () Tj
+T* (#### 6.1 System Architecture) Tj
+T* () Tj
+T* (In one embodiment, the system comprises a user interface \(100\), an access request processor \(110\), an identity) Tj
+T* (and permission verification module \(120\), a contextual data collection module \(130\), a risk assessment engine) Tj
+T* (\(140\), an access control decision engine \(150\), a document access enforcement module \(160\), a document) Tj
+T* (repository \(170\), and an audit logging module \(180\). The modules communicate through suitable software interfaces) Tj
+T* (and may be deployed on a single computing device, a distributed computing environment, or a cloud-based) Tj
+T* (infrastructure.) Tj
+T* () Tj
+T* (The user interface \(100\) enables a user to select a document and submit an access request. The access request) Tj
+T* (processor \(110\) receives the request and extracts relevant information, including a user identifier, document) Tj
+T* (identifier, requested operation, and available session information.) Tj
+T* () Tj
+T* (The identity and permission verification module \(120\) verifies the identity or authenticated session of the requesting) Tj
+T* (user and retrieves the applicable access permissions. The contextual data collection module \(130\) obtains relevant) Tj
+T* (security information, which may include device attributes, authentication status, access history, request frequency,) Tj
+T* (and other permitted contextual indicators.) Tj
+T* () Tj
+T* (#### 6.2 Contextual Risk Assessment) Tj
+T* () Tj
+T* (The risk assessment engine \(140\) evaluates the collected information to determine a risk level associated with the) Tj
+T* (access request. In one implementation, the engine applies predefined security rules and assigns risk values to) Tj
+T* (selected indicators. In an alternative implementation, statistical or machine-learning techniques may be used to) Tj
+T* (identify patterns associated with suspicious access behavior.) Tj
+T* () Tj
+T* (The engine produces a risk assessment result that is provided to the access control decision engine \(150\). The risk) Tj
+T* (assessment result may include a risk score, a risk category, and the factors contributing to the assessment.) Tj
+T* () Tj
+T* (#### 6.3 Access Control Decision and Enforcement) Tj
+T* () Tj
+T* (The access control decision engine \(150\) evaluates the risk assessment result together with the user's permissions) Tj
+T* (and the requested document operation. Based on the applicable policy, the engine determines an appropriate) Tj
+T* (action, such as granting access, restricting an operation, requesting additional authentication, or denying the) Tj
+T* (request.) Tj
+T* () Tj
+T* (The document access enforcement module \(160\) implements the resulting decision. When access is authorized, the) Tj
+T* (module permits the requested operation through the applicable document repository interface. When access is) Tj
+T* (restricted or denied, the module prevents the unauthorized operation and may initiate an additional verification) Tj
+T* (procedure.) Tj
+T* () Tj
+T* (The document repository \(170\) stores or provides access to digital documents. The repository may be implemented) Tj
+T* (using a local database, a file server, an enterprise document management platform, or a cloud storage service.) Tj
+T* () Tj
+T* (#### 6.4 Audit Logging and Reassessment) Tj
+T* () Tj
+T* (The audit logging module \(180\) records relevant events, which may include the access request, verification result,) Tj
+T* (risk assessment outcome, decision taken, and enforcement result. Access to audit records is controlled according) Tj
+T* (to the applicable security policy.) Tj
+T* () Tj
+T* (In a further embodiment, the system reassesses access conditions when a predefined event occurs, such as a) Tj
+T* (change in device context, a new authentication result, or detection of a suspicious access pattern. The system may) Tj
+T* (then initiate a revised access decision and apply updated restrictions where appropriate.) Tj
+T* () Tj
+T* (#### 6.5 Alternative Embodiments) Tj
+T* () Tj
+T* (The system may be implemented as a web application, a server-side service, a software module integrated with an) Tj
+T* (existing document management platform, or a cloud-based application programming interface. The risk assessment) Tj
+T* (engine may employ rule-based logic, statistical techniques, machine-learning models, or a combination thereof.) Tj
+T* () Tj
+T* (The specific modules, assessment criteria, decision policies, communication interfaces, and deployment) Tj
+T* (arrangements may vary according to the intended application without departing from the defined scope of the) Tj
+T* (invention, subject to the limitations of the claims.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 8 0 R
+>>
+endobj
+8 0 obj
+<<
+/Length 5839
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 785.1970866141732586 Td
+(9. TECHNICAL COMPONENTS & ASSEMBLIES) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 768.1892125984252289 Td
+(### 7. Technical Components) Tj
+T* () Tj
+T* (The following reference numerals identify the principal components of the illustrative system.) Tj
+T* () Tj
+T* (| Reference numeral | Component | Function |) Tj
+T* (|---|---|---|) Tj
+T* (| 100 | User Interface | Receives document access requests and displays access outcomes. |) Tj
+T* (| 110 | Access Request Processor | Receives and processes access request information. |) Tj
+T* (| 120 | Identity and Permission Verification Module | Verifies authentication status and retrieves applicable) Tj
+T* (permissions. |) Tj
+T* (| 130 | Contextual Data Collection Module | Collects relevant security and access-context information. |) Tj
+T* (| 140 | Risk Assessment Engine | Evaluates contextual information and generates a risk assessment. |) Tj
+T* (| 150 | Access Control Decision Engine | Determines the access action according to risk and policy. |) Tj
+T* (| 160 | Document Access Enforcement Module | Enforces the access decision. |) Tj
+T* (| 170 | Document Repository | Stores or provides access to protected digital documents. |) Tj
+T* (| 180 | Audit Logging Module | Records access events, assessment results, and decisions. |) Tj
+T* () Tj
+T* (#### Computational and Communication Elements) Tj
+T* () Tj
+T* (The system may additionally comprise one or more processors, memory devices, persistent storage, network) Tj
+T* (interfaces, and communication channels configured to execute the software modules and exchange information) Tj
+T* (between them.) Tj
+T* () Tj
+T* (The processors execute instructions stored in memory. The memory stores program instructions, configuration) Tj
+T* (parameters, access policies, and temporary processing data. Persistent storage may maintain document metadata,) Tj
+T* (access records, and audit logs. Communication interfaces may enable interaction with external authentication) Tj
+T* (providers, document repositories, and enterprise identity services.) Tj
+T* () Tj
+T* (These supporting computing elements are implementation-dependent and should be assigned separate reference) Tj
+T* (numerals in the final drawings if they are important to understanding the claimed invention.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 325.9844881889763428 Td
+(10. WORKING PRINCIPLE & OPERATIONAL FLOW) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 308.9766141732283131 Td
+(### 8. Working Principle) Tj
+T* () Tj
+T* (The system operates according to the following sequence.) Tj
+T* () Tj
+T* (**Step 1: Access Request Initiation**) Tj
+T* () Tj
+T* (A user selects a digital document through the user interface \(100\) and requests an operation, such as viewing,) Tj
+T* (downloading, or modifying the document.) Tj
+T* () Tj
+T* (**Step 2: Request Processing**) Tj
+T* () Tj
+T* (The access request processor \(110\) receives the request and identifies the requesting user, the target document,) Tj
+T* (the requested operation, and the available session context.) Tj
+T* () Tj
+T* (**Step 3: Identity and Permission Verification**) Tj
+T* () Tj
+T* (The identity and permission verification module \(120\) checks the user's authentication status and retrieves the) Tj
+T* (permissions applicable to the requested document operation. A request that fails mandatory authentication or) Tj
+T* (authorization requirements may be rejected according to the applicable policy.) Tj
+T* () Tj
+T* (**Step 4: Contextual Information Collection**) Tj
+T* () Tj
+T* (For requests that proceed to risk assessment, the contextual data collection module \(130\) obtains available security) Tj
+T* (indicators, such as device information, access history, authentication status, and request patterns, subject to the) Tj
+T* (system's permissions and privacy requirements.) Tj
+T* () Tj
+T* (**Step 5: Risk Assessment**) Tj
+T* () Tj
+T* (The risk assessment engine \(140\) evaluates the collected indicators using the configured assessment mechanism) Tj
+T* (and generates a risk result.) Tj
+T* () Tj
+T* (**Step 6: Access Decision**) Tj
+T* () Tj
+T* (The access control decision engine \(150\) evaluates the risk result, the verified permissions, and the applicable) Tj
+T* (security policies. The engine selects an action, such as granting access, limiting access, requesting additional) Tj
+T* (verification, or denying access.) Tj
+T* () Tj
+T* (**Step 7: Enforcement of the Decision**) Tj
+T* () Tj
+T* (The document access enforcement module \(160\) applies the selected action to the requested operation. An) Tj
+T* (authorized request is passed to the document repository \(170\), while a restricted or denied request is handled) Tj
+T* (according to the applicable policy.) Tj
+T* () Tj
+T* (**Step 8: Event Recording**) Tj
+T* () Tj
+T* (The audit logging module \(180\) records the relevant request details, assessment outcome, access decision, and) Tj
+T* (enforcement result, subject to applicable data-retention and security requirements.) Tj
+T* () Tj
+T* (**Step 9: Reassessment, Where Applicable**) Tj
+T* () Tj
+T* (If a significant security-related event occurs during an active session, the system may collect updated contextual) Tj
+T* (information and repeat the risk assessment and decision process. The resulting action may maintain, restrict, or) Tj
+T* (revoke access according to the configured policy.) Tj
+T* () Tj
+T* (**Technical Effect**) Tj
+T* () Tj
+T* (The described arrangement provides a coordinated process for evaluating contextual security information and) Tj
+T* (enforcing document access decisions. Depending on the implementation, it may support more responsive access) Tj
+T* (control, consistent policy enforcement, and improved traceability of document access events.) Tj
+ET
+endstream
+endobj
+9 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 10 0 R
+>>
+endobj
+10 0 obj
+<<
+/Length 4000
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 785.1970866141732586 Td
+(11. TECHNICAL ADVANTAGES & IMPROVEMENTS) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 768.1892125984252289 Td
+(The proposed invention may combine contextual risk assessment with a dynamic access enforcement mechanism) Tj
+T* (that adjusts document permissions in response to changing security conditions. A potential inventive contribution) Tj
+T* (would be a specific technical mechanism for coordinating these components, such as a defined risk-update) Tj
+T* (process, a novel policy-adjustment algorithm, or a measurable improvement in access-control performance.) Tj
+T* (The inventive-step argument must identify the distinguishing technical features, explain why they are not disclosed) Tj
+T* (by the closest prior art, and establish why a person skilled in the field would not have arrived at the claimed) Tj
+T* (combination in an obvious manner.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 651.9687401574802834 Td
+(12. APPLICATIONS & EMBODIMENTS) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 634.9608661417322537 Td
+( 10. Applications) Tj
+T* () Tj
+T* (The proposed system for adaptive access control of digital documents may be applied in environments where) Tj
+T* (electronic documents contain confidential, sensitive, proprietary, or restricted information. The system can be) Tj
+T* (integrated into existing document management infrastructure to evaluate access requests and enforce security) Tj
+T* (policies based on user permissions and relevant contextual information.) Tj
+T* () Tj
+T* (**10.1 Enterprise Document Management:** The system may be used by organizations to manage access to) Tj
+T* (internal reports, business records, contracts, technical documentation, and other confidential corporate documents.) Tj
+T* () Tj
+T* (**10.2 Healthcare Information Systems:** The system may be adapted to protect electronic medical records,) Tj
+T* (diagnostic reports, and administrative healthcare documents by enforcing role-based permissions and additional) Tj
+T* (security checks where appropriate.) Tj
+T* () Tj
+T* (**10.3 Educational and Research Institutions:** Universities, research laboratories, and academic institutions may) Tj
+T* (use the system to control access to research papers, unpublished findings, intellectual property disclosures, student) Tj
+T* (records, and institutional documents.) Tj
+T* () Tj
+T* (**10.4 Financial and Banking Environments:** The system may be incorporated into document management) Tj
+T* (workflows involving financial reports, audit records, customer documentation, and internal compliance materials,) Tj
+T* (subject to applicable regulatory requirements.) Tj
+T* () Tj
+T* (**10.5 Government and Public Administration:** Government departments and public institutions may use the) Tj
+T* (system to manage access to administrative records and restricted digital documents in accordance with applicable) Tj
+T* (information security policies.) Tj
+T* () Tj
+T* (**10.6 Cloud-Based Collaboration Platforms:** The system may be integrated with cloud storage services,) Tj
+T* (collaborative workspaces, and enterprise content management applications to support contextual access evaluation) Tj
+T* (across distributed working environments.) Tj
+T* () Tj
+T* (**10.7 Intellectual Property and Legal Services:** Patent professionals, legal firms, research organizations, and) Tj
+T* (innovation teams may use the system to control access to patent drafts, invention disclosures, confidential technical) Tj
+T* (documents, and supporting evidence.) Tj
+T* () Tj
+T* (The system may be deployed as a standalone application, a server-side software service, a cloud-hosted security) Tj
+T* (component, or an application programming interface integrated with an existing document repository. The precise) Tj
+T* (implementation may be adapted according to the security requirements, scale, and operational environment of the) Tj
+T* (intended application.) Tj
+ET
+endstream
+endobj
+11 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 12 0 R
+>>
+endobj
+12 0 obj
+<<
+/Length 2348
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F2 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 785.1970866141732586 Td
+(13. INDUSTRIAL APPLICABILITY) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+42.5196850393700814 768.1892125984252289 Td
+(11. Industrial Applicability) Tj
+T* () Tj
+T* (The invention relates to the technical field of cybersecurity and digital document access management and is) Tj
+T* (capable of practical implementation in information technology systems used by commercial, industrial, educational,) Tj
+T* (healthcare, financial, legal, and public-sector organizations.) Tj
+T* () Tj
+T* (The system can be implemented using conventional computing hardware, including one or more processors,) Tj
+T* (memory devices, persistent storage, and network communication interfaces, executing software instructions that) Tj
+T* (implement contextual risk assessment and access control functions. It may be manufactured or configured as a) Tj
+T* (software product, deployed as a server-based application, incorporated into an enterprise document management) Tj
+T* (platform, or provided as a cloud-based service.) Tj
+T* () Tj
+T* (In industrial use, the system receives document access requests, evaluates relevant authentication and contextual) Tj
+T* (information, determines an access decision according to configured policies, and enforces the resulting decision.) Tj
+T* (The system may also maintain audit records to support security monitoring and operational review.) Tj
+T* () Tj
+T* (The implementation can be adapted to different document repositories, organizational access policies, and) Tj
+T* (computing environments. Its use may assist organizations in managing access to confidential information, applying) Tj
+T* (security controls consistently, and maintaining records of document access events.) Tj
+T* () Tj
+T* (Accordingly, the described system is capable of practical use in information technology and digital information) Tj
+T* (security operations. The precise industrial applicability and technical advantages depend on the final implementation) Tj
+T* (and the features supported by the invention.) Tj
+T* () Tj
+T* (This section is intended to address the industrial applicability requirement described in Section 2\(1\)\(ac\) of the Indian) Tj
+T* (Patents Act, 1970, subject to the actual technical disclosure and applicable patent examination requirements.) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R 7 0 R 9 0 R 11 0 R ]
+/Count 5
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+19 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+20 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+21 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+22 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+23 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+24 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+25 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+26 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 13 0 R
+/F2 14 0 R
+/F3 15 0 R
+/F4 16 0 R
+/F5 17 0 R
+/F6 18 0 R
+/F7 19 0 R
+/F8 20 0 R
+/F9 21 0 R
+/F10 22 0 R
+/F11 23 0 R
+/F12 24 0 R
+/F13 25 0 R
+/F14 26 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+27 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20261016211830+05'30')
+>>
+endobj
+28 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 29
+0000000000 65535 f 
+0000026167 00000 n 
+0000028014 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000004262 00000 n 
+0000004399 00000 n 
+0000013408 00000 n 
+0000013545 00000 n 
+0000019436 00000 n 
+0000019574 00000 n 
+0000023627 00000 n 
+0000023766 00000 n 
+0000026249 00000 n 
+0000026375 00000 n 
+0000026506 00000 n 
+0000026640 00000 n 
+0000026778 00000 n 
+0000026902 00000 n 
+0000027031 00000 n 
+0000027163 00000 n 
+0000027299 00000 n 
+0000027427 00000 n 
+0000027554 00000 n 
+0000027683 00000 n 
+0000027816 00000 n 
+0000027918 00000 n 
+0000028267 00000 n 
+0000028353 00000 n 
+trailer
+<<
+/Size 29
+/Root 28 0 R
+/Info 27 0 R
+/ID [ <C8CD6F3D7B09A6F0D1A5D569F8514CC9> <C8CD6F3D7B09A6F0D1A5D569F8514CC9> ]
+>>
+startxref
+28457
+%%EOF

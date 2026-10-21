@@ -1,0 +1,445 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 6963
+>>
+stream
+0.5670000000000001 w
+0 G
+0.12 0.16 0.23 rg
+0. 841.8899999999999864 595.2755905511811534 -99.2125984251968589 re
+f
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+1. g
+42.5196850393700814 799.3703149606299121 Td
+(IPO Patent Form 2) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+1. g
+42.5196850393700814 771.0238582677164914 Td
+(Intellectual Property India \(Government of India / Patent Office Registry\)) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 700.15771653543311 Td
+(FORM 2 [FILING PREPARATION DRAFT]) Tj
+ET
+0.78 G
+42.5196850393700814 685.9844881889763428 m
+552.7559055118110791 685.9844881889763428 l
+S
+BT
+/F2 10 Tf
+11.5 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 657.6380314960629221 Td
+(PROVISIONAL / COMPLETE SPECIFICATION \(Section 10; Rule 13\)) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 620.7876377952754865 Td
+(1. Title of Invention:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 620.7876377952754865 Td
+(A System for Detecting and Preventing Unauthorized Access to Digital Documents Using) Tj
+T* (Adaptive Access Control) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 583.9372440944881646 Td
+(2. Specification Type:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 583.9372440944881646 Td
+(COMPLETE) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 561.2600787401574962 Td
+(3. Preamble to Description:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 561.2600787401574962 Td
+(The following specification particularly describes the invention and the manner in which it is to be) Tj
+T* (performed.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 510.2364566929133503 Td
+(4. DESCRIPTION & CLAIMS:) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 487.559291338582625 Td
+(Abstract Description:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 487.559291338582625 Td
+(A computer-implemented document security system comprising an access request processor, a) Tj
+T* (contextual risk assessment module, and an adaptive access control engine configured to) Tj
+T* (evaluate access conditions and modify document access permissions in response to detected) Tj
+T* (security risks.) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 422.3624409448818255 Td
+(Problem Statement:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 422.3624409448818255 Td
+(Existing document-sharing systems may allow unauthorized users to access sensitive) Tj
+T* (information when access permissions are improperly configured or user credentials are) Tj
+T* (compromised. Conventional access control mechanisms may not respond dynamically to) Tj
+T* (suspicious access patterns, increasing the risk of data leakage.) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 357.1655905511810261 Td
+(Proposed Solution:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 357.1655905511810261 Td
+(The proposed system monitors document access requests and evaluates user permissions,) Tj
+T* (device information, and access patterns. A risk assessment module identifies potentially) Tj
+T* (unauthorized activity and dynamically applies access restrictions, additional verification, or) Tj
+T* (access denial based on configurable security rules.) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 291.9687401574802834 Td
+(Novel Features:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 291.9687401574802834 Td
+(The proposed invention may combine contextual risk assessment with a dynamic access) Tj
+T* (enforcement mechanism that adjusts document permissions in response to changing security) Tj
+T* (conditions. A potential inventive contribution would be a specific technical mechanism for) Tj
+T* (coordinating these components, such as a defined risk-update process, a novel) Tj
+T* (policy-adjustment algorithm, or a measurable improvement in access-control performance.) Tj
+T* (The inventive-step argument must identify the distinguishing technical features, explain why they) Tj
+T* (are not disclosed by the closest prior art, and establish why a person skilled in the field would) Tj
+T* (not have arrived at the claimed combination in an obvious manner.) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 170.0789763779526993 Td
+(Claims Count:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 170.0789763779526993 Td
+(3) Tj
+ET
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 147.4018110236219172 Td
+(Claims Scope:) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.059 0.09 0.165 rg
+170.0787401574803255 147.4018110236219172 Td
+(1. An automated intelligent system comprising: A computer-implemented system for controlling) Tj
+T* (access to digital documents, comprising:<br>\(a\) an access request processing module) Tj
+T* (configured to receive a request from a user to perform an operation on a digital) Tj
+T* (document;<br>\(b\) an identity and permission verification module configured to determine an) Tj
+T* (authentication status of the user and retrieve an applicable access permission associated with) Tj
+T* (the digital document;<br>\(c\) a contextual data collection module configured to obtain one or) Tj
+T* (more security-related parameters associated with the access request;<br>\(d\) a risk assessment) Tj
+T* (engine configured to evaluate the one or more security-related parameters and generate a risk) Tj
+T* (assessment result;<br>\(e\) an access control decision engine configured to determine an access) Tj
+T* (action based on the risk assessment result and the applicable access permission; and<br>\(f\) a) Tj
+T* (document access enforcement module configured to implement the access action by permitting,) Tj
+T* (restricting, or denying the requested operation on the digital document.) Tj
+T* () Tj
+T* (2. An automated intelligent system comprising: The system as claimed in claim 1, wherein the) Tj
+T* (security-related parameters comprise at least two of device information, authentication status,) Tj
+T* (document access history, and access request frequency.) Tj
+T* () Tj
+T* (3. An automated intelligent system comprising: The system as claimed in claim 1, wherein the) Tj
+T* (access control decision engine is configured to reassess access during an active document) Tj
+T* (access session in response to a detected change in a security-related parameter.) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.392 0.455 0.545 rg
+42.5196850393700814 34.0159842519684616 Td
+(Note: This is a pre-filing preparation draft compiled by PatentHub AI. Not an official filing receipt.) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R ]
+/Count 1
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+6 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+/F4 8 0 R
+/F5 9 0 R
+/F6 10 0 R
+/F7 11 0 R
+/F8 12 0 R
+/F9 13 0 R
+/F10 14 0 R
+/F11 15 0 R
+/F12 16 0 R
+/F13 17 0 R
+/F14 18 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+19 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20261017090318+05'30')
+>>
+endobj
+20 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000007167 00000 n 
+0000008984 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000007224 00000 n 
+0000007349 00000 n 
+0000007479 00000 n 
+0000007612 00000 n 
+0000007749 00000 n 
+0000007872 00000 n 
+0000008001 00000 n 
+0000008133 00000 n 
+0000008269 00000 n 
+0000008397 00000 n 
+0000008524 00000 n 
+0000008653 00000 n 
+0000008786 00000 n 
+0000008888 00000 n 
+0000009232 00000 n 
+0000009318 00000 n 
+trailer
+<<
+/Size 21
+/Root 20 0 R
+/Info 19 0 R
+/ID [ <14E284B19C24C10A1EA1E40E62F6E6CB> <14E284B19C24C10A1EA1E40E62F6E6CB> ]
+>>
+startxref
+9422
+%%EOF

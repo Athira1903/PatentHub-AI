@@ -308,7 +308,7 @@ export const TasksPage: React.FC = () => {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               My Tasks
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-black">
+            <span className="px-2.5 py-0.5 rounded-full bg-[#E4F0EC] text-[#235952] text-xs font-black">
               {totalTasks} Total
             </span>
           </div>
@@ -320,17 +320,17 @@ export const TasksPage: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            className="px-4 py-2 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-3xs cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Create Task</span>
           </button>
           <button
             onClick={() => fetchData(true)}
-            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 rounded-xl transition cursor-pointer shadow-xs"
+            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 rounded-xl transition cursor-pointer shadow-3xs"
             title="Refresh tasks"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#235952]' : ''}`} />
           </button>
         </div>
       </div>
@@ -340,7 +340,7 @@ export const TasksPage: React.FC = () => {
         <div
           onClick={() => setStatusFilter('ALL')}
           className={`p-4 bg-white rounded-2xl border transition cursor-pointer shadow-3xs hover:border-slate-300 ${
-            statusFilter === 'ALL' ? 'border-blue-600 ring-2 ring-blue-100' : 'border-slate-200/80'
+            statusFilter === 'ALL' ? 'border-[#235952] ring-2 ring-[#235952]/20' : 'border-slate-200/80'
           }`}
         >
           <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
@@ -363,14 +363,14 @@ export const TasksPage: React.FC = () => {
 
         <div
           onClick={() => setStatusFilter('IN_PROGRESS')}
-          className={`p-4 bg-white rounded-2xl border transition cursor-pointer shadow-3xs hover:border-blue-300 ${
-            statusFilter === 'IN_PROGRESS' ? 'border-blue-600 ring-2 ring-blue-100' : 'border-slate-200/80'
+          className={`p-4 bg-white rounded-2xl border transition cursor-pointer shadow-3xs hover:border-[#235952]/40 ${
+            statusFilter === 'IN_PROGRESS' ? 'border-[#235952] ring-2 ring-[#235952]/20' : 'border-slate-200/80'
           }`}
         >
-          <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
+          <span className="text-[10px] font-extrabold text-[#235952] uppercase tracking-wider block">
             In Progress
           </span>
-          <span className="text-2xl font-black text-blue-700 mt-1 block">{inProgressTasks}</span>
+          <span className="text-2xl font-black text-[#235952] mt-1 block">{inProgressTasks}</span>
         </div>
 
         <div
@@ -461,7 +461,7 @@ export const TasksPage: React.FC = () => {
                 onClick={() => setStatusFilter(btn.id as any)}
                 className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
                   statusFilter === btn.id
-                    ? 'bg-blue-900 text-white shadow-xs'
+                    ? 'bg-[#235952] text-white shadow-3xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/70'
                 }`}
               >
@@ -482,7 +482,7 @@ export const TasksPage: React.FC = () => {
           Loading tasks from database...
         </div>
       ) : filteredTasks.length === 0 ? (
-        <div className="p-16 text-center bg-white rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+        <div className="p-16 text-center bg-white rounded-3xl border border-slate-200/80 shadow-3xs space-y-3">
           <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="font-extrabold text-slate-900 text-base">No tasks assigned to you.</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto font-medium">
@@ -490,7 +490,7 @@ export const TasksPage: React.FC = () => {
           </p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+            className="px-4 py-2 bg-[#235952] hover:bg-[#1B453F] text-white rounded-xl text-xs font-bold shadow-3xs cursor-pointer inline-flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             <span>Create New Task</span>
@@ -870,7 +870,7 @@ export const TasksPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  className="px-4 py-2 bg-[#235952] hover:bg-[#1B453F] disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-3xs cursor-pointer"
                 >
                   {submitting ? 'Creating...' : 'Create Task'}
                 </button>

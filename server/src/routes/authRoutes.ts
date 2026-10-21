@@ -20,6 +20,7 @@ router.post('/activate', activate);
 router.post('/resend-activation', resendActivation);
 router.post('/google-login', googleLogin);
 router.get('/profile', authenticateToken, getProfile);
+router.get('/me', authenticateToken, getProfile);
 router.post('/change-password', authenticateToken, changePassword);
 router.post('/send-otp', sendOtp);
 router.post('/verify-otp-reset', verifyOtpReset);
