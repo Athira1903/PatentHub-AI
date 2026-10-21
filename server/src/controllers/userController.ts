@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/db';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
@@ -202,7 +203,6 @@ export const updateUsername = async (req: AuthenticatedRequest, res: Response): 
       include: { role: true },
     })) as any;
 
-    const jwt = require('jsonwebtoken');
     const token = jwt.sign(
       { userId: user.id, username: user.username, role: user.role.name },
       process.env.JWT_SECRET || 'patenthub_secret',

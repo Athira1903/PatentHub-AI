@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateUsername = exports.listUsers = exports.toggleUserStatus = exports.promoteUser = exports.searchUsers = void 0;
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = require("../config/db");
 const searchUsers = async (req, res) => {
     try {
@@ -188,8 +192,7 @@ const updateUsername = async (req, res) => {
             data: { username: cleanUsername },
             include: { role: true },
         }));
-        const jwt = require('jsonwebtoken');
-        const token = jwt.sign({ userId: user.id, username: user.username, role: user.role.name }, process.env.JWT_SECRET || 'patenthub_secret', { expiresIn: '7d' });
+        const token = jsonwebtoken_1.default.sign({ userId: user.id, username: user.username, role: user.role.name }, process.env.JWT_SECRET || 'patenthub_secret', { expiresIn: '7d' });
         res.status(200).json({
             message: 'Username updated successfully!',
             token,

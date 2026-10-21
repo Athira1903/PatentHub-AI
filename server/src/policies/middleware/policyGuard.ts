@@ -1,9 +1,24 @@
-import { Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../../middleware/authMiddleware';
+import { Request, Response, NextFunction } from 'express';
+import { ParamsDictionary, Query } from 'express-serve-static-core';
+import { AuthenticatedRequest, AuthenticatedUser } from '../../middleware/authMiddleware';
 import { prisma } from '../../config/db';
 
-export interface ProjectRequest extends AuthenticatedRequest {
+export interface ProjectRequest<
+  P = ParamsDictionary,
+  ResBody = any,
+  ReqBody = any,
+  ReqQuery = Query,
+  Locals extends Record<string, any> = Record<string, any>
+> extends AuthenticatedRequest<P, ResBody, ReqBody, ReqQuery, Locals> {
   project?: any;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      project?: any;
+    }
+  }
 }
 
 /**

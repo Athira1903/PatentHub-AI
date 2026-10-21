@@ -1,14 +1,32 @@
 import { Request, Response, NextFunction } from 'express';
+import { ParamsDictionary, Query } from 'express-serve-static-core';
 import jwt from 'jsonwebtoken';
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    userId: string;
-    username: string;
-    role: string;
-    accountType?: 'INDIVIDUAL' | 'ORGANIZATION';
-    organizationId?: string | null;
-  };
+export interface AuthenticatedUser {
+  userId: string;
+  id?: string;
+  username: string;
+  role: string;
+  accountType?: 'INDIVIDUAL' | 'ORGANIZATION';
+  organizationId?: string | null;
+}
+
+export interface AuthenticatedRequest<
+  P = ParamsDictionary,
+  ResBody = any,
+  ReqBody = any,
+  ReqQuery = Query,
+  Locals extends Record<string, any> = Record<string, any>
+> extends Request<P, ResBody, ReqBody, ReqQuery, Locals> {
+  user?: AuthenticatedUser;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthenticatedUser;
+    }
+  }
 }
 
 export const authenticateToken = (
