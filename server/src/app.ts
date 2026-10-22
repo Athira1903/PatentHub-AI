@@ -13,6 +13,7 @@ import adminRoutes from './routes/adminRoutes';
 import organizationRoutes from './routes/organizationRoutes';
 import policyRoutes from './routes/policyRoutes';
 import billingRoutes from './routes/billingRoutes';
+import calendarRoutes from './routes/calendarRoutes';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/policies', policyRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/calendar', calendarRoutes);
 app.use('/api/ipc', searchIPC);
 
 // Health check endpoint

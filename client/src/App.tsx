@@ -27,6 +27,8 @@ import { DocumentsPage } from './pages/DocumentsPage';
 import { UserPoliciesPage } from './pages/policies/UserPoliciesPage';
 import { OrganizationAdminDashboardPage } from './pages/admin/OrganizationAdminDashboardPage';
 import { BillingPage } from './pages/admin/BillingPage';
+import { RoadmapPage } from './pages/RoadmapPage';
+import { CalendarPage } from './pages/CalendarPage';
 
 export const App: React.FC = () => {
   return (
@@ -105,6 +107,10 @@ export const App: React.FC = () => {
               <Route path="billing" element={<BillingPage />} />
               <Route path="org-admin" element={<OrganizationAdminDashboardPage />} />
               <Route path="claims" element={<ProjectSelectionPage />} />
+              <Route path="roadmap" element={<RoadmapPage />} />
+              <Route path="projects/:id/roadmap" element={<RoadmapPage />} />
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="projects/:id/calendar" element={<CalendarPage />} />
               <Route path="prior-art" element={<Navigate to="/dashboard/research" replace />} />
               <Route path="fto-analysis" element={<ProjectSelectionPage />} />
               <Route path="team" element={<ProjectSelectionPage />} />
@@ -112,7 +118,11 @@ export const App: React.FC = () => {
             </Route>
 
             {/* Direct Shortcuts */}
+            <Route path="/roadmap" element={<RoadmapPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/projects/:id" element={<ProjectDetailsPage />} />
+            <Route path="/projects/:id/roadmap" element={<RoadmapPage />} />
+            <Route path="/projects/:id/calendar" element={<CalendarPage />} />
             <Route path="/projects/:id/reviews" element={<ProjectDetailsPage />} />
             <Route path="/create-project" element={<CreateProject />} />
             <Route path="/research" element={<ResearchPage />} />

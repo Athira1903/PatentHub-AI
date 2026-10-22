@@ -372,7 +372,7 @@ export const HomePage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#0B0F17] text-[#202124] dark:text-[#F8FAFC] flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen google-multicolor-bg text-[#202124] dark:text-[#F8FAFC] flex flex-col font-sans transition-colors duration-200">
       
       {/* 4-Color Continuous Google Ambient Progress Bar */}
       <div

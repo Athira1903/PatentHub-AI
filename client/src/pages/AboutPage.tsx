@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 export const AboutPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans py-16 px-6 animate-fade-in">
+    <div className="min-h-screen google-multicolor-bg text-[#202124] font-sans py-16 px-6 animate-fade-in">
       <div className="max-w-4xl mx-auto space-y-12">
         {/* Header Block */}
         <motion.div
@@ -12,13 +12,13 @@ export const AboutPage: React.FC = () => {
           transition={{ duration: 0.3 }}
           className="text-center space-y-3"
         >
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-50 border border-blue-100 text-blue-700">
+          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-[#E8F0FE] border border-[#D2E3FC] text-[#1A73E8]">
             Our Mission & Vision
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#202124] tracking-tight">
             About PatentHub-AI
           </h1>
-          <p className="text-slate-500 text-xs sm:text-sm font-medium max-w-xl mx-auto leading-relaxed">
+          <p className="text-[#5F6368] text-xs sm:text-sm font-medium max-w-xl mx-auto leading-relaxed">
             Bridging the gap between engineering research and filing-ready patent applications through evidence-first AI and expert validation.
           </p>
         </motion.div>

@@ -25,6 +25,7 @@ import {
   Shield,
   BookOpen,
   Scale,
+  Layers,
 } from 'lucide-react';
 import { api, patentApi } from '../services/api';
 import toast from 'react-hot-toast';
@@ -36,6 +37,7 @@ import { FilingReadinessView } from '../components/project/FilingReadinessView';
 import { PriorArtEvidenceView } from '../components/project/PriorArtEvidenceView';
 import { ProjectReviewCenter } from '../components/project/ProjectReviewCenter';
 import { SpecificationStudio } from '../components/project/SpecificationStudio';
+import { ProjectRoadmapView } from '../components/roadmap/ProjectRoadmapView';
 import { WorkflowProgress } from '../components/ui/WorkflowProgress';
 
 export interface ProjectDetail {
@@ -1089,6 +1091,7 @@ export const ProjectDetailsPage: React.FC = () => {
 
   const sidebarLinks = [
     { label: 'Overview', tab: 'Overview', icon: Lightbulb },
+    { label: 'Roadmap', tab: 'Roadmap', icon: Layers },
     { label: 'AI Assistant', tab: 'AI Assistant', icon: Sparkles },
     { label: 'Innovation Details', tab: 'Innovation Details', icon: FileText },
     { label: 'Prior Art Search', tab: 'Prior Art Search', icon: Search },
@@ -1246,6 +1249,16 @@ export const ProjectDetailsPage: React.FC = () => {
                 navigator.clipboard.writeText(window.location.href);
                 toast.success('Project workspace link copied to clipboard!');
               }}
+              onRefreshProject={fetchProject}
+            />
+          )}
+
+          {/* T_ROADMAP: INTERACTIVE PATENT ROADMAP VIEW */}
+          {activeTab === 'Roadmap' && (
+            <ProjectRoadmapView
+              projectId={project.id}
+              project={project}
+              canEdit={canEdit}
               onRefreshProject={fetchProject}
             />
           )}

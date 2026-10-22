@@ -15,10 +15,16 @@ import {
   User,
   Building,
   RefreshCw,
+  Volume2,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { getRoleDisplayName } from '../utils/roleUtils';
+import {
+  testReminderBeep,
+  setReminderSoundEnabled,
+  isReminderSoundEnabled,
+} from '../utils/soundEffects';
 
 interface UserContext {
   user?: {
@@ -41,6 +47,7 @@ interface NotificationPrefs {
   reviewAlerts: boolean;
   invitations: boolean;
   systemAnnouncements: boolean;
+  reminderSound: boolean;
   emailDigest: 'instant' | 'daily' | 'weekly';
   compactTasks: boolean;
 }
@@ -51,6 +58,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   reviewAlerts: true,
   invitations: true,
   systemAnnouncements: true,
+  reminderSound: true,
   emailDigest: 'instant',
   compactTasks: false,
 };
@@ -86,7 +94,14 @@ export const SettingsPage: React.FC = () => {
       try {
         const stored = localStorage.getItem(`patenthub_prefs_${userId}`);
         if (stored) {
-          setPrefs(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          setPrefs({
+            ...DEFAULT_PREFS,
+            ...parsed,
+            reminderSound: isReminderSoundEnabled(),
+          });
+        } else {
+          setPrefs((p) => ({ ...p, reminderSound: isReminderSoundEnabled() }));
         }
       } catch (e) {
         console.warn('Failed to load local preferences', e);
@@ -106,6 +121,12 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleUpdatePref = (key: keyof NotificationPrefs, value: any) => {
+    if (key === 'reminderSound') {
+      setReminderSoundEnabled(Boolean(value));
+      if (value) {
+        testReminderBeep();
+      }
+    }
     const updated = { ...prefs, [key]: value };
     setPrefs(updated);
     try {
@@ -534,6 +555,42 @@ export const SettingsPage: React.FC = () => {
               />
               <div className="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#235952]"></div>
             </label>
+          </div>
+
+          {/* Reminder Sound / Audio Beep Alerts */}
+          <div className="flex items-center justify-between p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/60">
+            <div className="space-y-0.5 max-w-lg">
+              <div className="flex items-center gap-2">
+                <Volume2 className="w-4 h-4 text-[#235952]" />
+                <h4 className="text-xs font-extrabold text-slate-900">
+                  Reminder Audio Alerts (Beep Sound)
+                </h4>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Play an audible beep sound notification when calendar event reminders and patent deadlines are approaching.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  testReminderBeep();
+                  toast.success('Testing reminder beep sound 🔊');
+                }}
+                className="px-2.5 py-1 text-[11px] font-bold text-[#235952] hover:bg-[#E4F0EC] border border-[#235952]/30 rounded-lg transition flex items-center gap-1 cursor-pointer"
+              >
+                <span>Test Beep 🔊</span>
+              </button>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={prefs.reminderSound ?? true}
+                  onChange={(e) => handleUpdatePref('reminderSound', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#235952]"></div>
+              </label>
+            </div>
           </div>
         </div>
       </div>

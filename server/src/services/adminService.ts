@@ -3,11 +3,13 @@ import { ProjectRole } from '@prisma/client';
 import { AnalyticsService } from './analyticsService';
 import { FilingReadinessService } from './filingReadinessService';
 import { RazorpayService } from './razorpayService';
+import { AuditService } from './auditService';
 
 export interface AdminDashboardMetrics {
   kpis: {
     totalUsers: number;
     activeUsers: number;
+    newUsersPeriod?: number;
     totalOrganizations: number;
     activeOrganizations: number;
     totalProjects: number;
@@ -19,6 +21,12 @@ export interface AdminDashboardMetrics {
     filingReadyProjects: number;
     activeSubscriptions: number;
     trialOrganizations: number;
+    stalledProjects?: number;
+    overdueTasks?: number;
+    upcomingDeadlines?: number;
+    totalRoadmapMilestones?: number;
+    completedRoadmapMilestones?: number;
+    dbPingMs?: number;
   };
   systemStatus: {
     backend: string;
@@ -229,9 +237,18 @@ export class AdminService {
   /**
    * Fetches authentic real-time dashboard metrics from PostgreSQL.
    */
-  static async getDashboardMetrics(): Promise<AdminDashboardMetrics> {
+  static async getDashboardMetrics(timeRange: string = 'all'): Promise<AdminDashboardMetrics> {
+    const now = new Date();
+    let since: Date | undefined;
+    if (timeRange === '7d') since = new Date(now.getTime() - 7 * 86400000);
+    else if (timeRange === '30d') since = new Date(now.getTime() - 30 * 86400000);
+    else if (timeRange === '90d') since = new Date(now.getTime() - 90 * 86400000);
+
     const totalUsers = await prisma.user.count();
     const activeUsers = await prisma.user.count({ where: { isActive: true } });
+    const newUsersPeriod = await prisma.user.count({
+      where: since ? { createdAt: { gte: since } } : {},
+    });
     const totalProjects = await prisma.patentProject.count();
     const activeProjects = await prisma.patentProject.count({ where: { isArchived: false } });
     const projectsInProgress = await prisma.patentProject.count({
@@ -249,6 +266,24 @@ export class AdminService {
     const completedReviews = await prisma.projectReview.count({
       where: { decision: { in: ['APPROVED', 'REJECTED'] } },
     });
+
+    // Stalled Projects, Overdue Tasks, Upcoming Deadlines, Roadmap Milestones
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+    const in30Days = new Date(now.getTime() + 30 * 86400000);
+
+    const [stalledProjects, overdueTasks, upcomingDeadlines, totalRoadmapMilestones, completedRoadmapMilestones] = await Promise.all([
+      prisma.patentProject.count({
+        where: { isArchived: false, stage: { not: 'FILED' }, updatedAt: { lt: thirtyDaysAgo } },
+      }),
+      prisma.task.count({
+        where: { dueDate: { lt: now }, status: { not: 'COMPLETED' } },
+      }),
+      prisma.deadline.count({
+        where: { dueDate: { gte: now, lte: in30Days } },
+      }),
+      prisma.roadmapMilestone.count(),
+      prisma.roadmapMilestone.count({ where: { status: 'COMPLETED' } }),
+    ]);
 
     // Real Organizations
     let totalOrganizations = await prisma.organization.count();
@@ -280,10 +315,13 @@ export class AdminService {
       where: { status: { in: ['ACTIVE', 'active'] } },
     });
 
-    // Real Live System Status
+    // Real Live System Status with Ping latency measurement
     let dbStatus = 'DISCONNECTED';
+    let dbPingMs: number | undefined;
     try {
+      const pingStart = Date.now();
       await prisma.$queryRaw`SELECT 1`;
+      dbPingMs = Date.now() - pingStart;
       dbStatus = 'CONNECTED';
     } catch (e) {
       dbStatus = 'STATUS_UNAVAILABLE';
@@ -417,6 +455,7 @@ export class AdminService {
       kpis: {
         totalUsers,
         activeUsers,
+        newUsersPeriod,
         totalOrganizations,
         activeOrganizations,
         totalProjects,
@@ -428,6 +467,12 @@ export class AdminService {
         filingReadyProjects,
         activeSubscriptions,
         trialOrganizations,
+        stalledProjects,
+        overdueTasks,
+        upcomingDeadlines,
+        totalRoadmapMilestones,
+        completedRoadmapMilestones,
+        dbPingMs,
       },
       systemStatus,
       stageDistribution: stageDist,
@@ -484,27 +529,60 @@ export class AdminService {
     }));
   }
 
-  static async updateUserStatus(userId: string, isActive: boolean) {
-    return prisma.user.update({
+  static async updateUserStatus(userId: string, isActive: boolean, actorId?: string) {
+    const updated = await prisma.user.update({
       where: { id: userId },
       data: { isActive },
+      include: { role: true },
     });
+
+    if (actorId) {
+      await AuditService.logAdminAction({
+        actorId,
+        action: isActive ? 'ADMIN_REACTIVATE_USER' : 'ADMIN_SUSPEND_USER',
+        type: 'SECURITY',
+        targetId: userId,
+        details: `User ${updated.fullName} (@${updated.username}) status set to ${isActive ? 'ACTIVE' : 'SUSPENDED'}`,
+        metadata: { userId, isActive, username: updated.username },
+      });
+    }
+
+    return updated;
   }
 
-  static async updateUserRole(userId: string, roleName: string) {
+  static async updateUserRole(userId: string, roleName: string, actorId?: string) {
+    const prevUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
     const role = await prisma.role.upsert({
       where: { name: roleName },
       update: {},
       create: { name: roleName },
     });
 
-    return prisma.user.update({
+    const updated = await prisma.user.update({
       where: { id: userId },
       data: { roleId: role.id },
+      include: { role: true },
     });
+
+    if (actorId) {
+      await AuditService.logAdminAction({
+        actorId,
+        action: 'ADMIN_UPDATE_USER_ROLE',
+        type: 'SECURITY',
+        targetId: userId,
+        details: `Role updated from '${prevUser?.role?.name}' to '${roleName}' for ${updated.fullName}`,
+        metadata: { userId, oldRole: prevUser?.role?.name, newRole: roleName },
+      });
+    }
+
+    return updated;
   }
 
-  static async deleteUser(userId: string) {
+  static async deleteUser(userId: string, actorId?: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { role: true },
@@ -517,6 +595,17 @@ export class AdminService {
     await prisma.user.delete({
       where: { id: userId },
     });
+
+    if (actorId) {
+      await AuditService.logAdminAction({
+        actorId,
+        action: 'ADMIN_DELETE_USER',
+        type: 'SECURITY',
+        targetId: userId,
+        details: `Permanently deleted user account: ${user.fullName} (@${user.username})`,
+        metadata: { username: user.username, email: user.email, role: user.role.name },
+      });
+    }
 
     return {
       success: true,
@@ -550,12 +639,23 @@ export class AdminService {
     }));
   }
 
-  static async processVerification(id: string, decision: 'APPROVE' | 'REJECT' | 'REQUEST_INFO' | 'SUSPEND', notes?: string) {
+  static async processVerification(id: string, decision: 'APPROVE' | 'REJECT' | 'REQUEST_INFO' | 'SUSPEND', notes?: string, actorId?: string) {
     const isActive = decision === 'APPROVE';
     const user = await prisma.user.update({
       where: { id },
       data: { isActive },
     });
+
+    if (actorId) {
+      await AuditService.logAdminAction({
+        actorId,
+        action: `ADMIN_VERIFICATION_${decision}`,
+        type: 'AUDIT',
+        targetId: id,
+        details: `Verification processed with decision: ${decision}. Notes: ${notes || 'None'}`,
+        metadata: { decision, notes },
+      });
+    }
 
     return {
       id: user.id,
@@ -633,11 +733,16 @@ export class AdminService {
         },
         documents: { select: { id: true, category: true } },
         patentClaims: { select: { id: true } },
+        tasks: { select: { id: true, status: true, dueDate: true } },
+        projectReviews: { select: { id: true, decision: true } },
+        roadmapMilestones: { select: { id: true, status: true } },
+        deadlines: { select: { id: true, dueDate: true, status: true } },
       },
       orderBy: { updatedAt: 'desc' },
       take: 100,
     });
 
+    const now = new Date();
     const result = [];
     for (const p of projects) {
       const guide = p.members.find((m) => m.role === 'GUIDE')?.user?.fullName || 'Not Assigned';
@@ -647,6 +752,14 @@ export class AdminService {
         const r = await FilingReadinessService.getFilingReadiness(p.id);
         readinessScore = Math.round((r.completedCount / r.totalRequiredCount) * 100);
       } catch (e) {}
+
+      const totalMilestones = p.roadmapMilestones.length;
+      const completedMilestones = p.roadmapMilestones.filter((m) => m.status === 'COMPLETED').length;
+      const milestoneProgress = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
+      const overdueTasksCount = p.tasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'COMPLETED').length;
+      const pendingReviewsCount = p.projectReviews.filter((r) => r.decision === 'PENDING').length;
+      const upcomingDeadlinesCount = p.deadlines.filter((d) => new Date(d.dueDate) >= now).length;
+      const isStalled = !p.isArchived && p.stage !== 'FILED' && (now.getTime() - new Date(p.updatedAt).getTime()) > 30 * 24 * 60 * 60 * 1000;
 
       result.push({
         id: p.id,
@@ -659,6 +772,13 @@ export class AdminService {
         readinessScore,
         claimsCount: p.patentClaims.length,
         documentsCount: p.documents.length,
+        milestonesCount: totalMilestones,
+        completedMilestonesCount: completedMilestones,
+        milestoneProgress,
+        overdueTasksCount,
+        pendingReviewsCount,
+        upcomingDeadlinesCount,
+        isStalled,
         lastActivity: new Date(p.updatedAt).toLocaleDateString(),
         status: p.isArchived ? 'ARCHIVED' : 'ACTIVE',
         category: p.category,
@@ -1748,12 +1868,15 @@ export class AdminService {
   }
 
   /**
-   * Live System Health Probe
+   * Live System Health & Telemetry Probe
    */
   static async getSystemHealth() {
     let dbStatus = 'DISCONNECTED';
+    let dbLatencyMs: number | null = null;
     try {
+      const pingStart = Date.now();
       await prisma.$queryRaw`SELECT 1`;
+      dbLatencyMs = Date.now() - pingStart;
       dbStatus = 'CONNECTED';
     } catch (e) {
       dbStatus = 'STATUS_UNAVAILABLE';
@@ -1776,24 +1899,55 @@ export class AdminService {
         ? 'AVAILABLE'
         : 'STATUS_UNAVAILABLE';
 
+    const mem = process.memoryUsage();
+    const uptimeSeconds = Math.floor(process.uptime());
+
+    const recentErrorsCount = await prisma.activityLog.count({
+      where: {
+        action: { contains: 'ERROR', mode: 'insensitive' },
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+    });
+
     return {
       backend: 'ONLINE',
       database: dbStatus,
+      dbLatencyMs,
       aiService: aiStatus,
       cloudStorage: cloudStorageStatus,
       payment: paymentStatus,
       email: emailStatus,
+      nodeVersion: process.version,
+      uptimeSeconds,
+      memoryUsage: {
+        heapUsedMb: Math.round((mem.heapUsed / 1024 / 1024) * 10) / 10,
+        rssMb: Math.round((mem.rss / 1024 / 1024) * 10) / 10,
+      },
+      recentErrorsCount,
       timestamp: new Date().toISOString(),
     };
   }
 
-  static async updateOrganizationStatus(orgId: string, status: string) {
+  static async updateOrganizationStatus(orgId: string, status: string, actorId?: string) {
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
     if (!org) throw new Error('Organization not found.');
-    return await prisma.organization.update({
+    const updated = await prisma.organization.update({
       where: { id: orgId },
       data: { status },
     });
+
+    if (actorId) {
+      await AuditService.logAdminAction({
+        actorId,
+        action: 'ADMIN_UPDATE_ORG_STATUS',
+        type: 'AUDIT',
+        targetId: orgId,
+        details: `Organization '${org.name}' status changed from '${org.status}' to '${status}'`,
+        metadata: { orgId, oldStatus: org.status, newStatus: status },
+      });
+    }
+
+    return updated;
   }
 
   static async toggleNotificationStatus(notificationId: string) {

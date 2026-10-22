@@ -209,16 +209,19 @@ export const RegisterPage: React.FC = () => {
   return (
     <div className="w-full max-w-xl mx-auto px-4 font-sans my-auto py-12 animate-fade-in relative z-10">
       {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#235952]/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-tr from-[#4285F4]/15 via-[#FBBC05]/10 to-[#EA4335]/15 rounded-full blur-3xl pointer-events-none -z-10" />
 
-      <div className="app-card p-6 sm:p-8 bg-white border border-[#E5E7E5] rounded-3xl shadow-xl space-y-6">
+      <div className="app-card p-6 sm:p-8 bg-white/95 dark:bg-[#131B2B]/95 backdrop-blur-md border border-[#E8EAF0] dark:border-[#23314B] rounded-3xl shadow-xl space-y-6 relative overflow-hidden">
+        {/* Top Accent Gradient Line */}
+        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-[#4285F4] via-[#EA4335] via-[#FBBC05] to-[#34A853]"></div>
+
         {/* Header */}
-        <div className="text-center space-y-1">
-          <div className="inline-flex p-3 rounded-2xl bg-[#E4F0EC] text-[#235952] mb-2 border border-[#DCECE9]">
-            <ShieldCheck className="w-6 h-6 text-[#235952]" />
+        <div className="text-center space-y-1 pt-1">
+          <div className="inline-flex p-3 rounded-2xl bg-[#E8F0FE] text-[#1A73E8] mb-2 border border-[#D2E3FC] dark:bg-blue-950/40 dark:text-[#8AB4F8] dark:border-blue-900/40">
+            <ShieldCheck className="w-6 h-6 text-[#1A73E8] dark:text-[#8AB4F8]" />
           </div>
-          <h2 className="text-2xl font-extrabold text-[#191F1D] tracking-tight">Create Workspace Account</h2>
-          <p className="text-xs font-semibold text-slate-500 max-w-sm mx-auto leading-relaxed">
+          <h2 className="text-2xl font-extrabold text-[#202124] dark:text-[#F8FAFC] tracking-tight">Create Workspace Account</h2>
+          <p className="text-xs font-semibold text-[#5F6368] dark:text-[#94A3B8] max-w-sm mx-auto leading-relaxed">
             Register your institution credentials to create and collaborate on patent projects.
           </p>
         </div>
@@ -525,7 +528,7 @@ export const RegisterPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-11 rounded-xl font-bold bg-[#235952] hover:bg-[#1B453F] text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
+            className="w-full h-11 rounded-xl font-bold bg-[#1A73E8] hover:bg-[#1557B0] text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
           >
             {isSubmitting ? 'Registering Account...' : 'Register Account'} <ArrowRight className="w-4 h-4" />
           </button>
@@ -535,7 +538,7 @@ export const RegisterPage: React.FC = () => {
         <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-medium">
           <p className="text-slate-500">
             Already have an account?{' '}
-            <Link to="/login" className="font-bold text-[#235952] hover:text-[#1B453F] hover:underline">
+            <Link to="/login" className="font-bold text-[#1A73E8] hover:text-[#1557B0] hover:underline">
               Sign in
             </Link>
           </p>

@@ -525,37 +525,37 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
+      <div className="min-h-screen google-multicolor-bg flex items-center justify-center p-8">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-bold text-slate-600">Loading Organization Workspace...</p>
+          <div className="w-10 h-10 border-4 border-[#1A73E8] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-bold text-[#5F6368]">Loading Organization Workspace...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#191F1D] flex flex-col font-sans">
+    <div className="min-h-screen google-multicolor-bg text-[#202124] flex flex-col font-sans">
       {/* Top Organization Header */}
-      <header className="bg-white border-b border-[#E5E7E5] sticky top-0 z-30 shadow-2xs">
+      <header className="bg-white/95 backdrop-blur-md border-b border-[#E8EAF0] sticky top-0 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-[#235952] flex items-center justify-center text-white shadow-xs shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#1A73E8] flex items-center justify-center text-white shadow-xs shrink-0">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-black tracking-tight text-[#191F1D]">
+                <h1 className="text-xl font-black tracking-tight text-[#202124]">
                   {org?.name || 'Organization Workspace'}
                 </h1>
-                <span className="px-2 py-0.5 rounded-full bg-[#F0F7F6] border border-[#DCECE9] text-[#1B453F] text-[10px] font-extrabold uppercase">
+                <span className="px-2 py-0.5 rounded-full bg-[#E8F0FE] border border-[#D2E3FC] text-[#1A73E8] text-[10px] font-extrabold uppercase">
                   {org?.type || 'UNIVERSITY'}
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-[#F0FDF4] border border-[#DCFCE7] text-[#15803D] text-[10px] font-extrabold uppercase">
+                <span className="px-2 py-0.5 rounded-full bg-[#E6F4EA] border border-[#CEEAD6] text-[#137333] text-[10px] font-extrabold uppercase">
                   {org?.status || 'ACTIVE'}
                 </span>
               </div>
-              <p className="text-xs text-[#5C6662] font-medium mt-0.5">
+              <p className="text-xs text-[#5F6368] font-medium mt-0.5">
                 Multi-Tenant Administration, Policy Enforcement & Governance Hub
               </p>
             </div>
@@ -565,7 +565,7 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
             {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-xl bg-[#F4F5F4] hover:bg-[#ECEEEC] text-[#191F1D] border border-[#E5E7E5] transition cursor-pointer"
+              className="p-2 rounded-xl bg-[#F8F9FA] hover:bg-[#F1F3F4] text-[#202124] border border-[#E8EAF0] transition cursor-pointer"
               title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
               aria-label="Toggle theme"
             >
@@ -579,14 +579,14 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
             <button
               onClick={fetchOrgOverview}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#F4F5F4] hover:bg-[#ECEEEC] text-[#191F1D] border border-[#E5E7E5] text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#F8F9FA] hover:bg-[#F1F3F4] text-[#202124] border border-[#E8EAF0] text-xs font-bold transition disabled:opacity-50 cursor-pointer"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-[#235952]' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-[#1A73E8]' : ''}`} />
               Refresh
             </button>
             <button
               onClick={() => setShowAddUserModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#235952] hover:bg-[#1B453F] text-white text-xs font-bold shadow-xs transition cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1A73E8] hover:bg-[#1557B0] text-white text-xs font-bold shadow-xs transition cursor-pointer"
             >
               <UserPlus className="w-3.5 h-3.5" />
               Invite Member
@@ -595,7 +595,7 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 border-t border-[#E5E7E5] overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 border-t border-[#E8EAF0] overflow-x-auto">
           {[
             { id: 'overview', label: 'Dashboard', icon: Activity },
             { id: 'users', label: 'Users', icon: Users, badge: (metrics.totalInventors + metrics.totalGuides + metrics.totalPatentExperts) },
@@ -612,15 +612,15 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'border-[#235952] text-[#235952] bg-[#F0F7F6]/50'
-                    : 'border-transparent text-[#5C6662] hover:text-[#191F1D] hover:bg-[#F4F5F4]'
+                    ? 'border-[#1A73E8] text-[#1A73E8] bg-[#E8F0FE]/50'
+                    : 'border-transparent text-[#5F6368] hover:text-[#202124] hover:bg-[#F8F9FA]'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 <span>{tab.label}</span>
                 {tab.badge !== undefined && (
                   <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                    isActive ? 'bg-[#E0ECE9] text-[#1B453F]' : 'bg-[#ECEEEC] text-[#5C6662]'
+                    isActive ? 'bg-[#E8F0FE] text-[#1A73E8]' : 'bg-[#ECEEEC] text-[#5F6368]'
                   }`}>
                     {tab.badge}
                   </span>
@@ -629,10 +629,11 @@ export const OrganizationAdminDashboardPage: React.FC = () => {
             );
           })}
         </div>
+        <div className="google-accent-bar"></div>
       </header>
 
       {/* Main Workspace Body */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8 bg-transparent">
         {/* ========================================================================= */}
         {/* TAB 1: OVERVIEW DASHBOARD */}
         {/* ========================================================================= */}

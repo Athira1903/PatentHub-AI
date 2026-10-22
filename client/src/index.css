@@ -95,30 +95,35 @@
 @layer base {
   :root {
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --canvas-bg: #F8F9FA;
+    --canvas-bg: #FAFBFF;
     --card-bg: #FFFFFF;
-    --card-bg-subtle: #F1F3F4;
-    --border-color: #E2E8F0;
-    --border-strong: #CBD5E1;
-    --text-primary: #1E293B;
+    --card-bg-subtle: #F8FAFD;
+    --border-color: #E8EAF0;
+    --border-strong: #DADCE0;
+    --text-primary: #202124;
     --text-secondary: #5F6368;
-    --text-muted: #94A3B8;
+    --text-muted: #80868B;
     --brand-primary: #1A73E8;
     --brand-primary-hover: #1557B0;
     --brand-primary-surface: #E8F0FE;
 
-    /* Google Theme Tokens */
-    --google-blue: #1A73E8;
+    /* Google Multicolor Theme Tokens */
+    --google-blue: #4285F4;
+    --google-blue-primary: #1A73E8;
     --google-blue-hover: #1557B0;
     --google-blue-surface: #E8F0FE;
     --google-red: #EA4335;
     --google-red-surface: #FCE8E6;
-    --google-yellow: #FBBC04;
+    --google-yellow: #FBBC05;
     --google-yellow-surface: #FEF7E0;
     --google-green: #34A853;
     --google-green-surface: #E6F4EA;
-    --google-gray-bg: #F8F9FA;
-    --google-border: #DADCE0;
+    --google-lavender: #A882FF;
+    --google-lavender-surface: #F3E8FD;
+    --google-cyan: #24C6DC;
+    --google-cyan-surface: #E0F7FA;
+    --google-mint: #CEEAD6;
+    --google-border: #E8EAF0;
     --google-text: #202124;
     --google-text-secondary: #5F6368;
   }
@@ -138,6 +143,7 @@
 
     /* Google Dark Tokens */
     --google-blue: #8AB4F8;
+    --google-blue-primary: #8AB4F8;
     --google-blue-hover: #aecbfa;
     --google-blue-surface: rgba(138, 180, 248, 0.15);
     --google-red: #F28B82;
@@ -146,7 +152,9 @@
     --google-yellow-surface: rgba(253, 214, 99, 0.15);
     --google-green: #81C995;
     --google-green-surface: rgba(129, 201, 149, 0.15);
-    --google-gray-bg: #131B2B;
+    --google-lavender: #C58AF9;
+    --google-lavender-surface: rgba(197, 138, 249, 0.15);
+    --google-cyan: #78D9EC;
     --google-border: #23314B;
     --google-text: #F8FAFC;
     --google-text-secondary: #94A3B8;
@@ -154,18 +162,45 @@
 
   html {
     scroll-behavior: smooth;
-    background-color: var(--canvas-bg);
   }
 
-  body {
+  /* Google-Inspired Atmospheric Multicolor Background System */
+  html,
+  body,
+  .google-multicolor-bg {
+    background-color: #FAFBFF;
+    background-image:
+      radial-gradient(ellipse 65% 50% at 5% 5%, rgba(66, 133, 244, 0.10), transparent 45%),
+      radial-gradient(ellipse 60% 45% at 95% 5%, rgba(234, 67, 53, 0.07), transparent 40%),
+      radial-gradient(ellipse 65% 50% at 5% 95%, rgba(52, 168, 83, 0.08), transparent 40%),
+      radial-gradient(ellipse 60% 50% at 95% 95%, rgba(168, 130, 255, 0.09), transparent 45%),
+      radial-gradient(circle at 50% 50%, rgba(251, 188, 5, 0.035), transparent 50%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
     font-family: var(--font-sans);
-    background-color: var(--canvas-bg);
     color: var(--text-primary);
     min-height: 100vh;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .dark html,
+  .dark body,
+  .dark .google-multicolor-bg {
+    background-color: #0B0F17;
+    background-image:
+      radial-gradient(ellipse 65% 50% at 5% 5%, rgba(66, 133, 244, 0.15), transparent 45%),
+      radial-gradient(ellipse 60% 45% at 95% 5%, rgba(234, 67, 53, 0.09), transparent 40%),
+      radial-gradient(ellipse 65% 50% at 5% 95%, rgba(52, 168, 83, 0.09), transparent 40%),
+      radial-gradient(ellipse 60% 50% at 95% 95%, rgba(168, 130, 255, 0.13), transparent 45%),
+      radial-gradient(circle at 50% 50%, rgba(251, 188, 5, 0.03), transparent 50%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+    color: #F8FAFC;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -844,4 +879,221 @@
 .dark select,
 .dark textarea {
   color-scheme: dark;
+}
+
+/* ==================================================== */
+/* Google-Inspired Multicolor Theme Utilities           */
+/* ==================================================== */
+
+/* 4-Color Ambient Header & Accent Beam */
+.google-accent-bar {
+  height: 3px;
+  background: linear-gradient(90deg, #4285F4 0%, #EA4335 33%, #FBBC05 66%, #34A853 100%);
+  width: 100%;
+}
+
+/* Subtle Multicolor Hero Gradient Background */
+.google-hero-bg {
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.07) 0%, rgba(168, 130, 255, 0.05) 35%, rgba(251, 188, 5, 0.04) 70%, rgba(52, 168, 83, 0.06) 100%);
+}
+
+.dark .google-hero-bg {
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.14) 0%, rgba(168, 130, 255, 0.10) 35%, rgba(251, 188, 5, 0.06) 70%, rgba(52, 168, 83, 0.09) 100%);
+}
+
+/* AI Action Button with Google-Gemini Gradient */
+.google-btn-ai {
+  background: linear-gradient(135deg, #4285F4 0%, #7C3AED 50%, #EA4335 100%);
+  color: #FFFFFF !important;
+  font-weight: 700;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.28);
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.google-btn-ai:hover {
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.42);
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+/* Accessible Status Badges */
+.badge-google-success {
+  background-color: #E6F4EA;
+  color: #137333;
+  border: 1px solid #CEEAD6;
+}
+.dark .badge-google-success {
+  background-color: rgba(52, 168, 83, 0.18);
+  color: #81C995;
+  border-color: rgba(52, 168, 83, 0.35);
+}
+
+.badge-google-warning {
+  background-color: #FEF7E0;
+  color: #B06000;
+  border: 1px solid #FEEFC3;
+}
+.dark .badge-google-warning {
+  background-color: rgba(251, 188, 5, 0.18);
+  color: #FDD663;
+  border-color: rgba(251, 188, 5, 0.35);
+}
+
+.badge-google-danger {
+  background-color: #FCE8E6;
+  color: #C5221F;
+  border: 1px solid #FAD2CF;
+}
+.dark .badge-google-danger {
+  background-color: rgba(234, 67, 53, 0.18);
+  color: #F28B82;
+  border-color: rgba(234, 67, 53, 0.35);
+}
+
+.badge-google-info {
+  background-color: #E8F0FE;
+  color: #1967D2;
+  border: 1px solid #D2E3FC;
+}
+.dark .badge-google-info {
+  background-color: rgba(66, 133, 244, 0.18);
+  color: #8AB4F8;
+  border-color: rgba(66, 133, 244, 0.35);
+}
+
+.badge-google-ai {
+  background-color: #F3E8FD;
+  color: #8430CE;
+  border: 1px solid #E9D2FD;
+}
+.dark .badge-google-ai {
+  background-color: rgba(168, 130, 255, 0.18);
+  color: #D7AEFB;
+  border-color: rgba(168, 130, 255, 0.35);
+}
+
+/* ==================================================== */
+/* Light Mode Global Legacy Remapping to Google Palette */
+/* ==================================================== */
+html:not(.dark) .bg-\[\#315C55\],
+html:not(.dark) .bg-\[\#235952\],
+html:not(.dark) .bg-\[\#1B453F\] {
+  background-color: #1A73E8 !important;
+}
+
+html:not(.dark) .hover\:bg-\[\#254640\]:hover,
+html:not(.dark) .hover\:bg-\[\#1B453F\]:hover,
+html:not(.dark) .hover\:bg-\[\#173B35\]:hover {
+  background-color: #1557B0 !important;
+}
+
+html:not(.dark) .text-\[\#315C55\],
+html:not(.dark) .text-\[\#235952\],
+html:not(.dark) .text-\[\#1B453F\] {
+  color: #1A73E8 !important;
+}
+
+html:not(.dark) .bg-\[\#E4F0EC\],
+html:not(.dark) .bg-\[\#F0F7F6\],
+html:not(.dark) .bg-\[\#E0ECE9\] {
+  background-color: #E8F0FE !important;
+}
+
+html:not(.dark) .border-\[\#A8C8BD\],
+html:not(.dark) .border-\[\#A8C8BD\]\/40,
+html:not(.dark) .border-\[\#A8C8BD\]\/50,
+html:not(.dark) .border-\[\#235952\]\/20 {
+  border-color: rgba(66, 133, 244, 0.25) !important;
+}
+
+html:not(.dark) .border-\[\#E5EBE8\],
+html:not(.dark) .border-\[\#E5E7E5\],
+html:not(.dark) .border-\[\#DADCE0\],
+html:not(.dark) .border-\[\#CCD0CD\] {
+  border-color: #E8EAF0 !important;
+}
+
+html:not(.dark) .text-\[\#253330\],
+html:not(.dark) .text-\[\#191F1D\],
+html:not(.dark) .text-\[\#202124\] {
+  color: #202124 !important;
+}
+
+html:not(.dark) .text-\[\#5C6B67\],
+html:not(.dark) .text-\[\#5C6662\],
+html:not(.dark) .text-\[\#71807C\],
+html:not(.dark) .text-\[\#5F6368\] {
+  color: #5F6368 !important;
+}
+
+html:not(.dark) .text-\[\#8A9B96\],
+html:not(.dark) .text-\[\#88928E\],
+html:not(.dark) .text-\[\#6F8F88\] {
+  color: #80868B !important;
+}
+
+html:not(.dark) .bg-\[\#FAF9F6\],
+html:not(.dark) .bg-\[\#faf9f6\],
+html:not(.dark) .bg-\[\#F7FAF9\],
+html:not(.dark) .bg-\[\#F8F9FA\] {
+  background-color: #FAFBFF !important;
+}
+
+/* ==================================================== */
+/* Google Micro-Interactions & Accessibility Utilities   */
+/* ==================================================== */
+.google-text-gradient {
+  background: linear-gradient(135deg, #1A73E8 0%, #7C3AED 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dark .google-text-gradient {
+  background: linear-gradient(135deg, #8AB4F8 0%, #C58AF9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.google-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E8EAF0;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1), border-color 0.2s ease;
+}
+
+.google-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(66, 133, 244, 0.08);
+  border-color: #D2E3FC;
+}
+
+.dark .google-card {
+  background-color: #131B2B;
+  border-color: #23314B;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.dark .google-card:hover {
+  border-color: #3B82F6;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

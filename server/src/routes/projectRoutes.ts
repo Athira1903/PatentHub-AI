@@ -15,6 +15,15 @@ import {
   createComment,
 } from '../controllers/projectController';
 import {
+  getProjectRoadmap,
+  createMilestone,
+  updateMilestone,
+  deleteMilestone,
+  reorderMilestones,
+  getMilestoneDetails,
+  getProjectProgress,
+} from '../controllers/roadmapController';
+import {
   getDashboardAnalytics,
   getInventorDashboard,
   getCoInventorDashboard,
@@ -108,6 +117,15 @@ router.post('/:id/tasks', projectGuard((u, p) => ProjectPolicy.canCreateTask(u, 
 router.put('/:id/tasks/:taskId', projectGuard((u, p) => ProjectPolicy.canUpdateTask(u, p)) as any, updateTask as any);
 router.put('/:id/tasks/:taskId/status', projectGuard((u, p) => ProjectPolicy.canUpdateTask(u, p)) as any, updateTask as any);
 router.delete('/:id/tasks/:taskId', projectGuard((u, p) => ProjectPolicy.canDeleteTask(u, p)) as any, deleteTask as any);
+
+// Roadmap Management Endpoints
+router.get('/:id/roadmap', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getProjectRoadmap as any);
+router.get('/:id/roadmap/progress', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getProjectProgress as any);
+router.get('/:id/roadmap/milestones/:milestoneId', projectGuard((u, p) => ProjectPolicy.canViewProject(u, p)) as any, getMilestoneDetails as any);
+router.post('/:id/roadmap/milestones', projectGuard((u, p) => ProjectPolicy.canCreateTask(u, p)) as any, createMilestone as any);
+router.put('/:id/roadmap/milestones/:milestoneId', projectGuard((u, p) => ProjectPolicy.canUpdateTask(u, p)) as any, updateMilestone as any);
+router.delete('/:id/roadmap/milestones/:milestoneId', projectGuard((u, p) => ProjectPolicy.canDeleteTask(u, p)) as any, deleteMilestone as any);
+router.put('/:id/roadmap/reorder', projectGuard((u, p) => ProjectPolicy.canUpdateTask(u, p)) as any, reorderMilestones as any);
 
 // Comments Endpoint
 router.post('/:id/comments', projectGuard((u, p) => ReviewPolicy.canComment(u, p)) as any, createComment as any);

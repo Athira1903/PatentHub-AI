@@ -196,16 +196,16 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="w-full max-w-md mx-auto px-4 font-sans my-auto py-12 animate-fade-in relative z-10">
       {/* Background Glow */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-blue-400/15 via-cyan-400/10 to-indigo-500/15 rounded-3xl blur-2xl pointer-events-none -z-10" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-[#4285F4]/15 via-[#FBBC05]/10 to-[#EA4335]/15 rounded-3xl blur-2xl pointer-events-none -z-10" />
 
       {/* Main Login Card */}
-      <div className="glass-card border border-slate-200/80 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+      <div className="bg-white/95 dark:bg-[#131B2B]/95 backdrop-blur-md border border-[#E8EAF0] dark:border-[#23314B] rounded-3xl p-8 shadow-2xl relative overflow-hidden">
         {/* Top Accent Gradient Line */}
-        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-[#1B453F] via-[#235952] to-[#3B82F6]"></div>
+        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-[#4285F4] via-[#EA4335] via-[#FBBC05] to-[#34A853]"></div>
 
         {/* Header */}
         <div className="text-center mb-8 pt-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#235952] text-white shadow-xs mb-3">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#1A73E8] text-white shadow-xs mb-3">
             <Shield className="w-6 h-6 fill-white" />
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Institutional Login</h1>
@@ -245,7 +245,7 @@ export const LoginPage: React.FC = () => {
                 type="text"
                 {...register('emailOrUsername')}
                 placeholder="e.g. STU202600015"
-                className="w-full h-11 pl-10 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 font-medium transition-all shadow-3xs"
+                className="w-full h-11 pl-10 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/10 font-medium transition-all shadow-3xs"
               />
             </div>
             {errors.emailOrUsername && (
@@ -262,7 +262,7 @@ export const LoginPage: React.FC = () => {
                   setOtpStep(1);
                   setForgotModalOpen(true);
                 }}
-                className="text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                className="text-[11px] font-bold text-[#1A73E8] hover:text-[#1557B0] hover:underline cursor-pointer"
               >
                 Forgot password?
               </button>
@@ -273,7 +273,7 @@ export const LoginPage: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 {...register('password')}
                 placeholder="Enter password"
-                className="w-full h-11 pl-10 pr-10 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 font-medium transition-all shadow-3xs"
+                className="w-full h-11 pl-10 pr-10 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/10 font-medium transition-all shadow-3xs"
               />
               <button
                 type="button"
@@ -289,7 +289,7 @@ export const LoginPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-11 rounded-xl font-bold bg-[#235952] hover:bg-[#1B453F] text-white text-xs shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-50 mt-5 cursor-pointer"
+            className="w-full h-11 rounded-xl font-bold bg-[#1A73E8] hover:bg-[#1557B0] text-white text-xs shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-50 mt-5 cursor-pointer"
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'} <ArrowRight className="w-4 h-4" />
           </button>
@@ -297,13 +297,13 @@ export const LoginPage: React.FC = () => {
           <div className="pt-5 border-t border-slate-100 flex flex-col gap-2.5 text-center text-xs text-slate-500 font-medium">
             <div>
               Don't have an account?{' '}
-              <Link to="/register" className="font-extrabold text-[#235952] hover:text-[#1B453F] hover:underline">
+              <Link to="/register" className="font-extrabold text-[#1A73E8] hover:text-[#1557B0] hover:underline">
                 Create an account
               </Link>
             </div>
-            <div className="text-[11px] text-slate-500 bg-[#F4F5F4] p-2.5 rounded-lg border border-[#E5E7E5]">
+            <div className="text-[11px] text-slate-500 bg-[#FAFBFF] p-2.5 rounded-lg border border-[#E8EAF0]">
               Need to activate a new account?{' '}
-              <Link to="/activate" className="font-bold text-[#235952] hover:text-[#1B453F] hover:underline">
+              <Link to="/activate" className="font-bold text-[#1A73E8] hover:text-[#1557B0] hover:underline">
                 Activate Account here
               </Link>
             </div>

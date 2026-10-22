@@ -160,17 +160,17 @@ export const ActivatePage: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-tr from-blue-400/15 via-cyan-400/10 to-indigo-500/15 rounded-3xl blur-2xl pointer-events-none -z-10" />
 
       {/* Card Wrapper */}
-      <div className="glass-card border border-slate-200/80 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-        {/* Top Accent Gradient Bar */}
-        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-[#1B453F] via-[#235952] to-[#3B82F6]"></div>
+      <div className="glass-card border border-slate-200/80 rounded-3xl p-8 shadow-2xl relative overflow-hidden bg-white/95">
+        {/* Top Google 4-Color Accent Gradient Bar */}
+        <div className="absolute top-0 inset-x-0 h-1.5 google-accent-bar"></div>
 
         {/* Header */}
         <div className="text-center mb-6 pt-1">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#235952] text-white shadow-xs mb-3">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#1A73E8] text-white shadow-xs mb-3">
             <KeyRound className="w-6 h-6 fill-white" />
           </div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Activate Account</h1>
-          <p className="mt-1 text-xs text-slate-500 font-medium">Verify your OTP and set up your permanent password</p>
+          <h1 className="text-2xl font-extrabold text-[#202124] tracking-tight">Activate Account</h1>
+          <p className="mt-1 text-xs text-[#5F6368] font-medium">Verify your OTP and set up your permanent password</p>
         </div>
 
         {/* Activation Form */}
@@ -293,7 +293,7 @@ export const ActivatePage: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-11 rounded-xl font-bold bg-[#235952] hover:bg-[#1B453F] text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
+            className="w-full h-11 rounded-xl font-bold bg-[#1A73E8] hover:bg-[#1557B0] text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
           >
             {isSubmitting ? 'Activating Account...' : 'Activate & Login'} <ArrowRight className="w-4 h-4" />
           </button>
@@ -301,14 +301,14 @@ export const ActivatePage: React.FC = () => {
 
         {/* Footer Link */}
         <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-medium">
-          <p className="text-slate-500">
+          <p className="text-[#5F6368]">
             Back to{' '}
-            <Link to="/login" className="font-bold text-[#235952] hover:text-[#1B453F] hover:underline">
+            <Link to="/login" className="font-bold text-[#1A73E8] hover:text-[#1557B0] hover:underline">
               Sign In
             </Link>
           </p>
           <span className="flex items-center gap-1 text-[11px] text-slate-400 font-semibold">
-            <ShieldCheck className="w-4 h-4 text-[#235952]" /> IPO Compliant
+            <ShieldCheck className="w-4 h-4 text-[#1A73E8]" /> IPO Compliant
           </span>
         </div>
       </div>
@@ -319,12 +319,12 @@ export const ActivatePage: React.FC = () => {
           <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 relative overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-[#E4F0EC] text-[#235952]">
+                <div className="p-2 rounded-xl bg-[#E8F0FE] text-[#1A73E8]">
                   <RefreshCw className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-slate-900">Resend Activation Code</h3>
-                  <p className="text-[11px] text-slate-500">Generate a fresh 6-digit verification code</p>
+                  <h3 className="text-sm font-extrabold text-[#202124]">Resend Activation Code</h3>
+                  <p className="text-[11px] text-[#5F6368]">Generate a fresh 6-digit verification code</p>
                 </div>
               </div>
               <button
@@ -348,7 +348,7 @@ export const ActivatePage: React.FC = () => {
                     value={resendIdentifier}
                     onChange={(e) => setResendIdentifier(e.target.value)}
                     placeholder="e.g. STU202600001 or your@email.com"
-                    className="w-full h-11 pl-10 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-[#235952] focus:ring-2 focus:ring-[#235952]/10 font-medium transition shadow-3xs"
+                    className="w-full h-11 pl-10 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-[#202124] text-xs focus:outline-none focus:bg-white focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/10 font-medium transition shadow-3xs"
                     autoFocus
                   />
                 </div>
@@ -368,7 +368,7 @@ export const ActivatePage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isResending}
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#235952] hover:bg-[#1B453F] text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#1A73E8] hover:bg-[#1557B0] text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isResending ? (
                     <>

@@ -321,7 +321,7 @@ export const BillingPage: React.FC = () => {
   const isTrialExpired = currentBilling?.trial?.status === 'EXPIRED' && !isProActive;
 
   return (
-    <div className="min-h-screen bg-[#faf9f6] text-[#2d3748] px-6 py-8 md:px-12 max-w-7xl mx-auto space-y-10">
+    <div className="min-h-screen bg-transparent text-[#202124] px-6 py-8 md:px-12 max-w-7xl mx-auto space-y-10">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>

@@ -24,6 +24,8 @@ import {
   FileText,
   Sun,
   Moon,
+  Calendar as CalendarIcon,
+  Layers,
 } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
@@ -35,6 +37,7 @@ import {
   getWorkspaceTitle,
   getRoleInitials,
 } from '../utils/roleUtils';
+import { useReminderNotifier } from '../utils/reminderNotifier';
 
 interface UserProfile {
   fullName: string;
@@ -51,6 +54,7 @@ interface UserProfile {
 }
 
 export const DashboardLayout: React.FC = () => {
+  useReminderNotifier();
   const { isDark, toggleTheme } = useTheme();
   const [user, setUser] = useState<UserProfile | null>(() => {
     try {
@@ -202,6 +206,8 @@ export const DashboardLayout: React.FC = () => {
         { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { label: 'Review Queue', path: '/dashboard/reviews', icon: ClipboardCheck },
         { label: 'Advisee Projects', path: '/dashboard/projects', icon: FolderKanban },
+        { label: 'Roadmap', path: '/dashboard/roadmap', icon: Layers },
+        { label: 'Calendar', path: '/dashboard/calendar', icon: CalendarIcon },
         { label: 'Research', path: '/dashboard/research', icon: BookOpen },
         { label: 'Documents', path: '/dashboard/documents', icon: FileText },
         { label: 'Policies', path: '/dashboard/policies', icon: Shield },
@@ -210,6 +216,8 @@ export const DashboardLayout: React.FC = () => {
     ? [
         { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { label: 'Patent Reviews', path: '/dashboard/reviews', icon: ClipboardCheck },
+        { label: 'Roadmap', path: '/dashboard/roadmap', icon: Layers },
+        { label: 'Calendar', path: '/dashboard/calendar', icon: CalendarIcon },
         { label: 'Research', path: '/dashboard/research', icon: BookOpen },
         { label: 'Documents', path: '/dashboard/documents', icon: FileText },
         { label: 'Policies', path: '/dashboard/policies', icon: Shield },
@@ -218,6 +226,8 @@ export const DashboardLayout: React.FC = () => {
     ? [
         { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { label: 'My Inventions', path: '/dashboard/projects', icon: Folder },
+        { label: 'Roadmap', path: '/dashboard/roadmap', icon: Layers },
+        { label: 'Calendar', path: '/dashboard/calendar', icon: CalendarIcon },
         { label: 'Research', path: '/dashboard/research', icon: BookOpen },
         { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
         { label: 'Documents', path: '/dashboard/documents', icon: FileText },
@@ -226,6 +236,8 @@ export const DashboardLayout: React.FC = () => {
     : [
         { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { label: 'My Inventions', path: '/dashboard/projects', icon: Folder },
+        { label: 'Roadmap', path: '/dashboard/roadmap', icon: Layers },
+        { label: 'Calendar', path: '/dashboard/calendar', icon: CalendarIcon },
         { label: 'Research', path: '/dashboard/research', icon: BookOpen },
         { label: 'Tasks', path: '/dashboard/tasks', icon: CheckSquare },
         { label: 'Documents', path: '/dashboard/documents', icon: FileText },
@@ -245,6 +257,8 @@ export const DashboardLayout: React.FC = () => {
     if (p.includes('/dashboard/projects/')) return { parent: 'Projects', current: 'Project Command Center' };
     if (p.includes('/dashboard/projects'))
       return { parent: 'Workspace', current: isCoInventor || isPatentExpert || isGuide ? 'My Projects' : 'My Inventions' };
+    if (p.includes('/dashboard/roadmap')) return { parent: 'Workspace', current: 'Patent Roadmap' };
+    if (p.includes('/dashboard/calendar')) return { parent: 'Workspace', current: 'Interactive Calendar' };
     if (p.includes('/dashboard/tasks')) return { parent: 'Workspace', current: 'Tasks' };
     if (p.includes('/dashboard/reviews'))
       return { parent: 'Workspace', current: isGuide || isPatentExpert ? 'Review Queue' : 'Project Reviews' };
@@ -285,7 +299,7 @@ export const DashboardLayout: React.FC = () => {
             onClick={onItemClick}
             className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
               isActive
-                ? 'bg-blue-50 dark:bg-blue-950/40 text-[#1A73E8] dark:text-[#8AB4F8] border-r-2 border-[#1A73E8] dark:border-[#8AB4F8] shadow-3xs'
+                ? 'bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-purple-50/40 dark:from-blue-950/40 dark:to-purple-950/20 text-[#1A73E8] dark:text-[#8AB4F8] border-r-2 border-[#4285F4] dark:border-[#8AB4F8] shadow-3xs'
                 : 'text-[#5F6368] dark:text-[#94A3B8] hover:text-[#202124] dark:hover:text-[#F8FAFC] hover:bg-[#F1F3F4] dark:hover:bg-[#1C263B]'
             }`}
           >
@@ -309,13 +323,13 @@ export const DashboardLayout: React.FC = () => {
   );
 
   return (
-    <div className="h-screen bg-[#F8F9FA] dark:bg-[#0B0F17] text-[#202124] dark:text-[#F8FAFC] flex flex-col overflow-hidden font-sans antialiased transition-colors duration-200">
+    <div className="h-screen google-multicolor-bg text-[#202124] dark:text-[#F8FAFC] flex flex-col overflow-hidden font-sans antialiased transition-colors duration-200">
       <div className="flex-1 flex overflow-hidden">
         {/* Desktop Left Sidebar */}
         <aside
           className={`${
             collapsed ? 'w-20' : 'w-64'
-          } bg-white dark:bg-[#131B2B] border-r border-[#E2E8F0] dark:border-[#23314B] flex flex-col h-screen sticky top-0 shrink-0 z-40 transition-all duration-200 shadow-[1px_0_3px_rgba(0,0,0,0.02)] hidden md:flex`}
+          } bg-white dark:bg-[#131B2B] border-r border-[#E8EAF0] dark:border-[#23314B] flex flex-col h-screen sticky top-0 shrink-0 z-40 transition-all duration-200 shadow-[1px_0_3px_rgba(0,0,0,0.02)] hidden md:flex`}
         >
           {/* Logo Header */}
           <div className="h-16 flex items-center justify-between px-5 border-b border-[#E2E8F0] dark:border-[#23314B]">
@@ -659,9 +673,11 @@ export const DashboardLayout: React.FC = () => {
               </div>
             </div>
           </header>
+          {/* Google 4-Color Accent Bar */}
+          <div className="google-accent-bar" />
 
-          {/* Main Outlet Scroll Area with Crisp Background */}
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#F8F9FA] dark:bg-[#0B0F17] transition-colors duration-200">
+          {/* Main Outlet Scroll Area with Atmospheric Multicolor Background */}
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-transparent transition-colors duration-200">
             <div className="max-w-7xl mx-auto">
               <Outlet context={{ user }} />
             </div>

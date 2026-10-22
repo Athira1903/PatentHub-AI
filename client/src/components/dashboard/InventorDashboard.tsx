@@ -213,13 +213,13 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="My Projects"
-          value={kpis.myProjects < 10 ? `0${kpis.myProjects}` : kpis.myProjects}
+          value={kpis.myProjects}
           subtext="Owned & collaborated files"
           icon={<FolderKanban className="w-4 h-4 text-teal-700" />}
         />
         <KpiCard
           label="Active Projects"
-          value={kpis.activeProjects < 10 ? `0${kpis.activeProjects}` : kpis.activeProjects}
+          value={kpis.activeProjects}
           subtext="In invention pipeline"
           icon={<Layers className="w-4 h-4 text-teal-700" />}
         />
@@ -231,7 +231,7 @@ export const InventorDashboard: React.FC<InventorDashboardProps> = ({ user, onRe
         />
         <KpiCard
           label="Pending Actions"
-          value={kpis.pendingActions < 10 ? `0${kpis.pendingActions}` : kpis.pendingActions}
+          value={kpis.pendingActions}
           subtext="Tasks, reviews & attention items"
           icon={<AlertCircle className="w-4 h-4 text-amber-600" />}
         />

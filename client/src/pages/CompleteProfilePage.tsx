@@ -261,24 +261,24 @@ export const CompleteProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 py-20 font-sans">
-        <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
-        <p className="text-sm font-semibold text-slate-500">Loading your profile onboarding...</p>
+      <div className="flex-1 flex flex-col items-center justify-center google-multicolor-bg py-20 font-sans">
+        <Loader2 className="w-10 h-10 text-[#1A73E8] animate-spin mb-4" />
+        <p className="text-sm font-semibold text-[#5F6368]">Loading your profile onboarding...</p>
       </div>
     );
   }
 
   if (needUsernameSelection) {
     return (
-      <div className="flex-1 bg-slate-50 py-12 px-4 flex items-center justify-center font-sans">
-        <div className="w-full max-w-md bg-white border border-[#E5E7E5] rounded-3xl p-8 shadow-2xl space-y-6 relative overflow-hidden">
-          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-[#1B453F] via-[#235952] to-[#3B82F6]"></div>
+      <div className="flex-1 google-multicolor-bg py-12 px-4 flex items-center justify-center font-sans">
+        <div className="w-full max-w-md bg-white border border-[#E8EAF0] rounded-3xl p-8 shadow-2xl space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1.5 google-accent-bar"></div>
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#235952] text-white shadow-xs mb-1">
+            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#1A73E8] text-white shadow-xs mb-1">
               <Shield className="w-6 h-6 fill-white" />
             </div>
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Choose your Username</h1>
-            <p className="text-xs text-slate-500 font-medium">Please set a unique username for project invitations and team collaborations.</p>
+            <h1 className="text-xl font-extrabold text-[#202124] tracking-tight">Choose your Username</h1>
+            <p className="text-xs text-[#5F6368] font-medium">Please set a unique username for project invitations and team collaborations.</p>
           </div>
           <form onSubmit={handleUsernameSubmit} className="space-y-4">
             <div>
@@ -293,7 +293,7 @@ export const CompleteProfilePage: React.FC = () => {
                     setUsernameError('');
                   }}
                   placeholder="e.g. your_username"
-                  className="w-full h-11 pl-8 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-[#235952] focus:ring-2 focus:ring-[#235952]/10 font-medium transition-all shadow-3xs"
+                  className="w-full h-11 pl-8 pr-3 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-[#202124] text-xs focus:outline-none focus:bg-white focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/10 font-medium transition-all shadow-3xs"
                 />
               </div>
               {usernameError && <p className="mt-1 text-[11px] text-rose-600 font-semibold">{usernameError}</p>}
@@ -301,7 +301,7 @@ export const CompleteProfilePage: React.FC = () => {
             <button
               type="submit"
               disabled={savingUsername}
-              className="w-full h-11 rounded-xl font-bold bg-[#235952] hover:bg-[#1B453F] text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
+              className="w-full h-11 rounded-xl font-bold bg-[#1A73E8] hover:bg-[#1557B0] text-white text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 mt-4 cursor-pointer"
             >
               {savingUsername ? 'Saving Username...' : 'Set Username'}
             </button>
@@ -312,15 +312,16 @@ export const CompleteProfilePage: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 bg-slate-50 py-12 px-4 flex items-center justify-center font-sans">
-      <div className="w-full max-w-3xl app-card p-8 space-y-8">
+    <div className="flex-1 google-multicolor-bg py-12 px-4 flex items-center justify-center font-sans">
+      <div className="w-full max-w-3xl app-card p-8 space-y-8 bg-white/95 border border-[#E8EAF0] shadow-xl rounded-3xl relative overflow-hidden">
+        <div className="absolute top-0 inset-x-0 h-1.5 google-accent-bar"></div>
         {/* Header */}
-        <div className="text-center space-y-1">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#235952] text-white shadow-xs mb-2">
+        <div className="text-center space-y-1 pt-2">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#1A73E8] text-white shadow-xs mb-2">
             <Shield className="w-6 h-6 fill-white" />
           </div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Complete Your Profile</h1>
-          <p className="text-xs text-slate-500 font-medium">Provide your workspace information to unlock the patent research workspace.</p>
+          <h1 className="text-2xl font-extrabold text-[#202124] tracking-tight">Complete Your Profile</h1>
+          <p className="text-xs text-[#5F6368] font-medium">Provide your workspace information to unlock the patent research workspace.</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -595,7 +596,7 @@ export const CompleteProfilePage: React.FC = () => {
           <button
             type="submit"
             disabled={saving || !isValid}
-            className="w-full h-12 rounded-xl font-bold bg-[#235952] hover:bg-[#1B453F] text-white text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-12 rounded-xl font-bold bg-[#1A73E8] hover:bg-[#1557B0] text-white text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <>

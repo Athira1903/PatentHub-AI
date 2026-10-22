@@ -219,25 +219,25 @@ export const CoInventorDashboard: React.FC<CoInventorDashboardProps> = ({ user, 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="My Projects"
-          value={kpis.myProjects < 10 ? `0${kpis.myProjects}` : kpis.myProjects}
+          value={kpis.myProjects}
           subtext="Collaborating & accessible files"
           icon={<FolderKanban className="w-4 h-4 text-teal-700" />}
         />
         <KpiCard
           label="Active Projects"
-          value={kpis.activeProjects < 10 ? `0${kpis.activeProjects}` : kpis.activeProjects}
+          value={kpis.activeProjects}
           subtext="In development pipeline"
           icon={<Layers className="w-4 h-4 text-teal-700" />}
         />
         <KpiCard
           label="My Tasks"
-          value={kpis.myTasks < 10 ? `0${kpis.myTasks}` : kpis.myTasks}
+          value={kpis.myTasks}
           subtext="Assigned to you"
           icon={<CheckSquare className="w-4 h-4 text-teal-700" />}
         />
         <KpiCard
           label="Pending Reviews"
-          value={kpis.pendingReviews < 10 ? `0${kpis.pendingReviews}` : kpis.pendingReviews}
+          value={kpis.pendingReviews}
           subtext="Supervisor reviews pending"
           icon={<AlertCircle className="w-4 h-4 text-amber-600" />}
         />

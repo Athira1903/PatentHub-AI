@@ -76,4 +76,33 @@ export const patentApi = {
   runInnovationAnalysis: (projectId: string) => api.post(`/projects/${projectId}/ai/innovation-analysis`),
   runClaimSuggestion: (preamble: string, body: string) =>
     api.post('/projects/ai/claim-suggestion', { preamble, body }),
+
+  // Roadmap Endpoints
+  getProjectRoadmap: (projectId: string) => api.get(`/projects/${projectId}/roadmap`),
+  getMilestoneDetails: (projectId: string, milestoneId: string) =>
+    api.get(`/projects/${projectId}/roadmap/milestones/${milestoneId}`),
+  getProjectRoadmapProgress: (projectId: string) =>
+    api.get(`/projects/${projectId}/roadmap/progress`),
+  createMilestone: (projectId: string, data: any) =>
+    api.post(`/projects/${projectId}/roadmap/milestones`, data),
+  updateMilestone: (projectId: string, milestoneId: string, data: any) =>
+    api.put(`/projects/${projectId}/roadmap/milestones/${milestoneId}`, data),
+  deleteMilestone: (projectId: string, milestoneId: string) =>
+    api.delete(`/projects/${projectId}/roadmap/milestones/${milestoneId}`),
+  reorderMilestones: (projectId: string, orderedMilestoneIds: string[]) =>
+    api.put(`/projects/${projectId}/roadmap/reorder`, { orderedMilestoneIds }),
+
+  // Calendar Endpoints
+  getCalendarEvents: (params?: {
+    startDate?: string;
+    endDate?: string;
+    projectId?: string;
+    category?: string;
+    status?: string;
+  }) => api.get('/calendar', { params }),
+  getCalendarEventDetails: (eventId: string) => api.get(`/calendar/${eventId}`),
+  createCalendarEvent: (data: any) => api.post('/calendar', data),
+  updateCalendarEvent: (eventId: string, data: any) => api.put(`/calendar/${eventId}`, data),
+  deleteCalendarEvent: (eventId: string) => api.delete(`/calendar/${eventId}`),
 };
+

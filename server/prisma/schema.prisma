@@ -88,6 +88,10 @@ model User {
   assignedPolicies    PolicyAssignment[] @relation("UserPolicyAssignments")
   assignedByPolicies  PolicyAssignment[] @relation("PolicyAssigner")
   revokedByPolicies   PolicyAssignment[] @relation("PolicyRevoker")
+  assignedMilestones  RoadmapMilestone[] @relation("MilestoneAssignee")
+  createdMilestones   RoadmapMilestone[] @relation("MilestoneCreator")
+  createdCalendarEvents CalendarEvent[]  @relation("CalendarEventCreator")
+  assignedCalendarEvents CalendarEvent[] @relation("CalendarEventAssignee")
 }
 
 model PatentProject {
@@ -141,6 +145,8 @@ model PatentProject {
   filingEvents       FilingEvent[]
   aiAnalyses         AIAnalysis[]
   ipcClassifications PatentProjectIPC[]
+  roadmapMilestones  RoadmapMilestone[]
+  calendarEvents     CalendarEvent[]
 
   @@index([organizationId])
 }
@@ -250,6 +256,8 @@ model Task {
   createdBy   String?
   assignedToId String?
   assignedTo   User?        @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  roadmapMilestones RoadmapMilestone[]
+  calendarEvents    CalendarEvent[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -564,6 +572,7 @@ model Deadline {
   completedAt    DateTime?
   description    String?       @db.Text
   reminderSent   Boolean       @default(false)
+  roadmapMilestones RoadmapMilestone[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -662,6 +671,7 @@ model Organization {
   trial              Trial?
   payments           Payment[]
   entitlements       Entitlement[]
+  calendarEvents     CalendarEvent[]
 }
 
 model Policy {
@@ -857,3 +867,82 @@ model WebhookEvent {
   @@index([eventId])
   @@index([eventType])
 }
+
+model RoadmapMilestone {
+  id                    String            @id @default(uuid())
+  projectId             String
+  project               PatentProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title                 String
+  description           String?           @db.Text
+  stageKey              String?           // DEFINE_INVENTION, PRIOR_ART, AI_ANALYSIS, DRAFT_SPECIFICATION, CLAIMS_ENGINEERING, GUIDE_REVIEW, FILING_READINESS
+  isDefault             Boolean           @default(false)
+  orderIndex            Int               @default(0)
+  status                String            @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, BLOCKED
+  startDate             DateTime?
+  dueDate               DateTime?
+  completedAt           DateTime?
+  progress              Int               @default(0) // 0 - 100
+  notes                 String?           @db.Text
+  assignedToId          String?
+  assignedTo            User?             @relation("MilestoneAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  dependencyMilestoneId String?
+  dependencyMilestone   RoadmapMilestone? @relation("MilestoneDependency", fields: [dependencyMilestoneId], references: [id], onDelete: SetNull)
+  dependentMilestones   RoadmapMilestone[] @relation("MilestoneDependency")
+  taskId                String?
+  task                  Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  deadlineId            String?
+  deadline              Deadline?         @relation(fields: [deadlineId], references: [id], onDelete: SetNull)
+  createdById           String?
+  createdBy             User?             @relation("MilestoneCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  calendarEvents        CalendarEvent[]
+
+  @@index([projectId, orderIndex])
+  @@index([projectId, status])
+  @@index([assignedToId])
+}
+
+model CalendarEvent {
+  id              String            @id @default(uuid())
+  title           String
+  description     String?           @db.Text
+  eventType       String            @default("CUSTOM") // PATENT_DEADLINE, ROADMAP_MILESTONE, PROJECT_TASK, GUIDE_MEETING, EXPERT_REVIEW, TEAM_MEETING, REMINDER, CUSTOM
+  startDate       DateTime
+  endDate         DateTime
+  allDay          Boolean           @default(false)
+  location        String?
+  meetingUrl      String?
+  notes           String?           @db.Text
+  status          String            @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  reminderMinutes Int?              // 15, 30, 60, 1440
+  reminderSent    Boolean           @default(false)
+
+  projectId       String?
+  project         PatentProject?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  milestoneId     String?
+  milestone       RoadmapMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+
+  taskId          String?
+  task            Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  organizationId  String?
+  organization    Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  createdById     String
+  createdBy       User              @relation("CalendarEventCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  assignedToId    String?
+  assignedTo      User?             @relation("CalendarEventAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([projectId, startDate])
+  @@index([createdById, startDate])
+  @@index([organizationId])
+  @@index([eventType])
+}
+

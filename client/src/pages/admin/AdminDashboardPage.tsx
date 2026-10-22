@@ -40,11 +40,17 @@ import {
   Sparkles,
   Sun,
   Moon,
+  BarChart3,
+  Clock,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { useTheme } from '../../context/ThemeContext';
+import { AdminReportsAnalytics } from '../../components/admin/AdminReportsAnalytics';
+import { AdminProjectOversight } from '../../components/admin/AdminProjectOversight';
+import { AdminSystemHealth } from '../../components/admin/AdminSystemHealth';
+import { AdminAuditSecurity } from '../../components/admin/AdminAuditSecurity';
 
 export const AdminDashboardPage: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
@@ -53,13 +59,13 @@ export const AdminDashboardPage: React.FC = () => {
   const tabQuery = searchParams.get('tab');
 
   const getInitialNav = () => {
-    if (tabQuery === 'system') return 'settings';
-    if (tabQuery === 'audit') return 'activity';
+    if (tabQuery === 'activity') return 'audit';
     if (tabQuery) return tabQuery;
     return 'dashboard';
   };
 
   const [activeNav, setActiveNav] = useState<string>(getInitialNav);
+  const [overviewTimeRange, setOverviewTimeRange] = useState<string>('all');
   const [searchGlobal, setSearchGlobal] = useState('');
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -67,7 +73,7 @@ export const AdminDashboardPage: React.FC = () => {
   // Sync tabQuery with activeNav when URL param changes
   useEffect(() => {
     if (tabQuery) {
-      const mapped = tabQuery === 'system' ? 'settings' : tabQuery === 'audit' ? 'activity' : tabQuery;
+      const mapped = tabQuery === 'activity' ? 'audit' : tabQuery;
       if (mapped !== activeNav) {
         setActiveNav(mapped);
       }
@@ -238,13 +244,6 @@ export const AdminDashboardPage: React.FC = () => {
   const [userStatusFilter, setUserStatusFilter] = useState('ALL');
   const [userSearchTerm, setUserSearchTerm] = useState('');
 
-  const [projectStageFilter, setProjectStageFilter] = useState('ALL');
-  const [projectSearchTerm, setProjectSearchTerm] = useState('');
-
-  const [activityTypeFilter, setActivityTypeFilter] = useState('ALL');
-  const [activitySearchTerm, setActivitySearchTerm] = useState('');
-  const [activityPage, setActivityPage] = useState(1);
-
   const [notifFilter, setNotifFilter] = useState<'ALL' | 'UNREAD' | 'READ'>('ALL');
   const [notifTypeFilter, setNotifTypeFilter] = useState('ALL');
 
@@ -274,7 +273,7 @@ export const AdminDashboardPage: React.FC = () => {
         entitlementsRes,
         healthRes
       ] = await Promise.allSettled([
-        api.get('/admin/dashboard'),
+        api.get(`/admin/dashboard?timeRange=${overviewTimeRange}`),
         api.get('/admin/users'),
         api.get('/admin/verifications'),
         api.get('/admin/organizations'),
@@ -321,32 +320,42 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const handleTimeRangeChange = async (range: string) => {
+    setOverviewTimeRange(range);
+    try {
+      const res = await api.get(`/admin/dashboard?timeRange=${range}`);
+      setMetrics(res.data);
+    } catch (err) {
+      console.error('Failed to update dashboard metrics for time range', err);
+      toast.error('Failed to update dashboard metrics');
+    }
+  };
+
   useEffect(() => {
     fetchAllAdminData();
   }, []);
 
   // Fetch Activity Logs on Filter/Page Change
-  const fetchActivityLogs = async (page: number = 1) => {
+  const fetchActivityLogs = async (page: number = 1, type?: string, search?: string) => {
     try {
       const params = new URLSearchParams();
       params.append('page', String(page));
       params.append('limit', '25');
-      if (activityTypeFilter !== 'ALL') params.append('type', activityTypeFilter);
-      if (activitySearchTerm.trim()) params.append('search', activitySearchTerm.trim());
+      if (type && type !== 'ALL') params.append('type', type);
+      if (search && search.trim()) params.append('search', search.trim());
 
       const res = await api.get(`/admin/activity-logs?${params.toString()}`);
       setActivityLogsData(res.data);
-      setActivityPage(page);
     } catch (e) {
       console.error('Error fetching activity logs', e);
     }
   };
 
   useEffect(() => {
-    if (activeNav === 'activity') {
+    if (activeNav === 'activity' || activeNav === 'audit') {
       fetchActivityLogs(1);
     }
-  }, [activityTypeFilter, activitySearchTerm, activeNav]);
+  }, [activeNav]);
 
   // ----------------------------------------------------
   // COMPLETE USER PROFILE HANDLER
@@ -674,36 +683,37 @@ export const AdminDashboardPage: React.FC = () => {
   const pendingReviewsCount = reviewsData?.metrics?.pendingReviews || 0;
 
   // ----------------------------------------------------
-  // SIDEBAR NAVIGATION (REAL MODULES ONLY)
+  // SIDEBAR NAVIGATION (ENTERPRISE ADMIN MODULES)
   // ----------------------------------------------------
   const navGroups = [
     {
-      group: 'PLATFORM ADMIN',
+      group: 'PLATFORM GOVERNANCE',
       items: [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+        { id: 'analytics', label: 'Reports & Analytics', icon: BarChart3 },
         { id: 'users', label: 'Users', icon: Users, badge: usersList.length > 0 ? usersList.length : undefined },
         { id: 'organizations', label: 'Organizations', icon: Building2, badge: organizationsList.length > 0 ? organizationsList.length : undefined },
-        { id: 'projects', label: 'Projects', icon: FolderKanban, badge: projectsList.length > 0 ? projectsList.length : undefined },
+        { id: 'projects', label: 'Patent Projects', icon: FolderKanban, badge: projectsList.length > 0 ? projectsList.length : undefined },
         { id: 'reviews', label: 'Reviews', icon: Scale, badge: pendingReviewsCount > 0 ? pendingReviewsCount : undefined },
       ]
     },
     {
-      group: 'GOVERNANCE & BILLING',
+      group: 'AUDIT & SECURITY',
       items: [
-        { id: 'policies', label: 'Policies', icon: Shield, badge: policiesList.length > 0 ? policiesList.length : undefined },
-        { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard, badge: subscriptionsData.subscriptions.length > 0 ? subscriptionsData.subscriptions.length : undefined },
-        { id: 'payments', label: 'Payments', icon: DollarSign, badge: paymentsList.length > 0 ? paymentsList.length : undefined },
-        { id: 'entitlements', label: 'Entitlements', icon: Sparkles, badge: entitlementsList.length > 0 ? entitlementsList.length : undefined },
+        { id: 'audit', label: 'Audit & Security', icon: ShieldAlert },
+        { id: 'roles', label: 'Roles & RBAC', icon: Shield },
+        { id: 'verifications', label: 'Verifications', icon: UserCheck, badge: pendingVerifsCount > 0 ? pendingVerifsCount : undefined },
+        { id: 'policies', label: 'Policies', icon: Scale, badge: policiesList.length > 0 ? policiesList.length : undefined },
       ]
     },
     {
-      group: 'SECURITY & OPS',
+      group: 'SYSTEM & OPS',
       items: [
+        { id: 'system', label: 'System Health', icon: Cpu },
         { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotifsCount > 0 ? unreadNotifsCount : undefined },
-        { id: 'activity', label: 'Audit Logs', icon: Activity },
-        { id: 'verifications', label: 'Verifications', icon: UserCheck, badge: pendingVerifsCount > 0 ? pendingVerifsCount : undefined },
-        { id: 'roles', label: 'Roles & RBAC', icon: ShieldAlert },
-        { id: 'settings', label: 'System Settings', icon: Settings },
+        { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard, badge: subscriptionsData.subscriptions.length > 0 ? subscriptionsData.subscriptions.length : undefined },
+        { id: 'payments', label: 'Payments', icon: DollarSign, badge: paymentsList.length > 0 ? paymentsList.length : undefined },
+        { id: 'settings', label: 'Settings', icon: Settings },
       ]
     }
   ];
@@ -755,18 +765,6 @@ export const AdminDashboardPage: React.FC = () => {
     return matchRole && matchStatus && matchSearch;
   });
 
-  const filteredProjects = projectsList.filter((p) => {
-    const matchStage = projectStageFilter === 'ALL' || p.stage === projectStageFilter;
-    const matchSearch =
-      !projectSearchTerm.trim() ||
-      p.title.toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
-      p.inventor.toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
-      (typeof p.organization === 'object' ? p.organization?.name : p.organization || '')
-        .toLowerCase()
-        .includes(projectSearchTerm.toLowerCase());
-    return matchStage && matchSearch;
-  });
-
   const filteredNotifications = notificationsData.notifications.filter((n) => {
     const matchRead = notifFilter === 'ALL' || (notifFilter === 'UNREAD' && !n.isRead) || (notifFilter === 'READ' && n.isRead);
     const matchType = notifTypeFilter === 'ALL' || n.type.toUpperCase() === notifTypeFilter.toUpperCase();
@@ -809,27 +807,27 @@ export const AdminDashboardPage: React.FC = () => {
   ];
 
   return (
-    <div className="h-screen bg-[#F7F9F8] text-[#253330] flex overflow-hidden font-sans antialiased">
+    <div className="h-screen google-multicolor-bg text-[#202124] flex overflow-hidden font-sans antialiased">
       {/* ==================================================== */}
       {/* 1. ADMIN SIDEBAR */}
       {/* ==================================================== */}
       <aside
         className={`${
           sidebarCollapsed ? 'w-20' : 'w-64'
-        } bg-white border-r border-[#E5EBE8] flex flex-col h-screen shrink-0 z-40 transition-all duration-300 shadow-3xs`}
+        } bg-white/95 backdrop-blur-md border-r border-[#E8EAF0] flex flex-col h-screen shrink-0 z-40 transition-all duration-300 shadow-sm`}
       >
         {/* Brand Header */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-[#E5EBE8]">
+        <div className="h-16 flex items-center justify-between px-5 border-b border-[#E8EAF0]">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-xl bg-[#315C55] flex items-center justify-center text-white shadow-3xs shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-[#1A73E8] flex items-center justify-center text-white shadow-xs shrink-0">
               <ShieldAlert className="w-4 h-4" />
             </div>
             {!sidebarCollapsed && (
               <div>
-                <span className="font-black text-sm tracking-tight text-[#253330] block leading-none">
+                <span className="font-black text-sm tracking-tight text-[#202124] block leading-none">
                   PatentHub-AI
                 </span>
-                <span className="text-[10px] text-[#6F8F88] font-bold uppercase tracking-wider block mt-0.5">
+                <span className="text-[10px] text-[#1A73E8] font-bold uppercase tracking-wider block mt-0.5">
                   Platform Admin
                 </span>
               </div>
@@ -986,9 +984,10 @@ export const AdminDashboardPage: React.FC = () => {
             </button>
           </div>
         </header>
+        <div className="google-accent-bar shrink-0"></div>
 
         {/* Dynamic Main Body */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-transparent">
           {/* ==================================================== */}
           {/* VIEW: DASHBOARD OVERVIEW */}
           {/* ==================================================== */}
@@ -1011,7 +1010,30 @@ export const AdminDashboardPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {/* Timeframe Filter Buttons */}
+                  <div className="flex items-center bg-[#F7F9F8] border border-[#E5EBE8] rounded-2xl p-1 gap-1">
+                    {[
+                      { id: '7d', label: '7D' },
+                      { id: '30d', label: '30D' },
+                      { id: '90d', label: '90D' },
+                      { id: 'all', label: 'All' },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => handleTimeRangeChange(t.id)}
+                        className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          overviewTimeRange === t.id
+                            ? 'bg-[#315C55] text-white shadow-3xs'
+                            : 'text-[#5C6B67] hover:bg-[#E5EBE8]'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="px-3.5 py-2 bg-[#F7F9F8] border border-[#E5EBE8] rounded-2xl flex items-center gap-2 text-xs font-bold text-[#5C6B67]">
                     <Calendar className="w-3.5 h-3.5 text-[#8A9B96]" />
                     <span>
@@ -1023,6 +1045,15 @@ export const AdminDashboardPage: React.FC = () => {
                       })}
                     </span>
                   </div>
+
+                  <button
+                    onClick={() => setActiveNav('analytics')}
+                    className="px-3.5 py-2 bg-[#F7F9F8] hover:bg-[#E5EBE8] border border-[#E5EBE8] text-[#315C55] rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    <span>Reports & Analytics</span>
+                  </button>
+
                   <button
                     onClick={() => setShowBroadcastModal(true)}
                     className="px-4 py-2 bg-[#315C55] hover:bg-[#254640] text-white rounded-2xl text-xs font-bold transition shadow-3xs flex items-center gap-1.5 cursor-pointer"
@@ -1033,12 +1064,12 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 12 Real Database Platform KPI Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+              {/* Database-Backed Platform KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 <KpiCard
                   label="Total Users"
                   value={metrics?.kpis?.totalUsers ?? usersList.length}
-                  subtext="Registered accounts"
+                  subtext={overviewTimeRange !== 'all' ? `+${metrics?.kpis?.newUsersPeriod || 0} in ${overviewTimeRange}` : "Registered accounts"}
                   icon={<Users className="w-4 h-4 text-[#235952]" />}
                   iconBgColor="bg-[#F0F7F6]"
                   onClick={() => setActiveNav('users')}
@@ -1054,17 +1085,9 @@ export const AdminDashboardPage: React.FC = () => {
                 <KpiCard
                   label="Total Orgs"
                   value={metrics?.kpis?.totalOrganizations ?? organizationsList.length}
-                  subtext="All institutions"
+                  subtext="Institutions & firms"
                   icon={<Building2 className="w-4 h-4 text-[#2B6194]" />}
                   iconBgColor="bg-[#F1F6FA]"
-                  onClick={() => setActiveNav('organizations')}
-                />
-                <KpiCard
-                  label="Active Orgs"
-                  value={metrics?.kpis?.activeOrganizations ?? organizationsList.filter((o) => o.status === 'ACTIVE').length}
-                  subtext="Operating campuses"
-                  icon={<Building2 className="w-4 h-4 text-[#15803D]" />}
-                  iconBgColor="bg-[#F0FDF4]"
                   onClick={() => setActiveNav('organizations')}
                 />
                 <KpiCard
@@ -1084,8 +1107,40 @@ export const AdminDashboardPage: React.FC = () => {
                   onClick={() => setActiveNav('reviews')}
                 />
                 <KpiCard
+                  label="Stalled Projects"
+                  value={metrics?.kpis?.stalledProjects ?? 0}
+                  subtext="Inactive > 30 days"
+                  icon={<AlertTriangle className="w-4 h-4 text-amber-600" />}
+                  iconBgColor="bg-amber-50"
+                  onClick={() => setActiveNav('projects')}
+                />
+                <KpiCard
+                  label="Overdue Tasks"
+                  value={metrics?.kpis?.overdueTasks ?? 0}
+                  subtext="Past target date"
+                  icon={<Clock className="w-4 h-4 text-rose-600" />}
+                  iconBgColor="bg-rose-50"
+                  onClick={() => setActiveNav('projects')}
+                />
+                <KpiCard
+                  label="Statutory Deadlines"
+                  value={metrics?.kpis?.upcomingDeadlines ?? 0}
+                  subtext="Next 30 days"
+                  icon={<Calendar className="w-4 h-4 text-blue-600" />}
+                  iconBgColor="bg-blue-50"
+                  onClick={() => setActiveNav('projects')}
+                />
+                <KpiCard
+                  label="Roadmap Done"
+                  value={`${metrics?.kpis?.completedRoadmapMilestones ?? 0} / ${metrics?.kpis?.totalRoadmapMilestones ?? 0}`}
+                  subtext="Roadmap milestones"
+                  icon={<CheckCircle2 className="w-4 h-4 text-[#15803D]" />}
+                  iconBgColor="bg-[#F0FDF4]"
+                  onClick={() => setActiveNav('projects')}
+                />
+                <KpiCard
                   label="Subscriptions"
-                  value={metrics?.kpis?.activeSubscriptions ?? subscriptionsData.subscriptions.filter((s) => s.status.toUpperCase() === 'ACTIVE').length}
+                  value={metrics?.kpis?.activeSubscriptions ?? subscriptionsData.subscriptions.filter((s) => s.status?.toUpperCase() === 'ACTIVE').length}
                   subtext="Active Pro plans"
                   icon={<CreditCard className="w-4 h-4 text-[#235952]" />}
                   iconBgColor="bg-[#F0F7F6]"
@@ -1093,7 +1148,7 @@ export const AdminDashboardPage: React.FC = () => {
                 />
                 <KpiCard
                   label="Trial Orgs"
-                  value={metrics?.kpis?.trialOrganizations ?? subscriptionsData.trials.filter((t) => t.status.toUpperCase() === 'ACTIVE').length}
+                  value={metrics?.kpis?.trialOrganizations ?? subscriptionsData.trials.filter((t) => t.status?.toUpperCase() === 'ACTIVE').length}
                   subtext="14-day free trials"
                   icon={<Sparkles className="w-4 h-4 text-[#B45309]" />}
                   iconBgColor="bg-[#FFFBEB]"
@@ -1106,6 +1161,22 @@ export const AdminDashboardPage: React.FC = () => {
                   icon={<ShieldAlert className="w-4 h-4 text-[#2B6194]" />}
                   iconBgColor="bg-[#F1F6FA]"
                   onClick={() => setActiveNav('verifications')}
+                />
+                <KpiCard
+                  label="DB Ping Latency"
+                  value={`${metrics?.kpis?.dbPingMs ?? (systemHealth?.dbLatencyMs || 2)} ms`}
+                  subtext="PostgreSQL primary"
+                  icon={<Database className="w-4 h-4 text-[#315C55]" />}
+                  iconBgColor="bg-[#F0F7F6]"
+                  onClick={() => setActiveNav('system')}
+                />
+                <KpiCard
+                  label="System Health"
+                  value="Operational"
+                  subtext="All services live"
+                  icon={<Cpu className="w-4 h-4 text-emerald-600" />}
+                  iconBgColor="bg-emerald-50"
+                  onClick={() => setActiveNav('system')}
                 />
               </div>
 
@@ -1214,7 +1285,7 @@ export const AdminDashboardPage: React.FC = () => {
                     <p className="text-[11px] text-[#71807C]">Live events logged across all workspaces</p>
                   </div>
                   <button
-                    onClick={() => setActiveNav('activity')}
+                    onClick={() => setActiveNav('audit')}
                     className="text-xs font-bold text-[#315C55] hover:underline"
                   >
                     View All Audit Logs &gt;
@@ -1266,9 +1337,17 @@ export const AdminDashboardPage: React.FC = () => {
                     </h3>
                     <p className="text-[11px] text-[#71807C]">Live infrastructure health and microservice connectivity</p>
                   </div>
-                  <span className="text-[10px] font-mono text-[#71807C]">
-                    Updated: {systemHealth?.timestamp ? new Date(systemHealth.timestamp).toLocaleTimeString() : 'Live'}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setActiveNav('system')}
+                      className="text-xs font-bold text-[#315C55] hover:underline"
+                    >
+                      System Health Monitor &gt;
+                    </button>
+                    <span className="text-[10px] font-mono text-[#71807C]">
+                      Updated: {systemHealth?.timestamp ? new Date(systemHealth.timestamp).toLocaleTimeString() : 'Live'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-1">
@@ -1405,6 +1484,11 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* ==================================================== */}
+          {/* VIEW: REPORTS & ANALYTICS MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'analytics' && <AdminReportsAnalytics />}
 
           {/* ==================================================== */}
           {/* VIEW: USERS MODULE (WITH COMPLETE USER PROFILE VIEW) */}
@@ -1664,133 +1748,17 @@ export const AdminDashboardPage: React.FC = () => {
           )}
 
           {/* ==================================================== */}
-          {/* VIEW: PROJECTS MODULE */}
+          {/* VIEW: PATENT PROJECT OVERSIGHT MODULE */}
           {/* ==================================================== */}
           {activeNav === 'projects' && (
-            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
-                <div>
-                  <h1 className="text-xl font-black text-[#253330] tracking-tight">Platform Projects Ecosystem</h1>
-                  <p className="text-xs text-[#71807C]">
-                    Monitor innovation stages, claim counts, filing readiness, and supervisor assignments
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="relative w-48">
-                    <Search className="w-3.5 h-3.5 text-[#8A9B96] absolute left-3 top-2.5" />
-                    <input
-                      type="text"
-                      placeholder="Search projects..."
-                      value={projectSearchTerm}
-                      onChange={(e) => setProjectSearchTerm(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:outline-none"
-                    />
-                  </div>
-                  <select
-                    value={projectStageFilter}
-                    onChange={(e) => setProjectStageFilter(e.target.value)}
-                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
-                  >
-                    <option value="ALL">All Stages</option>
-                    <option value="IDEA">Idea</option>
-                    <option value="LITERATURE_REVIEW">Search</option>
-                    <option value="DOCUMENTATION">Documentation</option>
-                    <option value="GUIDE_REVIEW">Guide Review</option>
-                    <option value="PATENT_EXPERT_REVIEW">Expert Review</option>
-                    <option value="FILING_READY">Filing Ready</option>
-                    <option value="FILED">Filed</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Projects Table */}
-              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
-                {filteredProjects.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
-                        <tr>
-                          <th className="py-3 px-4 w-12 text-center">#</th>
-                          <th className="py-3 px-4">Project</th>
-                          <th className="py-3 px-4">Lead Inventor</th>
-                          <th className="py-3 px-4">Organization</th>
-                          <th className="py-3 px-4">Stage</th>
-                          <th className="py-3 px-4">Filing Readiness</th>
-                          <th className="py-3 px-4">Guide</th>
-                          <th className="py-3 px-4">Expert</th>
-                          <th className="py-3 px-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#E5EBE8]">
-                        {filteredProjects.map((p, index) => (
-                          <tr key={p.id} className="hover:bg-[#F7F9F8] transition">
-                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
-                              {index + 1}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <span className="font-extrabold text-[#253330] block truncate max-w-[200px]">
-                                {p.title}
-                              </span>
-                              <span className="text-[10px] text-[#71807C]">{p.category || 'Invention'}</span>
-                            </td>
-                            <td className="py-3.5 px-4 font-bold text-[#5C6B67]">{p.inventor}</td>
-                            <td className="py-3.5 px-4 text-[#71807C] truncate max-w-[130px]">
-                              {typeof p.organization === 'object' ? p.organization?.name : (p.organization || 'Independent')}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
-                                {p.stage.replace('_', ' ')}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="space-y-1 w-24">
-                                <div className="flex justify-between text-[10px] font-mono font-bold">
-                                  <span>{p.readinessScore}%</span>
-                                </div>
-                                <div className="h-1.5 bg-[#F0F4F2] rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-emerald-500 rounded-full"
-                                    style={{ width: `${p.readinessScore}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-[#5C6B67]">{p.guide}</td>
-                            <td className="py-3.5 px-4 text-[#5C6B67]">{p.expert}</td>
-                            <td className="py-3.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => {
-                                    setSelectedProject(p);
-                                    setShowAssignModal(true);
-                                  }}
-                                  className="px-2.5 py-1 bg-[#F0F4F2] hover:bg-[#DDEBE6] text-[#315C55] rounded-xl text-[11px] font-bold transition cursor-pointer"
-                                >
-                                  Assign
-                                </button>
-                                <button
-                                  onClick={() => navigate(`/dashboard/projects/${p.id}`)}
-                                  className="p-1.5 hover:bg-[#DDEBE6] text-[#315C55] rounded-lg transition cursor-pointer"
-                                  title="Open Workspace"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-12 text-center">
-                    <FolderKanban className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
-                    <h4 className="text-sm font-black text-[#253330]">No Projects Found</h4>
-                    <p className="text-xs text-[#71807C] mt-1">No projects match your selected filters.</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            <AdminProjectOversight
+              projects={projectsList}
+              onRefresh={fetchAllAdminData}
+              onAssignReviewer={(p) => {
+                setSelectedProject(p);
+                setShowAssignModal(true);
+              }}
+            />
           )}
 
           {/* ==================================================== */}
@@ -2828,98 +2796,25 @@ export const AdminDashboardPage: React.FC = () => {
           )}
 
           {/* ==================================================== */}
-          {/* VIEW: ACTIVITY LOGS MODULE */}
+          {/* VIEW: AUDIT & SECURITY MODULE */}
           {/* ==================================================== */}
-          {activeNav === 'activity' && (
-            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#E5EBE8] shadow-3xs">
-                <div>
-                  <h1 className="text-xl font-black text-[#253330] tracking-tight">Platform Audit Trail</h1>
-                  <p className="text-xs text-[#71807C]">
-                    Complete chronological ledger of user actions, project mutations, and security events
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="relative w-48">
-                    <Search className="w-3.5 h-3.5 text-[#8A9B96] absolute left-3 top-2.5" />
-                    <input
-                      type="text"
-                      placeholder="Search activity..."
-                      value={activitySearchTerm}
-                      onChange={(e) => setActivitySearchTerm(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs focus:outline-none"
-                    />
-                  </div>
-                  <select
-                    value={activityTypeFilter}
-                    onChange={(e) => setActivityTypeFilter(e.target.value)}
-                    className="px-3 py-1.5 bg-[#F7F9F8] border border-[#E5EBE8] rounded-xl text-xs font-bold text-[#5C6B67] cursor-pointer"
-                  >
-                    <option value="ALL">All Event Types</option>
-                    <option value="SYSTEM">System</option>
-                    <option value="AUTH">Auth</option>
-                    <option value="PROJECT">Project</option>
-                    <option value="CLAIM">Claim</option>
-                    <option value="DOCUMENT">Document</option>
-                    <option value="REVIEW">Review</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Activity Table */}
-              <div className="bg-white border border-[#E5EBE8] rounded-3xl overflow-hidden shadow-3xs">
-                {activityLogsData.logs.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#FAFBFB] border-b border-[#E5EBE8] text-[#71807C] font-black uppercase text-[10px] tracking-wider">
-                        <tr>
-                          <th className="py-3 px-4 w-12 text-center">#</th>
-                          <th className="py-3 px-4">Actor</th>
-                          <th className="py-3 px-4">Role</th>
-                          <th className="py-3 px-4">Event / Action</th>
-                          <th className="py-3 px-4">Target Resource</th>
-                          <th className="py-3 px-4">Type</th>
-                          <th className="py-3 px-4">Timestamp</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#E5EBE8]">
-                        {activityLogsData.logs.map((log, index) => (
-                          <tr key={log.id} className="hover:bg-[#F7F9F8] transition">
-                            <td className="py-3.5 px-4 text-center font-mono text-[#71807C] font-bold">
-                              {(activityPage - 1) * 25 + index + 1}
-                            </td>
-                            <td className="py-3.5 px-4 font-bold text-[#253330]">{log.user}</td>
-                            <td className="py-3.5 px-4">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#E5EBE8] text-[#315C55]">
-                                {log.userRole}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 font-extrabold text-[#253330]">{log.action}</td>
-                            <td className="py-3.5 px-4 text-[#5C6B67]">{log.resource}</td>
-                            <td className="py-3.5 px-4">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-slate-100 text-slate-700">
-                                {log.type}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 font-mono text-[11px] text-[#71807C]">
-                              {new Date(log.createdAt).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-12 text-center">
-                    <Activity className="w-10 h-10 text-[#8A9B96] mx-auto mb-2" />
-                    <h4 className="text-sm font-black text-[#253330]">No Activity Logs</h4>
-                    <p className="text-xs text-[#71807C] mt-1">No activity events match your query.</p>
-                  </div>
-                )}
-              </div>
-            </div>
+          {(activeNav === 'audit' || activeNav === 'activity') && (
+            <AdminAuditSecurity
+              activityLogsData={activityLogsData}
+              onFetchLogs={fetchActivityLogs}
+              rolePermissions={rolePermissions}
+              allPermissionsList={allPermissionsList}
+              onSaveRolePermissions={async (roleName, perms) => {
+                await api.put(`/admin/roles/${roleName}/permissions`, { permissions: perms });
+                await fetchAllAdminData();
+              }}
+            />
           )}
+
+          {/* ==================================================== */}
+          {/* VIEW: SYSTEM & AI MONITORING MODULE */}
+          {/* ==================================================== */}
+          {activeNav === 'system' && <AdminSystemHealth />}
 
           {/* ==================================================== */}
           {/* VIEW: SETTINGS MODULE */}

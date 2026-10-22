@@ -1,13 +1,25 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import { AdminService } from '../services/adminService';
+import { AdminAnalyticsService } from '../services/adminAnalyticsService';
 
 export const getDashboardMetrics = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const data = await AdminService.getDashboardMetrics();
+    const timeRange = (req.query.timeRange as string) || 'all';
+    const data = await AdminService.getDashboardMetrics(timeRange);
     res.status(200).json(data);
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to fetch admin dashboard metrics.' });
+  }
+};
+
+export const getReports = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const timeRange = (req.query.timeRange as string) || '30d';
+    const reports = await AdminAnalyticsService.getReports(timeRange);
+    res.status(200).json(reports);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch platform reports & analytics.' });
   }
 };
 
@@ -25,7 +37,7 @@ export const updateUserStatus = async (req: AuthenticatedRequest, res: Response)
   try {
     const id = req.params.id as string;
     const { isActive } = req.body;
-    const user = await AdminService.updateUserStatus(id, Boolean(isActive));
+    const user = await AdminService.updateUserStatus(id, Boolean(isActive), req.user?.userId);
     res.status(200).json({ message: 'User status updated successfully.', user });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to update user status.' });
@@ -36,7 +48,7 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response): 
   try {
     const id = req.params.id as string;
     const { roleName } = req.body;
-    const user = await AdminService.updateUserRole(id, roleName);
+    const user = await AdminService.updateUserRole(id, roleName, req.user?.userId);
     res.status(200).json({ message: 'User role updated successfully.', user });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to update user role.' });
@@ -51,7 +63,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
       res.status(400).json({ message: 'You cannot delete your own logged-in admin account.' });
       return;
     }
-    const result = await AdminService.deleteUser(id);
+    const result = await AdminService.deleteUser(id, req.user?.userId);
     res.status(200).json(result);
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to delete user account.' });
@@ -71,7 +83,7 @@ export const processVerification = async (req: AuthenticatedRequest, res: Respon
   try {
     const id = req.params.id as string;
     const { decision, notes } = req.body;
-    const result = await AdminService.processVerification(id, decision, notes);
+    const result = await AdminService.processVerification(id, decision, notes, req.user?.userId);
     res.status(200).json({ message: `Verification decision recorded: ${decision}`, application: result });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to process verification.' });
@@ -287,7 +299,7 @@ export const updateOrganizationStatus = async (req: AuthenticatedRequest, res: R
       res.status(400).json({ message: 'Status is required.' });
       return;
     }
-    const result = await AdminService.updateOrganizationStatus(id, status);
+    const result = await AdminService.updateOrganizationStatus(id, status, req.user?.userId);
     res.status(200).json({ message: 'Organization status updated.', organization: result });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to update organization status.' });

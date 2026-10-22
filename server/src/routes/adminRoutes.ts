@@ -40,6 +40,7 @@ import {
   getAuditLogs,
   getSystemHealth,
   toggleNotificationStatus,
+  getReports,
 } from '../controllers/adminController';
 
 const router = Router();
@@ -49,6 +50,8 @@ router.use(authenticateToken as any);
 router.use(authorize((user) => AuthenticationPolicy.isAdmin(user)) as any);
 
 router.get('/dashboard', getDashboardMetrics as any);
+router.get('/reports', getReports as any);
+router.get('/analytics/reports', getReports as any);
 
 // Users
 router.get('/users', getUsers as any);
