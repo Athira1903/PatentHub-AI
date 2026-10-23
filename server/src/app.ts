@@ -52,6 +52,16 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/ipc', searchIPC);
 
+// Root welcome / status endpoint
+app.get('/', (_req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'online',
+    service: 'PatentHub AI Backend Service',
+    health: '/api/health',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Health check endpoint
 app.get('/api/health', (_req: Request, res: Response) => {
   res.status(200).json({
