@@ -12,8 +12,8 @@ const startServer = async () => {
     await seedRoles();
     console.log('✅ Default roles (Inventor, Guide, CoInventor, PatentExpert, Admin) verified in DB.');
 
-    app.listen(PORT, () => {
-      console.log(`🚀 PatentHub AI Backend server running on http://localhost:${PORT}`);
+    app.listen(Number(PORT), '0.0.0.0', () => {
+      console.log(`🚀 PatentHub AI Backend server running on port ${PORT} (0.0.0.0)`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
